@@ -1,0 +1,42 @@
+{
+  "name": "frame-master",
+  "type": "module",
+  "version": "1.0.0",
+  "baseUrl": ".",
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "bin": {
+    "frame-master": "bin/index.ts"
+  },
+  "dependencies": {
+    "@shpaw415/webtoken": "^1.0.0",
+    "@types/react-dom": "^19.2.0",
+    "commander": "^14.0.1",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  },
+  "keywords": [
+    "framework",
+    "full-stack",
+    "front-end",
+    "backend",
+    "web",
+    "server",
+    "bun"
+  ],
+  "engines": {
+    "bun": "1.2.x"
+  },
+  "scripts": {
+    "dev": "bun run bin/index.ts dev"
+  },
+  "exports": {
+    "./runtime": "./src/server/runtime-loader.ts",
+    "./plugin/default/*": "./src/plugins/default-plugins/*/index.ts",
+    "./server": "./src/server/index.ts"
+  }
+}
