@@ -1,4 +1,3 @@
 import Serve from "frame-master/server";
 
-
-Serve();
+const server = Serve();

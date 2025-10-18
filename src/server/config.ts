@@ -1,7 +1,14 @@
 import type { FrameMasterConfig } from "./type";
 import { join } from "path";
 
-const config = (await import(join(process.cwd(), "config", "config.ts"))).default as FrameMasterConfig;
+const config = (await import(join(process.cwd(), "config", "config.ts")))
+  .default as FrameMasterConfig;
 
+if (config.HTTPServer.port == undefined) {
+  config.HTTPServer.port = 3000;
+}
+if (config.DevServer.port == undefined) {
+  config.DevServer.port = 3001;
+}
 
 export default config;

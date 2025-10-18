@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     // Environment setup & latest features
-    "lib": ["ESNext"],
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "target": "ESNext",
     "module": "Preserve",
     "moduleDetection": "force",
@@ -26,7 +26,20 @@
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "frame-master/*": ["./src/*"],
+      "frame-master/plugin": ["./src/plugins/index.ts"],
+      "frame-master/plugin/types": ["./src/plugins/types.ts"],
+      "frame-master/plugin/react": ["./src/plugins/react-stack/index.ts"],
+      "frame-master/server": ["./src/server/index.ts"],
+      "frame-master/runtime": ["./src/server/runtime-loader.ts"],
+      "frame-master/server/type": ["./src/server/type.ts"]
     }
-  }
+  },
+  "include": [
+    "src/**/*",
+    "bin/**/*",
+    "config/**/*",
+    ".frame-master/frame-master-custom-type.d.ts"
+  ]
 }

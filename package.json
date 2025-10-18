@@ -7,14 +7,15 @@
     "@types/bun": "latest"
   },
   "peerDependencies": {
-    "typescript": "^5"
+    "typescript": "^5.9.3"
   },
   "bin": {
     "frame-master": "bin/index.ts"
   },
   "dependencies": {
     "@shpaw415/webtoken": "^1.0.0",
-    "@types/react-dom": "^19.2.0",
+    "@types/react-dom": "^19.2.1",
+    "chalk": "^5.6.2",
     "commander": "^14.0.1",
     "react": "19.2.0",
     "react-dom": "19.2.0"
@@ -32,11 +33,14 @@
     "bun": "1.2.x"
   },
   "scripts": {
-    "dev": "bun run bin/index.ts dev"
+    "dev": "bun bin/index.ts dev"
   },
   "exports": {
     "./runtime": "./src/server/runtime-loader.ts",
-    "./plugin/default/*": "./src/plugins/default-plugins/*/index.ts",
-    "./server": "./src/server/index.ts"
+    "./server": "./src/server/index.ts",
+    "./server/type": "./src/server/type.ts",
+    "./plugin/types": "./src/plugins/types.ts",
+    "./plugin": "./src/plugins/index.ts",
+    "./plugin/react": "./src/plugins/react-stack/index.ts"
   }
 }

@@ -1,13 +1,23 @@
 import config from "./config";
-import { MasterRequest } from "./request-manager";
+import { masterRequest } from "./request-manager";
+import masterRoutes from "./frame-master-routes";
+import { logRequest } from "./log";
 
+const { routes, ...rest } = config.HTTPServer;
 
-
-export default () => Bun.serve({
-    ...(config.HTTPServer as {}),
-    fetch: async (request) => {
-        const reqManager = new MasterRequest({ request });
-        return reqManager.handleRequest();
+export default () =>
+  Bun.serve({
+    development: {
+      chromeDevToolsAutomaticWorkspaceFolders: true,
+      hmr: true,
     },
-});
+    ...(rest as {}),
+    fetch: (request) => {
+      // Log the incoming request
+      logRequest(request);
 
+      const reqManager = new masterRequest({ request });
+      return reqManager.handleRequest();
+    },
+    routes: { ...routes, ...masterRoutes },
+  });
