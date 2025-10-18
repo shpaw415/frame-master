@@ -11,6 +11,8 @@ export const PATH_TO_FRAME_MASTER = join(
 
 export const PATH_TO_DEFAULT_CONFIG_FILE = join(
   PATH_TO_FRAME_MASTER,
+  "bin",
+  "init",
   "config.default.ts"
 ) as `<cwd>/config.default.ts`;
 
