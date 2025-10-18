@@ -17,8 +17,8 @@ export const PATH_TO_DEFAULT_CONFIG_FILE = join(
 ) as `<cwd>/config.default.ts`;
 
 async function init() {
-  await copyConfigFileToProject();
-  await copyDotFrameMasterDirToProject();
+  await Promise.all([copyConfigFileToProject(), copyBunfigToProject()]);
+  copyDotFrameMasterDirToProject();
   console.log("frame-master has been initialized in your project.");
 }
 
