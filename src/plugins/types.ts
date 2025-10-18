@@ -58,13 +58,13 @@ type HTML_Rewrite_plugin_function<T = unknown> = {
 
 type Requirement = Partial<{
   /**
-   * bunextPlugins is an object where the key is the plugin name and the value is the version
+   * frameMasterPlugins is an object where the key is the plugin name and the value is the version
    *
    * this is used to check if the plugin is installed and the correct version
    *
    * if the plugin is not installed or the version is incorrect, an error will be thrown
    *
-   * @example { "bunext-plugin-name": "^1.0.0" }
+   * @example { "frame-master-plugin-name": "^1.0.0" }
    */
   frameMasterPlugins: Record<string, string>;
   frameMasterVersion: string;
@@ -84,7 +84,7 @@ export type AfterRequest_Plugin = (
 type PartialOverRideResponse =
   | Partial<{
       /**
-       * Parsed contents before Bunext processes it for internal features.
+       * Parsed contents before Frame-Master processes it for internal features.
        */
       contents: string;
       /**
@@ -120,7 +120,7 @@ type Build_Plugins = Partial<{
    */
   partialPluginOverRide: Partial<{
     /**
-     * modify tsx files in the src/pages directory before Bunext processes it for internal features.
+     * modify tsx files in the src/pages directory before Frame-Master processes it for internal features.
      *
      * **You must modify the fileContent variable and return it as contents in the response object.**
      *
@@ -145,7 +145,7 @@ type Build_Plugins = Partial<{
       fileDirectives: DirectiveTool
     ) => Promise<PartialOverRideResponse> | PartialOverRideResponse;
     /**
-     * modify ts files in the src/pages directory before Bunext processes it for internal features.
+     * modify ts files in the src/pages directory before Frame-Master processes it for internal features.
      *
      * **You must modify the fileContent variable and return it as contents in the response object.**
      *
@@ -275,19 +275,20 @@ export type FrameMasterPlugin<
        *
        * if a response is returned this will overwrite the original response
        *
-       * @example (manager: RequestManager, ipc: ClientIPCManager<"main" | "cluster">) => {
+       * @example (manager: masterRequest, ipc: ClientIPCManager<"main" | "cluster">) => {
        *  // Modify response headers and return a new response
-       *  const newHeaders = new Headers(response.headers);
+       *  const currentResponse = manager.response;
+       *  const newHeaders = new Headers(currentResponse.headers);
        *  newHeaders.set("X-Custom-Header", "value");
-       *  return new Response(manager.bunextReq.response.body, {
-       *    status: response.status,
+       *  return new Response(currentResponse.body, {
+       *    status: currentResponse.status,
        *    headers: newHeaders
        *  });
        * }
        *
-       * @example (manager: RequestManager, ipc: ClientIPCManager<"main" | "cluster">) => {
+       * @example (manager: masterRequest, ipc: ClientIPCManager<"main" | "cluster">) => {
        * // Add custom headers to the existing response
-       *  manager.bunextReq.response.headers.set("X-Custom-Header", "value");
+       *  manager.response.headers.set("X-Custom-Header", "value");
        * }
        */
       after_request: AfterRequest_Plugin;
@@ -328,10 +329,10 @@ export type FrameMasterPlugin<
      *
      * @example
      * {
-     *  bunextPlugins: {
-     *    "bunext-some-plugin": "^1.0.0"
+     *  frameMasterPlugins: {
+     *    "frame-master-some-plugin": "^1.0.0"
      *  },
-     *  bunextVersion: "^1.0.0",
+     *  frameMasterVersion: "^1.0.0",
      *  bunVersion: ">=1.0.0 <2.0.0"
      * }
      */
