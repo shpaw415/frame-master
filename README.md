@@ -172,30 +172,8 @@ export function myCustomPlugin(options = {}): FrameMasterPlugin {
       },
 
       // Runs on cluster threads in production (multi-threaded mode)
-      // **In future release**
       cluster: async () => {
         console.log("Plugin initialized on cluster thread");
-      },
-    },
-
-    // Build-time configuration
-    build: {
-      // Before build hook
-      before_build: async () => {
-        console.log("Before build step");
-      },
-
-      // After build hook
-      after_build: async (buildOutput) => {
-        console.log("Build complete:", buildOutput);
-      },
-
-      // Custom Bun plugins for build process
-      plugin: {
-        name: "my-build-plugin",
-        setup(build) {
-          // Custom build logic
-        },
       },
     },
 

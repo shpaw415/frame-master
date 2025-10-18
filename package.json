@@ -41,6 +41,7 @@
     "./server/types": "./src/server/type.ts",
     "./plugin/types": "./src/plugins/types.ts",
     "./plugin": "./src/plugins/index.ts",
-    "./plugin/react": "./src/plugins/react-stack/index.ts"
+    "./plugin/react": "./src/plugins/react-stack/index.ts",
+    "./plugin/utils": "./src/plugins/utils.ts"
   }
 }
