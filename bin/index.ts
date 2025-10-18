@@ -1,6 +1,5 @@
 import { program } from "commander";
 import { version } from "../package.json";
-import config from "@/server/config";
 import { join } from "path";
 
 type CommandOptions = {
@@ -9,6 +8,8 @@ type CommandOptions = {
   list?: boolean;
   search?: string;
 };
+
+const config = async () => (await import("@/server/config")).default;
 
 const importServerStart = () =>
   import(join(process.cwd(), ".frame-master", "server.ts"));
@@ -30,7 +31,9 @@ program
   .action(async () => {
     process.env.NODE_ENV = "development";
     console.log(
-      `Dev server running at http://localhost:${config.HTTPServer.port}`
+      `Dev server running at http://localhost:${
+        (await config()).HTTPServer.port
+      }`
     );
     await importServerStart();
   });
