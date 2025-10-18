@@ -1,4 +1,4 @@
-import type { FrameMasterConfig } from "../src/server/type";
+import type { FrameMasterConfig } from "./src/server/type";
 
 const config: FrameMasterConfig = {
   HTTPServer: {

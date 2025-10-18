@@ -12,9 +12,10 @@ import { pluginLoader } from "../plugins/plugin-loader";
 import type { BodyInit, HeadersInit, MatchedRoute } from "bun";
 import { FrameMasterError } from "./error";
 import { renderToString } from "react-dom/server";
-import type { Params } from "./type";
+import type { FrameMasterConfig, Params } from "./type";
 import { errorToJSXPage } from "./utils/error-to-jsx";
 import NotFound from "@/server/fallback/not-found";
+import ServerConfig from "./config";
 
 export type CookieOptions = Omit<_webToken, "cookieName"> & {
   encrypted?: boolean;
@@ -123,6 +124,10 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
     server: "",
     client: "",
   };
+  /**
+   * Server configuration
+   */
+  public serverConfig: FrameMasterConfig = ServerConfig;
 
   constructor(props: { request: Request }) {
     this.request = props.request;

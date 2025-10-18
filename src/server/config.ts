@@ -1,7 +1,8 @@
 import type { FrameMasterConfig } from "./type";
 import { join } from "path";
+import Paths from "@/paths";
 
-const config = (await import(join(process.cwd(), "config", "config.ts")))
+const config = (await import(join(process.cwd(), Paths.configFile)))
   .default as FrameMasterConfig;
 
 if (config.HTTPServer.port == undefined) {
