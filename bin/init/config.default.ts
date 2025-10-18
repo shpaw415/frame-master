@@ -1,4 +1,4 @@
-import type { FrameMasterConfig } from "frame-master/server/type";
+import type { FrameMasterConfig } from "frame-master/server/types";
 
 export default {
   HTTPServer: {

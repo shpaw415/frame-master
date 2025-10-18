@@ -33,7 +33,7 @@
       "frame-master/plugin/react": ["./src/plugins/react-stack/index.ts"],
       "frame-master/server": ["./src/server/index.ts"],
       "frame-master/runtime": ["./src/server/runtime-loader.ts"],
-      "frame-master/server/type": ["./src/server/type.ts"]
+      "frame-master/server/types": ["./src/server/type.ts"]
     }
   },
   "include": [
