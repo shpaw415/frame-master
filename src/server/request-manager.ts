@@ -11,7 +11,11 @@ import { join, resolve } from "path";
 import { pluginLoader } from "../plugins/plugin-loader";
 import type { BodyInit, HeadersInit, MatchedRoute } from "bun";
 import { FrameMasterError } from "./error";
-import { renderToString } from "react-dom/server";
+import {
+  renderToReadableStream,
+  renderToString,
+  type ReactDOMServerReadableStream,
+} from "react-dom/server";
 import type { FrameMasterConfig, Params } from "./type";
 import { errorToJSXPage } from "./utils/error-to-jsx";
 import NotFound from "@/server/fallback/not-found";
@@ -527,7 +531,7 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
         this.__ERROR__
       );
       return this.setResponseThenReturn(
-        new Response(renderToString(errorToJSXPage(error)))
+        new Response(await renderToReadableStream(errorToJSXPage(error)))
       );
     }
 
@@ -535,7 +539,9 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
       if (!this._response_setted) {
         return this.setResponseThenReturn(
           new Response(
-            renderToString(NotFound({ pathname: this.URL.pathname })),
+            await renderToReadableStream(
+              NotFound({ pathname: this.URL.pathname })
+            ),
             {
               status: 404,
               headers: { "Content-Type": "text/html" },
@@ -543,9 +549,26 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
           )
         );
       }
-
       // Handle string responses with potential HTML processing
-      if (typeof this._response_body !== "string")
+      if (this._response_body instanceof ReadableStream) {
+        const self = this;
+        const transformer = new TransformStream({
+          async transform(chunk, controller) {
+            let text = new TextDecoder().decode(chunk);
+
+            // Exemple : injection d’un script avant </body>
+            text = await self.applyModifiers(text);
+
+            controller.enqueue(new TextEncoder().encode(text));
+          },
+        });
+        return this.setResponseThenReturn(
+          new Response(
+            this._response_body.pipeThrough(transformer),
+            this._response_init
+          )
+        );
+      } else if (typeof this._response_body !== "string")
         return this.setResponseThenReturn(
           new Response(this._response_body as any, this._response_init)
         );
@@ -693,10 +716,11 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
       "process={env: __PROCESS_ENV__};",
     ].join(";");
     const rewriter = new HTMLRewriter();
-
-    rewriter.on("#_FrameMaster_BOOTSTRAP_SCRIPT_", {
+    rewriter.on("head", {
       element(element) {
-        element.setInnerContent(preloadSriptsStrList);
+        element.append("<script>" + preloadSriptsStrList + "</script>", {
+          html: true,
+        });
       },
     });
     html = rewriter.transform(html);

@@ -11,10 +11,6 @@ export type FrameMasterConfig = {
     "fetch" | "websocket"
   >;
   /**
-   *  WebSocket server config
-   */
-  DevServer: Omit<Bun.Serve.Options<undefined, string>, "fetch">;
-  /**
    * Frame-Master Plugins to load
    */
   plugins: FrameMasterPlugin<any>[];

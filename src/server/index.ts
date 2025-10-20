@@ -44,7 +44,7 @@ const pluginsRoutes = Object.assign(
   ...serverConfigPlugins
     .map((p) => p.pluginParent.routes)
     .filter((r) => r != undefined)
-);
+) as Bun.Serve.Routes<undefined, string>;
 
 export default async () => {
   await runOnStartMainPlugins();
@@ -94,7 +94,7 @@ async function runOnStartMainPlugins() {
 }
 
 async function runFileSystemWatcherPlugin() {
-  if (!globalThis.__DRY_RUN__) return;
+  if (!globalThis.__DRY_RUN__ || process.env.NODE_ENV == "production") return;
 
   const DirToWatch = pluginLoader
     .getPluginByName("fileSystemWatchDir")

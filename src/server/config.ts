@@ -8,8 +8,5 @@ const config = (await import(join(process.cwd(), Paths.configFile)))
 if (config.HTTPServer.port == undefined) {
   config.HTTPServer.port = 3000;
 }
-if (config.DevServer.port == undefined) {
-  config.DevServer.port = 3001;
-}
 
 export default config;

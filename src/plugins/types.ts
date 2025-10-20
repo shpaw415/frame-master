@@ -234,6 +234,10 @@ export type FrameMasterPlugin<
      * **Run on the main thread**
      *
      * **ONLY DEV MODE**
+     * 
+     * @param eventType: WatchEventType,
+       @param filePath: string,
+       @param absolutePath: string
      */
-    onFileSystemChange: FileChangeCallback;
+    onFileSystemChange?: FileChangeCallback;
   }>;

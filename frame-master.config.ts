@@ -5,9 +5,6 @@ const config: FrameMasterConfig = {
     port: 3000,
   },
   plugins: [],
-  DevServer: {
-    port: 3001,
-  },
 };
 
 export default config;
