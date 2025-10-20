@@ -18,6 +18,9 @@ export type FrameMasterConfig = {
    * Frame-Master Plugins to load
    */
   plugins: FrameMasterPlugin<any>[];
+  pluginsOptions?: Partial<{
+    disableHttpServerOptionsConflictWarning?: boolean;
+  }>;
 };
 
 export type Params = Record<string, string | string[]>;

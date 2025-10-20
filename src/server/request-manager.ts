@@ -442,7 +442,7 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
    *  var __MY_GLOBAL_VALUE__: string | undefined;
    * }
    * // then inject the value
-   * req.InjectGlobalValues({ __MY_GLOBAL_VALUE__: "my value" });
+   * req.setGlobalValues({ __MY_GLOBAL_VALUE__: "my value" });
    * // then access it in the client-side
    * console.log(globalThis.__MY_GLOBAL_VALUE__); // "my value"
    * @returns The current instance for chaining.
@@ -453,7 +453,7 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
    *
    * **Note**: If you want to prevent the injection of global values, you can use the `preventGlobalValuesInjection` method.
    */
-  InjectGlobalValues<T extends Partial<typeof globalThis>>(values: T) {
+  setGlobalValues<T extends Partial<typeof globalThis>>(values: T) {
     this._ensureisInState(
       ["before_request", "request"],
       "Global values injection is only available in the before_request and request states."

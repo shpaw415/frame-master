@@ -1,5 +1,6 @@
 import type { ClientIPCManager, DirectiveTool } from "./utils";
 import { masterRequest } from "../server/request-manager";
+import type { FileChangeCallback } from "@/server/watch";
 
 /**
  * IPCManager for the main thred
@@ -18,8 +19,7 @@ export type ServerStart = Partial<{
   /**
    * **executed on the main thread**
    */
-  main: () => //ipc: IPCMain
-  Promise<any> | any;
+  main: () => Promise<unknown> | unknown;
   /**
    * executed on dev mode on the main thread
    *
@@ -28,8 +28,7 @@ export type ServerStart = Partial<{
    * @param ipc IPC manager for the main thread
    * @returns
    */
-  dev_main: () => //ipc: IPCMain
-  Promise<any> | any;
+  dev_main: () => Promise<unknown> | unknown;
   /**
    * **executed on clusters in multi-threaded mode on the clusters thread**
    *
@@ -40,8 +39,7 @@ export type ServerStart = Partial<{
    * @param ipc IPC manager for the cluster thread
    * @returns
    */
-  cluster: () => //ipc: IPCCluster
-  Promise<any> | any;
+  cluster: () => Promise<unknown> | unknown;
 }>;
 
 type HTML_Rewrite_plugin_function<T = unknown> = {
@@ -84,17 +82,6 @@ export type AfterRequest_Plugin = (
 ) => Promise<void | Response> | void | Response;
 
 export type PreBuildContextDefaultValues = { route: string };
-
-type onFileSystemChangePlugin = (
-  filePath: string | undefined,
-  /**
-   * Prevent the build from running
-   *
-   * This is useful if you want to prevent the build from running when a file is changed
-   */
-  preventBuild: () => void
-  //ipc: IPCMain
-) => void | Promise<void>;
 
 export type PluginOptions = {
   HTMLRewrite?: unknown;
@@ -179,14 +166,6 @@ export type FrameMasterPlugin<
      * @example ["my_module/serverOnly/index.ts"]
      */
     removeFromBuild: Array<string>;
-    /**
-     * Triggered when a change is made in ./src and ./static, (add, delete, update) a file.
-     *
-     * **Run on the main thread**
-     *
-     * **ONLY DEV MODE**
-     */
-    onFileSystemChange: onFileSystemChangePlugin;
 
     /**
      * 0 has higher priority than 1
@@ -236,4 +215,25 @@ export type FrameMasterPlugin<
      *
      */
     directives: Array<{ name: string; regex: RegExp }>;
+    /**
+     * ServerConfig
+     */
+    serverConfig: Partial<
+      Omit<
+        Bun.Serve.Options<undefined, string>,
+        "fetch" | "port" | "websocket" | "tls"
+      >
+    >;
+    /**
+     * Watch directories for file system changes and trigger onFileSystemChange plugin on DEV mode.
+     */
+    fileSystemWatchDir?: Array<string>;
+    /**
+     * Triggered when a change is made in directory found in fileSystemWatchDir.
+     *
+     * **Run on the main thread**
+     *
+     * **ONLY DEV MODE**
+     */
+    onFileSystemChange: FileChangeCallback;
   }>;

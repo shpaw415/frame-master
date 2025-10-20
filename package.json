@@ -38,10 +38,10 @@
   "exports": {
     "./runtime": "./src/server/runtime-loader.ts",
     "./server": "./src/server/index.ts",
+    "./server/request": "./src/server/request-manager.ts",
     "./server/types": "./src/server/type.ts",
-    "./plugin/types": "./src/plugins/types.ts",
     "./plugin": "./src/plugins/index.ts",
-    "./plugin/react": "./src/plugins/react-stack/index.ts",
+    "./plugin/types": "./src/plugins/types.ts",
     "./plugin/utils": "./src/plugins/utils.ts"
   }
 }
