@@ -132,9 +132,11 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
    * Server configuration
    */
   public serverConfig: FrameMasterConfig = ServerConfig;
+  public serverInstance: Bun.Server<undefined>;
 
-  constructor(props: { request: Request }) {
+  constructor(props: { request: Request; server: Bun.Server<undefined> }) {
     this.request = props.request;
+    this.serverInstance = props.server;
 
     this.URL = new URL(this.request.url);
 

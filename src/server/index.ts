@@ -55,15 +55,14 @@ export default async () => {
   return Bun.serve({
     development: {
       chromeDevToolsAutomaticWorkspaceFolders: true,
-      hmr: true,
     },
     ...(pluginServerConfig as {}),
     ...(rest as {}),
-    fetch: (request) => {
+    fetch: (request, server) => {
       // Log the incoming request
       logRequest(request);
 
-      const reqManager = new masterRequest({ request });
+      const reqManager = new masterRequest({ request, server });
       return reqManager.handleRequest();
     },
     routes: { ...masterRoutes, ...routes, ...pluginsRoutes },

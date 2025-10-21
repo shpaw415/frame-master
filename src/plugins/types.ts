@@ -219,10 +219,7 @@ export type FrameMasterPlugin<
      * ServerConfig
      */
     serverConfig: Partial<
-      Omit<
-        Bun.Serve.Options<undefined, string>,
-        "fetch" | "port" | "websocket" | "tls"
-      >
+      Omit<Bun.Serve.Options<undefined, string>, "fetch" | "port" | "tls">
     >;
     /**
      * Watch directories for file system changes and trigger onFileSystemChange plugin on DEV mode.

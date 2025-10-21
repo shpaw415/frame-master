@@ -42,6 +42,7 @@
     "./server/types": "./src/server/type.ts",
     "./plugin": "./src/plugins/index.ts",
     "./plugin/types": "./src/plugins/types.ts",
-    "./plugin/utils": "./src/plugins/utils.ts"
+    "./plugin/utils": "./src/plugins/utils.ts",
+    "./config": "./src/server/config.ts"
   }
 }
