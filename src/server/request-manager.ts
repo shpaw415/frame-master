@@ -706,7 +706,7 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
       })
     );
 
-    return [HTML_DOCTYPE, transformedText].join("\n");
+    return [this.isAskingHTML ? HTML_DOCTYPE : "", transformedText].join("\n");
   }
   private async applyGlobalVariables(html: string): Promise<string> {
     if (this._prevent_global_values_injection) return html;
