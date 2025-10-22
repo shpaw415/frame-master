@@ -7,15 +7,11 @@ import {
 } from "@shpaw415/webtoken";
 import { formatHTML } from "./utils/html-formating";
 import { directiveToolSingleton, type Directives } from "../plugins/utils";
-import { join, resolve } from "path";
+import { resolve } from "path";
 import { pluginLoader } from "../plugins/plugin-loader";
-import type { BodyInit, HeadersInit, MatchedRoute } from "bun";
+import type { BodyInit, MatchedRoute } from "bun";
 import { FrameMasterError } from "./error";
-import {
-  renderToReadableStream,
-  renderToString,
-  type ReactDOMServerReadableStream,
-} from "react-dom/server";
+import { renderToReadableStream, renderToString } from "react-dom/server";
 import type { FrameMasterConfig, Params } from "./type";
 import { errorToJSXPage } from "./utils/error-to-jsx";
 import NotFound from "@/server/fallback/not-found";

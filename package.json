@@ -30,7 +30,7 @@
     "bun"
   ],
   "engines": {
-    "bun": "1.2.x"
+    "bun": ">=1.2.0"
   },
   "scripts": {
     "dev": "bun bin/index.ts dev"
@@ -43,6 +43,7 @@
     "./plugin": "./src/plugins/index.ts",
     "./plugin/types": "./src/plugins/types.ts",
     "./plugin/utils": "./src/plugins/utils.ts",
-    "./config": "./src/server/config.ts"
+    "./config": "./src/server/config.ts",
+    "./utils": "./src/utils.ts"
   }
 }
