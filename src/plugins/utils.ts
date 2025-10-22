@@ -88,6 +88,10 @@ export class DirectiveTool {
     return this;
   }
 
+  clearPaths() {
+    this.filePaths = [];
+  }
+
   static async getInstance(init?: Array<DirectiveEntry>) {
     const instance = new DirectiveTool();
     if (init) {
