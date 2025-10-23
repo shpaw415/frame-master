@@ -74,16 +74,14 @@ async function runOnStartMainPlugins() {
 
   await Promise.all(
     pluginLoader.getPluginByName("serverStart").map(async (plugin) => {
-      if (!plugin.pluginParent.main) return;
       try {
-        await plugin.pluginParent.main();
+        await plugin.pluginParent.main?.();
       } catch (error) {
         console.error(`Error in plugin ${plugin.name} main():`, error);
       }
       if (process.env.NODE_ENV != "production") {
-        if (!plugin.pluginParent.dev_main) return;
         try {
-          await plugin.pluginParent.dev_main();
+          await plugin.pluginParent.dev_main?.();
         } catch (error) {
           console.error(`Error in plugin ${plugin.name} dev_main():`, error);
         }
