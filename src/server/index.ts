@@ -14,6 +14,7 @@ globalThis.__FILESYSTEM_WATCHER__ ??= [];
 globalThis.__DRY_RUN__ ??= true;
 
 const serverConfigPlugins = pluginLoader.getPluginByName("serverConfig");
+const websockeretPlugins = pluginLoader.getPluginByName("websocket");
 
 function deepMergeServerConfig(target: any, source: any): any {
   const result = { ...target };
@@ -99,6 +100,29 @@ export default async () => {
       return reqManager.handleRequest();
     },
     routes: { ...masterRoutes, ...pluginsRoutes, ...pluginServerConfig.routes },
+    websocket: {
+      ...[
+        ...serverConfigPlugins.map((p) => p.pluginParent.websocket),
+        ...[pluginServerConfig.websocket],
+      ].reduce((curr, prev) => {
+        return deepMergeServerConfig(curr, prev || {});
+      }, {}),
+      message: (ws, message) => {
+        websockeretPlugins.forEach((plugin) => {
+          plugin.pluginParent.onMessage?.(ws, message);
+        });
+      },
+      open: (ws) => {
+        websockeretPlugins.forEach((plugin) => {
+          plugin.pluginParent.onOpen?.(ws);
+        });
+      },
+      close: (ws) => {
+        websockeretPlugins.forEach((plugin) => {
+          plugin.pluginParent.onClose?.(ws);
+        });
+      },
+    },
   });
 };
 

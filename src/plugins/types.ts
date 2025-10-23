@@ -237,4 +237,38 @@ export type FrameMasterPlugin<
        @param absolutePath: string
      */
     onFileSystemChange?: FileChangeCallback;
+    /**
+     * WebSocket event handlers for real-time communication.
+     *
+     * Note: You must upgrade the request first using:
+     * ```typescript
+     * request.serverInstance.upgrade(request.request)
+     * ```
+     *
+     * @example
+     * ```typescript
+     * websocket: {
+     *   onOpen: (ws) => {
+     *     console.log("WebSocket connected");
+     *   },
+     *   onMessage: (ws, message) => {
+     *     ws.send("Echo: " + message);
+     *   },
+     *   onClose: (ws) => {
+     *     console.log("WebSocket disconnected");
+     *   }
+     * }
+     * ```
+     */
+    websocket: Partial<{
+      /** Called when a WebSocket connection is established */
+      onOpen: (ws: Bun.ServerWebSocket<undefined>) => Promise<void> | void;
+      /** Called when a message is received from the WebSocket client */
+      onMessage: (
+        ws: Bun.ServerWebSocket<undefined>,
+        message: string | ArrayBufferView
+      ) => Promise<void> | void;
+      /** Called when the WebSocket connection is closed */
+      onClose: (ws: Bun.ServerWebSocket<undefined>) => Promise<void> | void;
+    }>;
   }>;

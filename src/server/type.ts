@@ -8,7 +8,7 @@ export type FrameMasterConfig = {
     Bun.Serve.Options<undefined, string> & {
       static?: {} | undefined;
     },
-    "fetch" | "websocket"
+    "fetch"
   >;
   /**
    * Frame-Master Plugins to load
