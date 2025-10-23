@@ -16,6 +16,9 @@ import type { FrameMasterConfig, Params } from "./type";
 import { errorToJSXPage } from "./utils/error-to-jsx";
 import NotFound from "./fallback/not-found";
 import ServerConfig from "./config";
+import { fixReactJSXDEV } from "./react-fix";
+
+fixReactJSXDEV();
 
 export type CookieOptions = Omit<_webToken, "cookieName"> & {
   encrypted?: boolean;
