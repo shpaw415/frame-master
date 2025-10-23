@@ -150,10 +150,14 @@ async function runOnStartMainPlugins() {
 async function runFileSystemWatcherPlugin() {
   if (!globalThis.__DRY_RUN__ || process.env.NODE_ENV == "production") return;
 
-  const DirToWatch = pluginLoader
-    .getPluginByName("fileSystemWatchDir")
-    .map((p) => p.pluginParent)
-    .reduce((curr, prev) => [...curr, ...prev], []);
+  const DirToWatch = [
+    ...new Set(
+      pluginLoader
+        .getPluginByName("fileSystemWatchDir")
+        .map((p) => p.pluginParent)
+        .reduce((curr, prev) => [...curr, ...prev], [])
+    ),
+  ];
 
   const OnFileSystemChangeCallbacks = pluginLoader
     .getPluginByName("onFileSystemChange")
