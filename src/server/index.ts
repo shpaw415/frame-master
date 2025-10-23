@@ -13,31 +13,65 @@ declare global {
 globalThis.__FILESYSTEM_WATCHER__ ??= [];
 globalThis.__DRY_RUN__ ??= true;
 
-const { routes, ...rest } = config.HTTPServer;
-
 const serverConfigPlugins = pluginLoader.getPluginByName("serverConfig");
 
-const pluginServerConfig = serverConfigPlugins
-  .map((p) => p.pluginParent)
-  .reduce((curr, prev) => {
-    if (config.pluginsOptions?.disableHttpServerOptionsConflictWarning) {
-      return { ...curr, ...prev };
+function deepMergeServerConfig(target: any, source: any): any {
+  const result = { ...target };
+
+  for (const [key, sourceValue] of Object.entries(source)) {
+    const targetValue = result[key];
+
+    if (sourceValue === undefined) continue;
+
+    if (targetValue === undefined) {
+      result[key] = sourceValue;
+      continue;
     }
-    const existstingKeys = Object.keys(prev);
-    const currentKeys = Object.keys(curr);
-    for (const key of currentKeys) {
-      if (
-        existstingKeys.includes(key) &&
-        typeof (curr as any)[key] != "object" &&
-        typeof (prev as any)[key] != "object"
-      ) {
-        throw new Error(
-          `Conflict in serverConfig plugins: key "${key}" exists in multiple plugins and will be overWritten.`
-        );
-      }
+
+    // Check for conflicts on non-object values
+    if (
+      !config.pluginsOptions?.disableHttpServerOptionsConflictWarning &&
+      typeof targetValue !== "object" &&
+      typeof sourceValue !== "object" &&
+      targetValue !== sourceValue
+    ) {
+      throw new Error(
+        `Conflict in serverConfig plugins: key "${key}" has conflicting values (${targetValue} vs ${sourceValue})`
+      );
     }
-    return { ...curr, ...prev };
-  }, {});
+
+    // Deep merge objects
+    if (isPlainObject(targetValue) && isPlainObject(sourceValue)) {
+      result[key] = deepMergeServerConfig(targetValue, sourceValue);
+    } else if (Array.isArray(targetValue) && Array.isArray(sourceValue)) {
+      // Concatenate arrays
+      result[key] = [...targetValue, ...sourceValue];
+    } else {
+      // Source overrides target
+      result[key] = sourceValue;
+    }
+  }
+
+  return result;
+}
+
+function isPlainObject(value: any): boolean {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    !(value instanceof Date) &&
+    !(value instanceof RegExp) &&
+    Object.prototype.toString.call(value) === "[object Object]"
+  );
+}
+
+const pluginServerConfig = deepMergeServerConfig(
+  serverConfigPlugins
+    .map((p) => p.pluginParent)
+    .reduce((curr, prev) => deepMergeServerConfig(curr, prev), {}),
+  config.HTTPServer
+) as typeof config.HTTPServer;
 
 const pluginsRoutes = Object.assign(
   {},
@@ -57,7 +91,6 @@ export default async () => {
       chromeDevToolsAutomaticWorkspaceFolders: true,
     },
     ...(pluginServerConfig as {}),
-    ...(rest as {}),
     fetch: (request, server) => {
       // Log the incoming request
       logRequest(request);
@@ -65,7 +98,7 @@ export default async () => {
       const reqManager = new masterRequest({ request, server });
       return reqManager.handleRequest();
     },
-    routes: { ...masterRoutes, ...routes, ...pluginsRoutes },
+    routes: { ...masterRoutes, ...pluginsRoutes, ...pluginServerConfig.routes },
   });
 };
 
