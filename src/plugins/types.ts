@@ -98,6 +98,8 @@ export type FrameMasterPlugin<
   options extends PluginOptions = Required<PluginOptions>
 > = Required<{
   name: string;
+  /** version must be set for requirement */
+  version: string;
 }> &
   Partial<{
     /**

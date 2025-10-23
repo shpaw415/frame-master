@@ -2,9 +2,10 @@ import config from "./config";
 import { masterRequest } from "./request-manager";
 import masterRoutes from "./frame-master-routes";
 import { logRequest } from "./log";
-import { pluginLoader } from "../plugins";
+import { pluginLoader, type FrameMasterPlugin } from "../plugins";
 import cluster from "node:cluster";
 import { createWatcher, type FileSystemWatcher } from "./watch";
+import FrameMasterPackageJson from "../../package.json";
 
 declare global {
   var __FILESYSTEM_WATCHER__: FileSystemWatcher[];
@@ -82,6 +83,7 @@ const pluginsRoutes = Object.assign(
 ) as Bun.Serve.Routes<undefined, string>;
 
 export default async () => {
+  ensurePluginRequirements();
   await runOnStartMainPlugins();
   await runFileSystemWatcherPlugin();
 
@@ -175,4 +177,58 @@ async function runFileSystemWatcherPlugin() {
       })
     )
   );
+}
+
+function ensureBunVersion(name: string, checkVersion?: string) {
+  if (checkVersion === undefined) return;
+  if (!Bun.semver.satisfies(Bun.version, checkVersion)) {
+    throw new Error(
+      `Plugin: ${name} Require Bun version ${checkVersion}, but current version is ${Bun.version}`
+    );
+  }
+}
+
+function ensureFrameMasterVersion(name: string, checkVersion?: string) {
+  if (checkVersion === undefined) return;
+  if (!Bun.semver.satisfies(FrameMasterPackageJson.version, checkVersion)) {
+    throw new Error(
+      `Plugin: ${name} require Frame Master version ${checkVersion}, but current version is ${FrameMasterPackageJson.version}`
+    );
+  }
+}
+
+function ensurePluginRequirements() {
+  const requiredPlugins = pluginLoader.getPluginByName("requirement");
+
+  for (const plugin of requiredPlugins) {
+    ensureBunVersion(plugin.name, plugin.pluginParent.bunVersion);
+    ensureFrameMasterVersion(
+      plugin.name,
+      plugin.pluginParent.frameMasterVersion
+    );
+
+    const requiredFrameMasterPlugins = plugin.pluginParent.frameMasterPlugins;
+
+    if (requiredFrameMasterPlugins) {
+      const installedPlugin = pluginLoader.getPlugins();
+
+      for (const [pluginName, version] of Object.entries(
+        requiredFrameMasterPlugins
+      ) as Array<[string, string]>) {
+        const pluginFounded = installedPlugin.find(
+          ({ name }) => name == pluginName
+        );
+
+        if (!pluginFounded) {
+          throw new Error(
+            `Plugin "${plugin.name}" requires Frame Master plugin "${pluginName}" to be installed in version ${version}. currently not installed.`
+          );
+        } else if (!Bun.semver.satisfies(pluginFounded.version, version)) {
+          throw new Error(
+            `Plugin "${plugin.name}" requires Frame Master plugin "${pluginName}" to be installed in version ${version}. currently installed version is ${pluginFounded.version}.`
+          );
+        }
+      }
+    }
+  }
 }
