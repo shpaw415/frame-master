@@ -1,14 +1,7 @@
 import { watch, type FSWatcher } from "fs";
 import { join, relative } from "path";
 import { stat, readdir } from "fs/promises";
-
-export type WatchEventType = "change" | "rename";
-
-export type FileChangeCallback = (
-  eventType: WatchEventType,
-  filePath: string,
-  absolutePath: string
-) => void | Promise<void>;
+import type { FileChangeCallback, WatchEventType } from "../plugins";
 
 export interface WatchOptions {
   /**
@@ -60,14 +53,14 @@ export class FileSystemWatcher {
    */
   private shouldIgnore(filePath: string): boolean {
     const relativePath = relative(this.options.path, filePath);
-    
+
     return this.options.ignore.some((pattern) => {
       // Simple glob-like matching
       if (pattern.startsWith("*")) {
         const ext = pattern.slice(1);
         return relativePath.endsWith(ext);
       }
-      
+
       // Check if path contains the ignore pattern
       const pathParts = relativePath.split("/");
       return pathParts.some((part) => part === pattern);
@@ -102,23 +95,20 @@ export class FileSystemWatcher {
 
     // Debounce the event
     const debounceKey = `${eventType}:${absolutePath}`;
-    
+
     if (this.debounceTimers.has(debounceKey)) {
       clearTimeout(this.debounceTimers.get(debounceKey)!);
     }
 
     const timer = setTimeout(async () => {
       this.debounceTimers.delete(debounceKey);
-      
+
       this.log(`${eventType} detected:`, absolutePath);
-      
+
       try {
         await this.options.callback(eventType, filename, absolutePath);
       } catch (error) {
-        console.error(
-          "[FileSystemWatcher] Error in callback:",
-          error
-        );
+        console.error("[FileSystemWatcher] Error in callback:", error);
       }
     }, this.options.debounceDelay);
 
@@ -136,7 +126,7 @@ export class FileSystemWatcher {
 
     try {
       const stats = await stat(dirPath);
-      
+
       if (!stats.isDirectory()) {
         return;
       }
@@ -161,7 +151,7 @@ export class FileSystemWatcher {
 
       // Recursively watch subdirectories
       const entries = await readdir(dirPath, { withFileTypes: true });
-      
+
       for (const entry of entries) {
         if (entry.isDirectory()) {
           const subDirPath = join(dirPath, entry.name);
@@ -171,10 +161,7 @@ export class FileSystemWatcher {
     } catch (error) {
       // Silently ignore errors for files that don't exist or can't be accessed
       if (this.options.verbose) {
-        console.error(
-          `[FileSystemWatcher] Error watching ${dirPath}:`,
-          error
-        );
+        console.error(`[FileSystemWatcher] Error watching ${dirPath}:`, error);
       }
     }
   }
@@ -189,32 +176,24 @@ export class FileSystemWatcher {
     }
 
     this.log("Starting file system watcher for:", this.options.path);
-    
+
     try {
       const stats = await stat(this.options.path);
-      
+
       if (stats.isDirectory()) {
         await this.watchDirectory(this.options.path);
       } else if (stats.isFile()) {
         // Watch single file
-        const watcher = watch(
-          this.options.path,
-          (eventType, filename) => {
-            this.handleEvent(eventType, filename, this.options.path);
-          }
-        );
+        const watcher = watch(this.options.path, (eventType, filename) => {
+          this.handleEvent(eventType, filename, this.options.path);
+        });
         this.watchers.set(this.options.path, watcher);
       }
-      
+
       this.isWatching = true;
-      this.log(
-        `Watching ${this.watchers.size} path(s)`
-      );
+      this.log(`Watching ${this.watchers.size} path(s)`);
     } catch (error) {
-      console.error(
-        "[FileSystemWatcher] Failed to start watcher:",
-        error
-      );
+      console.error("[FileSystemWatcher] Failed to start watcher:", error);
       throw error;
     }
   }
@@ -247,10 +226,10 @@ export class FileSystemWatcher {
         );
       }
     }
-    
+
     this.watchers.clear();
     this.isWatching = false;
-    
+
     this.log("File system watcher stopped");
   }
 
@@ -282,7 +261,7 @@ export async function createWatcher(
 
 /**
  * Example usage:
- * 
+ *
  * const watcher = await createWatcher({
  *   path: "./src",
  *   callback: async (eventType, filename, absolutePath) => {
@@ -293,7 +272,7 @@ export async function createWatcher(
  *   ignore: ["node_modules", ".git", "*.log"],
  *   verbose: true
  * });
- * 
+ *
  * // Later, to stop watching:
  * watcher.stop();
  */

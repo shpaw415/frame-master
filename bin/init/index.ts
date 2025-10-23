@@ -1,6 +1,6 @@
 import packageJson from "../../package.json";
 import { join } from "path";
-import Paths from "@/paths";
+import Paths from "../../src/paths";
 import { cpSync } from "fs";
 
 export const PATH_TO_FRAME_MASTER = join(

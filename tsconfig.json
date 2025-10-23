@@ -26,7 +26,6 @@
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false,
     "paths": {
-      "@/*": ["./src/*"],
       "frame-master/*": ["./src/*"],
       "frame-master/plugin": ["./src/plugins/index.ts"],
       "frame-master/plugin/types": ["./src/plugins/types.ts"],

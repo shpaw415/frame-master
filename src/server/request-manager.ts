@@ -14,7 +14,7 @@ import { FrameMasterError } from "./error";
 import { renderToReadableStream, renderToString } from "react-dom/server";
 import type { FrameMasterConfig, Params } from "./type";
 import { errorToJSXPage } from "./utils/error-to-jsx";
-import NotFound from "@/server/fallback/not-found";
+import NotFound from "./fallback/not-found";
 import ServerConfig from "./config";
 
 export type CookieOptions = Omit<_webToken, "cookieName"> & {

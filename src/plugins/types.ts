@@ -1,6 +1,13 @@
 import type { ClientIPCManager } from "./utils";
 import { masterRequest } from "../server/request-manager";
-import type { FileChangeCallback } from "@/server/watch";
+
+export type WatchEventType = "change" | "rename";
+
+export type FileChangeCallback = (
+  eventType: WatchEventType,
+  filePath: string,
+  absolutePath: string
+) => void | Promise<void>;
 
 /**
  * IPCManager for the main thred

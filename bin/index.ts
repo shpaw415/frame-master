@@ -10,7 +10,7 @@ type CommandOptions = {
   search?: string;
 };
 
-const config = async () => (await import("@/server/config")).default;
+const config = async () => (await import("../src/server/config")).default;
 
 const importServerStart = () =>
   import(join(process.cwd(), ".frame-master", "server.ts"));
