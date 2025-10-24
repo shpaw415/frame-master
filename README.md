@@ -189,7 +189,7 @@ export function myCustomPlugin(options = {}): FrameMasterPlugin {
           return { someData: "value" };
         },
 
-        rewrite: async (reWriter, manager, context) => {
+        rewrite: async (reWriter, master, context) => {
           // Use HTMLRewriter to modify HTML
           reWriter.on("div", {
             element(element) {
@@ -198,7 +198,7 @@ export function myCustomPlugin(options = {}): FrameMasterPlugin {
           });
         },
 
-        after: async (context, manager, HTML) => {
+        after: async (HTML, master, context) => {
           // Final HTML processing
           console.log("HTML processed");
         },
@@ -237,9 +237,6 @@ export function myCustomPlugin(options = {}): FrameMasterPlugin {
     runtimePlugins: [
       // Bun.BunPlugin instances
     ],
-
-    // Exclude paths from build
-    removeFromBuild: ["node_modules/my-package/server-only"],
   };
 }
 ```
@@ -253,7 +250,6 @@ import { myCustomPlugin } from "./plugins/my-custom-plugin";
 
 const config: FrameMasterConfig = {
   HTTPServer: { port: 3000 },
-  DevServer: { port: 3001 },
   plugins: [
     myCustomPlugin({
       // plugin options
@@ -271,14 +267,12 @@ export default config;
 ```typescript
 // frame-master.config.ts
 import type { FrameMasterConfig } from "frame-master/server/type";
-import { reactPlugin } from "frame-master/plugin/react";
+import reactPlugin from "frame-master-plugin-react-ssr/plugin";
 
 const config: FrameMasterConfig = {
   HTTPServer: { port: 3000 },
-  DevServer: { port: 3001 },
   plugins: [
     reactPlugin({
-      ssr: true,
       // React-specific options
     }),
   ],
@@ -298,9 +292,8 @@ import { databasePlugin } from "./plugins/database-plugin";
 
 const config: FrameMasterConfig = {
   HTTPServer: { port: 3000 },
-  DevServer: { port: 3001 },
   plugins: [
-    reactPlugin({ ssr: true }),
+    reactPlugin({}),
     authPlugin({
       providers: ["google", "github"],
     }),
@@ -325,9 +318,6 @@ const config: FrameMasterConfig = {
   HTTPServer: {
     port: parseInt(process.env.PORT || "3000"),
     host: "0.0.0.0",
-  },
-  DevServer: {
-    port: 3001,
   },
   plugins: [
     myFrameworkPlugin({
@@ -376,8 +366,8 @@ bun frame-master init
 # Start development server
 bun frame-master dev
 
-# Build for production
-bun frame-master build
+# start production server
+bun frame-master start
 
 # Get help
 bun frame-master --help
@@ -391,12 +381,10 @@ After running `bun frame-master init`, your project will have:
 my-project/
 ├── frame-master.config.ts    # Main configuration
 ├── .frame-master/           # Frame-Master internals
-│   ├── build/              # Build utilities
-│   ├── server.ts           # Server setup
-│   ├── preload.ts          # Runtime preloader
-│   └── frame-master-custom-type.d.ts
-├── src/                    # Your application code
-└── public/                 # Static assets
+    ├── build/              # Build utilities
+    ├── server.ts           # Server setup
+    ├── preload.ts          # Runtime preloader
+    └── frame-master-custom-type.d.ts
 ```
 
 ## 📚 Available Exports
@@ -410,12 +398,6 @@ import { utils } from "frame-master/plugin";
 
 // Server configuration
 import type { FrameMasterConfig } from "frame-master/server/type";
-
-// Runtime utilities
-import { runtime } from "frame-master/runtime";
-
-// React integration (if using React plugin)
-import { Shell } from "frame-master/plugin/react";
 ```
 
 ## 🤝 Contributing

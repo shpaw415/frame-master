@@ -57,9 +57,9 @@ type HTML_Rewrite_plugin_function<T = unknown> = {
     context: T
   ) => void | Promise<void>;
   after?: (
-    context: T,
+    HTML: string,
     manager: masterRequest,
-    HTML: string
+    context: T
   ) => void | Promise<void>;
 };
 
