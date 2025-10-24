@@ -75,7 +75,8 @@ async function setEnvFile() {
       `WEB_TOKEN_SECRET=${webToken.generateSecureSecret()}`,
   ]
     .filter((e) => e != undefined && e != null)
-    .join("\n");
+    .join("\n")
+    .trim();
 
   if (modifiedText !== envFileText) {
     return envFile.write(modifiedText);
