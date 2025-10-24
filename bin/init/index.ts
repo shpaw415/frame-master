@@ -65,7 +65,7 @@ async function addScriptsToPackageJson() {
 
 async function setEnvFile() {
   const envFile = Bun.file(join("./.env"));
-  const envFileText = await envFile.text();
+  const envFileText = (await envFile.exists()) ? await envFile.text() : "";
 
   const modifiedText = [
     envFileText,
