@@ -46,7 +46,7 @@ export type ServerStart = Partial<{
    * @param ipc IPC manager for the cluster thread
    * @returns
    */
-  cluster: () => Promise<unknown> | unknown;
+  // cluster: () => Promise<unknown> | unknown;
 }>;
 
 type HTML_Rewrite_plugin_function<T = unknown> = {
@@ -74,7 +74,13 @@ type Requirement = Partial<{
    * @example { "frame-master-plugin-name": "^1.0.0" }
    */
   frameMasterPlugins: Record<string, string>;
+  /**
+   * version requirement for frame-master itself
+   */
   frameMasterVersion: string;
+  /**
+   * version requirement for the bun runtime
+   */
   bunVersion: string;
 }>;
 
@@ -97,6 +103,7 @@ export type PluginOptions = {
 export type FrameMasterPlugin<
   options extends PluginOptions = Required<PluginOptions>
 > = Required<{
+  /** unique name of the plugin */
   name: string;
   /** version must be set for requirement */
   version: string;
@@ -170,11 +177,6 @@ export type FrameMasterPlugin<
      * You should create IPC listeners here if needed.
      */
     serverStart: ServerStart;
-    /**
-     * Paths from node_modules to force exclusion from the build
-     * @example ["my_module/serverOnly/index.ts"]
-     */
-    removeFromBuild: Array<string>;
 
     /**
      * 0 has higher priority than 1

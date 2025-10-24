@@ -40,7 +40,6 @@
     "src/**/*",
     "bin/**/*",
     "config/**/*",
-    ".frame-master/frame-master-custom-type.d.ts",
-    "frame-master.config.ts"
+    ".frame-master/frame-master-custom-type.d.ts"
   ]
 }

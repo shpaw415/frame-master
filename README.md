@@ -87,9 +87,6 @@ const config: FrameMasterConfig = {
   HTTPServer: {
     port: 3000,
   },
-  DevServer: {
-    port: 3001,
-  },
   plugins: [
     // Add your plugins here
   ],
@@ -129,26 +126,6 @@ bun frame-master dev
 
 Frame-Master's power comes from its extensible plugin architecture. Plugins handle everything from frontend frameworks to databases to authentication.
 
-### Core Plugin Categories
-
-#### Frontend Frameworks
-
-- `frame-master/plugin/react` - React with SSR support
-- Community plugins for Vue, Svelte, and more
-
-#### Backend & Runtime
-
-- `frame-master/plugin` - Core plugin utilities
-- Enhanced Bun.js integrations
-- HTTP server utilities
-
-#### Features
-
-- Authentication & authorization
-- File upload handling
-- Real-time communication
-- Caching solutions
-
 ### Creating Custom Plugins
 
 ```typescript
@@ -170,29 +147,24 @@ export function myCustomPlugin(options = {}): FrameMasterPlugin {
       dev_main: async () => {
         console.log("Plugin initialized in dev mode");
       },
-
-      // Runs on cluster threads in production (multi-threaded mode)
-      cluster: async () => {
-        console.log("Plugin initialized on cluster thread");
-      },
     },
 
     // Router hooks
     router: {
       // Before request processing
-      before_request: async (manager) => {
+      before_request: async (master) => {
         // Initialize context or inject global values
-        manager.setContext({ customData: "value" });
-        manager.InjectGlobalValues({ __MY_GLOBAL__: "data" });
+        master.setContext({ customData: "value" });
+        master.InjectGlobalValues({ __MY_GLOBAL__: "data" });
       },
 
       // Intercept and modify requests
-      request: async (manager) => {
+      request: async (master) => {
         // Access and modify request
-        console.log("Request:", manager.request.url);
+        console.log("Request:", master.request.url);
 
         // Optionally bypass with custom response
-        manager
+        master
           .setResponse("new response body", {
             header: { "x-header": "custom header" },
           })
@@ -200,9 +172,9 @@ export function myCustomPlugin(options = {}): FrameMasterPlugin {
       },
 
       // After request processing
-      after_request: async (manager) => {
+      after_request: async (master) => {
         // Modify response headers
-        const response = manager.response;
+        const response = master.response;
         if (response) {
           response.headers.set("X-Custom", "Header");
         }

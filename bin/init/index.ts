@@ -2,6 +2,7 @@ import packageJson from "../../package.json";
 import { join } from "path";
 import Paths from "../../src/paths";
 import { cpSync } from "fs";
+import { webToken } from "@shpaw415/webtoken";
 
 export const PATH_TO_FRAME_MASTER = join(
   process.cwd(),
@@ -21,6 +22,7 @@ async function init() {
     copyConfigFileToProject(),
     copyBunfigToProject(),
     addScriptsToPackageJson(),
+    setEnvFile(),
   ]);
   copyDotFrameMasterDirToProject();
   console.log("frame-master has been initialized in your project.");
@@ -59,6 +61,25 @@ async function addScriptsToPackageJson() {
   packageJson.scripts["start"] = "NODE_ENV=production bun frame-master start";
 
   return packageJsonFile.write(JSON.stringify(packageJson, null, 2));
+}
+
+async function setEnvFile() {
+  const envFile = Bun.file(join("./.env"));
+  const envFileText = await envFile.text();
+
+  const modifiedText = [
+    envFileText,
+    !envFileText.includes("WEB_TOKEN_IV=") &&
+      `WEB_TOKEN_IV=${webToken.generateSecureIV()}`,
+    !envFileText.includes("WEB_TOKEN_SECRET=") &&
+      `WEB_TOKEN_SECRET=${webToken.generateSecureSecret()}`,
+  ]
+    .filter((e) => e != undefined && e != null)
+    .join("\n");
+
+  if (modifiedText !== envFileText) {
+    return envFile.write(modifiedText);
+  }
 }
 
 export default init;
