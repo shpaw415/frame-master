@@ -39,8 +39,6 @@ export class ResponseAlreadySetError extends FrameMasterError {}
 export class ResponseNotSetError extends FrameMasterError {}
 export class NoServerSideMatchError extends FrameMasterError {}
 
-const CURRENT_PATH = process.cwd();
-
 export type RequestState = "before_request" | "request" | "after_request";
 
 export type RequestMatch = {
@@ -174,7 +172,8 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
       }
       if (this.isSendNowEnabled) break;
     }
-
+    // Finalize response
+    await this.toResponse();
     this.currentState = "after_request";
 
     for await (const { pluginParent, name } of routerPlugins) {
@@ -186,8 +185,7 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
         return this.sendErrorResponse(e);
       }
     }
-
-    await this._formatResponseBeforeSending();
+    this._triggerAwaitingCookies();
     return this._response!;
   }
 
@@ -318,11 +316,11 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
     return this;
   }
   /**
-   * Checks if the response has been set.
+   * Checks if the response has been set and exists as an object.
    * @returns True if the response has been set, false otherwise.
    */
   isResponseSetted(): boolean {
-    return this._response_setted;
+    return Boolean(this._response);
   }
   unsetResponse(): void {
     this._ensureisInState(
@@ -362,8 +360,6 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
     options?: CookieOptions,
     dataOptions?: SetDataOptions
   ) {
-    if (this.isResponseSetted())
-      return this._setCookie(name, data, options, dataOptions);
     this._awaitingCookies.push({ name, data, options, dataOptions });
     return this;
   }
@@ -410,7 +406,7 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
     this._awaitingCookieDeletion.push({ name, options });
     return this;
   }
-  public _triggerAwaitingCookies() {
+  private _triggerAwaitingCookies() {
     for (const cookie of this._awaitingCookies) {
       this._setCookie(
         cookie.name,
@@ -652,11 +648,6 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
     }
   }
 
-  public async _formatResponseBeforeSending() {
-    await this.toResponse();
-    this._triggerAwaitingCookies();
-  }
-
   private setResponseThenReturn(res: Response) {
     this._response = res;
     return this._response;
@@ -700,7 +691,7 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
     await Promise.all(
       afters.map(({ context, after, name }) => {
         try {
-          return after?.(context, this, transformedText);
+          return after?.(transformedText, this, context);
         } catch (e) {
           console.error(`Error in html_rewrite plugin, name: ${name}:`, e);
         }

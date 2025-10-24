@@ -10,7 +10,7 @@ export type FileChangeCallback = (
 ) => void | Promise<void>;
 
 /**
- * IPCManager for the main thred
+ * IPCManager for the main thread
  * used for sending messages between main, cluster and builder threads
  * ** for future release **
  */
@@ -31,9 +31,6 @@ export type ServerStart = Partial<{
    * executed on dev mode on the main thread
    *
    * **ONLY DEV MODE**
-   *
-   * @param ipc IPC manager for the main thread
-   * @returns
    */
   dev_main: () => Promise<unknown> | unknown;
   /**
@@ -42,9 +39,6 @@ export type ServerStart = Partial<{
    * This will not share the same context as the main thread.
    *
    * **ONLY IN MULTI-THREADED AND PRODUCTION MODE**
-   *
-   * @param ipc IPC manager for the cluster thread
-   * @returns
    */
   // cluster: () => Promise<unknown> | unknown;
 }>;
@@ -53,12 +47,12 @@ type HTML_Rewrite_plugin_function<T = unknown> = {
   initContext?: (req: masterRequest) => T;
   rewrite?: (
     reWriter: HTMLRewriter,
-    manager: masterRequest,
+    master: masterRequest,
     context: T
   ) => void | Promise<void>;
   after?: (
     HTML: string,
-    manager: masterRequest,
+    master: masterRequest,
     context: T
   ) => void | Promise<void>;
 };
@@ -85,12 +79,12 @@ type Requirement = Partial<{
 }>;
 
 export type Request_Plugin = (
-  request: masterRequest
+  master: masterRequest
   //ipc: ClientIPCManager<"cluster" | "main">
 ) => Promise<void> | void;
 
 export type AfterRequest_Plugin = (
-  request: masterRequest
+  master: masterRequest
   //ipc: ClientIPCManager<"cluster" | "main">
 ) => Promise<void | Response> | void | Response;
 
@@ -115,14 +109,91 @@ export type FrameMasterPlugin<
     router: Partial<{
       /**
        * Parse and rewrite HTML content before sending to the client.
+       *
+       * Allows for dynamic modifications of HTML structure, attributes, and content.
+       *
+       * **Works only if response body is `string | ReadableStream`**
+       *
+       * @example
+       * ```typescript
+       * {
+       *   initContext: (req: masterRequest) => {
+       *     return { userAgent: req.request.headers.get("user-agent") || "" };
+       *   },
+       *   rewrite: (reWriter: HTMLRewriter, master: masterRequest, context) => {
+       *     reWriter.on("title", {
+       *       element: (el) => {
+       *         el.setInnerContent(`Title for ${context.userAgent}`);
+       *       }
+       *     });
+       *   },
+       *   after: (HTML: string, master: masterRequest, context) => {
+       *     console.log("Final HTML length:", HTML.length);
+       *   }
+       * }
+       * ```
        */
       html_rewrite: HTML_Rewrite_plugin_function<options["HTMLRewrite"]>;
       /**
-       * Intercept and modify requests before they are processed by the router.
+       * Triggered before the request is processed.
+       *
+       * Allows context initialization or other pre-processing tasks.
+       *
+       * **Do not use this for modifying or setting the response.**
+       *
+       * @param manager - The masterRequest instance
+       *
+       * @example
+       * ```typescript
+       * (manager: masterRequest) => {
+       *   manager.setContext({ customValue: "value" });
+       *   manager.setGlobalValues({ __CUSTOM_GLOBAL__: "value" });
+       * }
+       * ```
+       *
+       * Get cookie and set in context example:
+       * @example
+       * ```typescript
+       * (master: masterRequest) => {
+       *    // Get a cookie named "session"
+       *    // second parameter true to decrypt if encrypted
+       *   const sessionCookie = master.getCookie<Record<string, unknown>>("session", true);
+       *   master.setContext<{ sessionData: Record<string, unknown> | null }>({
+       *     sessionData: sessionCookie || null,
+       *   });
+       * }
+       * ```
+       *
+       * Set global value example:
+       * @example
+       * ```typescript
+       *  declare global {
+       *    var __GLOBAL_VALUE__: string;
+       *  }
+       *
+       * (master: masterRequest) => {
+       *  // Set global value accessible client side
+       *   master.setGlobalValues({ __GLOBAL_VALUE__: "value" });
+       * }
+       * ```
+       */
+      before_request: (
+        master: masterRequest
+        //ipc: ClientIPCManager<"main" | "cluster">
+      ) => void | Promise<void>;
+      /**
+       * Intercept the request and set the response.
+       *
+       * Request plugin is triggered orderly based on plugin priority.
+       *
+       * if `master.sendNow()` is used the response is created immediately and no other request plugins are executed.
+       *
+       * then after_request plugins are executed orderly based on plugin priority.
+       *
+       * **At this point the response does not exists only the initializer can be setted**
+       *
        * Access the masterRequest
        * @example (req: masterRequest): Promise<masterRequest> | masterRequest | void | Promise<void> => {
-       *  req.__BYPASS_RESPONSE__ = new Response("Custom response");
-       *
        * // global injected value and rewrite plugin will be applied
        * req.setResponse("Custom response", { headers: { "X-Custom-Header": "value" } });
        *
@@ -130,42 +201,28 @@ export type FrameMasterPlugin<
        */
       request: Request_Plugin;
       /**
-       * Triggered before the request is processed.
-       *
-       * Allows context initialization or other pre-processing tasks.
-       *
-       * **Do not use this for modifying or setting the response.**
-       * @param request masterRequest
-       * @example (req: masterRequest) => {
-       *  req.setContext({ customValue: "value" });
-       *  req.InjectGlobalValues({ __CUSTOM_GLOBAL__: "value" });
-       * }
-       */
-      before_request: (
-        manager: masterRequest
-        //ipc: ClientIPCManager<"main" | "cluster">
-      ) => void | Promise<void>;
-      /**
        * Triggered after the request is processed.
-       * Allows for modifying the response before it is sent to the client or overriding the current response.
+       * Allows for modifying the response before it is sent to the client.
        *
-       * if a response is returned this will overwrite the original response
+       * @param master - The masterRequest instance
        *
-       * @example (manager: masterRequest, ipc: ClientIPCManager<"main" | "cluster">) => {
-       *  // Modify response headers and return a new response
-       *  const currentResponse = manager.response;
-       *  const newHeaders = new Headers(currentResponse.headers);
-       *  newHeaders.set("X-Custom-Header", "value");
-       *  return new Response(currentResponse.body, {
-       *    status: currentResponse.status,
-       *    headers: newHeaders
-       *  });
+       * @example
+       * Modify response headers:
+       * ```typescript
+       * (master: masterRequest) => {
+       *   master.response.headers.set("X-Custom-Header", "value");
        * }
+       * ```
        *
-       * @example (manager: masterRequest, ipc: ClientIPCManager<"main" | "cluster">) => {
-       * // Add custom headers to the existing response
-       *  manager.response.headers.set("X-Custom-Header", "value");
+       * SetCookie from context data:
+       * ```typescript
+       * (master: masterRequest) => {
+       *   const context = master.getContext<{ sessionData: string }>();
+       *   if (context.sessionData) {
+       *     master.setCookie("session", context.sessionData, { httpOnly: true, encrypted: true });
+       *   }
        * }
+       * ```
        */
       after_request: AfterRequest_Plugin;
     }>;
@@ -242,28 +299,35 @@ export type FrameMasterPlugin<
      * **Run on the main thread**
      *
      * **ONLY DEV MODE**
-     * 
-     * @param eventType: WatchEventType,
-       @param filePath: string,
-       @param absolutePath: string
+     *
+     * @param eventType - Type of file system event ("change" | "rename")
+     * @param filePath - Relative path to the changed file
+     * @param absolutePath - Absolute path to the changed file
      */
     onFileSystemChange?: FileChangeCallback;
     /**
      * WebSocket event handlers for real-time communication.
      *
-     * Note: You must upgrade the request first using:
-     * ```typescript
-     * request.serverInstance.upgrade(request.request)
-     * ```
+     * When defining WebSocket routes in serverConfig.routes, you can set custom data to identify the WebSocket connection.
+     *
+     * websocket onOpen, onMessage, and onClose handlers will receive the WebSocket instance of any other plugin as well.
+     *
+     * You can use the `ws.data` property to check if the WebSocket connection belongs to your plugin.
      *
      * @example
      * ```typescript
+     * serverConfig: {
+     *  routes: {
+     *     "/ws/my-plugin": (req, server) => server.upgrade(req, { data: { "my-plugin-ws": true } }),
+     * },
      * websocket: {
      *   onOpen: (ws) => {
      *     console.log("WebSocket connected");
      *   },
      *   onMessage: (ws, message) => {
-     *     ws.send("Echo: " + message);
+     *    if(ws.data["my-plugin-ws"]){
+     *      ws.send("Echo: " + message);
+     *    }
      *   },
      *   onClose: (ws) => {
      *     console.log("WebSocket disconnected");
