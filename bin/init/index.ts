@@ -15,7 +15,7 @@ export const PATH_TO_DEFAULT_CONFIG_FILE = join(
   "bin",
   "init",
   "config.default.ts"
-) as `<cwd>/config.default.ts`;
+) as `<frame-master-path>/config.default.ts`;
 
 async function init() {
   await Promise.all([
