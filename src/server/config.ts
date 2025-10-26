@@ -17,7 +17,7 @@ async function loadConfig(): Promise<FrameMasterConfig> {
       }
     )?.default;
 
-    if (config) return DEFAULT_CONFIG;
+    if (config) return config;
 
     console.error(`Config file is empty. Fallback to minimal config.`);
     return DEFAULT_CONFIG;
