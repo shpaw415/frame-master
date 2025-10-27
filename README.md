@@ -13,12 +13,11 @@ Frame-Master isn't just another web framework—it's a **framework maker** built
 // Want React + PostgreSQL?
 // frame-master.config.ts
 import type { FrameMasterConfig } from "frame-master/server/type";
-import { reactPlugin } from "frame-master/plugin/react";
-import { postgresPlugin } from "frame-master/plugins/postgres";
+import reactPlugin from "frame-master-plugin-react-ssr/plugin";
+import postgresPlugin from "frame-master-plugin-postgres/plugin";
 
 const config: FrameMasterConfig = {
   HTTPServer: { port: 3000 },
-  DevServer: { port: 3001 },
   plugins: [reactPlugin(), postgresPlugin()],
 };
 
@@ -29,12 +28,14 @@ export default config;
 // Prefer Vue + SQLite? Just swap plugins!
 // frame-master.config.ts
 import type { FrameMasterConfig } from "frame-master/server/type";
-import { vuePlugin } from "frame-master/plugins/vue";
-import { sqlitePlugin } from "frame-master/plugins/sqlite";
+
+// only as exemple...
+import vuePlugin from "frame-master-plugin-vuejs/plugins/vue";
+import sqlitePlugin from "frame-master-plugin-sqlite/plugin";
+// only as exemple
 
 const config: FrameMasterConfig = {
   HTTPServer: { port: 3000 },
-  DevServer: { port: 3001 },
   plugins: [vuePlugin(), sqlitePlugin()],
 };
 
@@ -47,7 +48,6 @@ export default config;
 
 - React, Vue, Svelte, Vanilla JS—your choice
 - Built exclusively for Bun.js runtime
-- Any database: PostgreSQL, MongoDB, SQLite
 
 ### 🔌 **Plugin Everything**
 
@@ -106,7 +106,7 @@ bun frame-master dev
 
 ```
 ┌─────────────────────────────────────┐
-│          Your Application          │
+│          Your Application           │
 ├─────────────────────────────────────┤
 │              Plugins                │
 │  ┌─────────┐ ┌─────────┐ ┌─────────┐│
@@ -115,10 +115,9 @@ bun frame-master dev
 │  └─────────┘ └─────────┘ └─────────┘│
 ├─────────────────────────────────────┤
 │         Frame-Master Core           │
-│   • Plugin System                  │
-│   • HTTP/Dev Server                │
-│   • Runtime Loader                 │
-│   • Build Pipeline                 │
+│   • Plugin System                   │
+│   • HTTP/Dev Server                 │
+│   • Runtime Loader                  │
 └─────────────────────────────────────┘
 ```
 
@@ -155,7 +154,8 @@ export function myCustomPlugin(options = {}): FrameMasterPlugin {
       before_request: async (master) => {
         // Initialize context or inject global values
         master.setContext({ customData: "value" });
-        master.InjectGlobalValues({ __MY_GLOBAL__: "data" });
+        // Access this value in a client context as global variable. ( globalThis.__MY_GLOBAL__ )
+        master.setGlobalValues({ __MY_GLOBAL__: "data" });
       },
 
       // Intercept and modify requests
@@ -163,7 +163,7 @@ export function myCustomPlugin(options = {}): FrameMasterPlugin {
         // Access and modify request
         console.log("Request:", master.request.url);
 
-        // Optionally bypass with custom response
+        // Set the response and skip other request plugin to trigger on this request with sendNow
         master
           .setResponse("new response body", {
             header: { "x-header": "custom header" },
@@ -173,14 +173,11 @@ export function myCustomPlugin(options = {}): FrameMasterPlugin {
 
       // After request processing
       after_request: async (master) => {
-        // Modify response headers
+        // Modify response headers or make post request processing
         const response = master.response;
         if (response) {
           response.headers.set("X-Custom", "Header");
         }
-
-        // Or return a new response to override
-        // return new Response("Override", { status: 200 });
       },
 
       // HTML rewriting
@@ -206,11 +203,11 @@ export function myCustomPlugin(options = {}): FrameMasterPlugin {
     },
 
     // File system change detection (dev mode only)
-    onFileSystemChange: async (filePath, preventBuild) => {
+    onFileSystemChange: async (eventType, filePath, absolutePath) => {
       console.log("File changed:", filePath);
-      // Optionally prevent rebuild
-      // if (shouldSkip) preventBuild();
     },
+    // watch for changes in there paths
+    fileSystemWatchDir: ["path/to/watch"]
 
     // Plugin priority (lower number = higher priority)
     priority: 0,
@@ -224,7 +221,7 @@ export function myCustomPlugin(options = {}): FrameMasterPlugin {
       bunVersion: ">=1.2.0",
     },
 
-    // Custom directives
+    // Custom directives for files for special operation or handling
     directives: [
       {
         name: "use-my-directive",
@@ -233,7 +230,7 @@ export function myCustomPlugin(options = {}): FrameMasterPlugin {
       },
     ],
 
-    // Runtime plugins for bunfig.toml
+    // Runtime plugins that will be loaded for the Bun runtime
     runtimePlugins: [
       // Bun.BunPlugin instances
     ],
@@ -273,7 +270,7 @@ const config: FrameMasterConfig = {
   HTTPServer: { port: 3000 },
   plugins: [
     reactPlugin({
-      // React-specific options
+      // React-plugin-specific options
     }),
   ],
 };
@@ -286,7 +283,7 @@ export default config;
 ```typescript
 // frame-master.config.ts
 import type { FrameMasterConfig } from "frame-master/server/type";
-import { reactPlugin } from "frame-master/plugin/react";
+import { reactPlugin } from "frame-master-plugin-react-ssr/plugin";
 import { authPlugin } from "./plugins/auth-plugin";
 import { databasePlugin } from "./plugins/database-plugin";
 
@@ -394,7 +391,7 @@ Frame-Master provides several entry points for different use cases:
 ```typescript
 // Plugin development
 import type { FrameMasterPlugin } from "frame-master/plugin/types";
-import { utils } from "frame-master/plugin";
+import { utils } from "frame-master/plugin/utils";
 
 // Server configuration
 import type { FrameMasterConfig } from "frame-master/server/type";
