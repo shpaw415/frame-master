@@ -11,7 +11,7 @@ export default async function CreateProject(props: CreatePropjectProps) {
   mkdirSync(cwd, {
     recursive: true,
   });
-  await Bun.$`bun init --yes --minimal ${props.name}`.cwd(cwd);
+  await Bun.$`bun init --yes ${props.name}`.cwd(cwd);
   await Bun.$`bun add frame-master`.cwd(cwd);
   await Bun.$`bun frame-master init`.cwd(cwd);
   if (props.type == "minimal")
