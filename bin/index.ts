@@ -20,11 +20,13 @@ program
   .description("CLI tool to manage frame-master plugins and server")
   .version(version);
 
+/*
 program
   .option("-i, --install <plugin>", "Install a plugin")
   .option("-u, --uninstall <plugin>", "Uninstall a plugin")
   .option("-l, --list", "List all installed plugins")
   .option("-s, --search <keyword>", "Search for plugins by keyword");
+*/
 
 program
   .command("dev")
