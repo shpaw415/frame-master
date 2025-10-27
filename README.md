@@ -283,7 +283,7 @@ export default config;
 ```typescript
 // frame-master.config.ts
 import type { FrameMasterConfig } from "frame-master/server/type";
-import { reactPlugin } from "frame-master-plugin-react-ssr/plugin";
+import reactPlugin from "frame-master-plugin-react-ssr/plugin";
 import { authPlugin } from "./plugins/auth-plugin";
 import { databasePlugin } from "./plugins/database-plugin";
 
