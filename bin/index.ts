@@ -57,11 +57,11 @@ program
   });
 
 program
-  .command("create <name> <type>")
+  .command("create <name>")
   .description("Create a new frame-master project")
-  .addHelpText("after", "\nAvailable project types:\n  - minimal")
-  .action(async (name: string, type: "minimal") => {
-    if (!type) type = "minimal";
+  .option("-t, --type <type>", "Type of project to create", "minimal")
+  .addHelpText("after", `\n  avalable type: [ minimal ]`)
+  .action(async (name: string, { type }: { type: "minimal" }) => {
     const createProject = (await import("./create")).default;
     await createProject({ name, type });
   });
