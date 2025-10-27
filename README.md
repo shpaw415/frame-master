@@ -67,14 +67,17 @@ export default config;
 ### Installation
 
 ```bash
-bun add frame-master
+bun add -g frame-master
 ```
 
-### Initialize Your Project
+### Create a New Project
 
 ```bash
-bun frame-master init
-# This creates frame-master.config.ts and .frame-master/ directory
+# Create a new project with the create command
+bunx frame-master create my-app
+
+# Or initialize Frame-Master in an existing project
+bunx frame-master init
 ```
 
 ### Configure Your Framework
@@ -357,13 +360,16 @@ Outgrown your current stack? With Frame-Master, you can:
 ## �️ Development Commands
 
 ```bash
-# Initialize a new Frame-Master project
+# Create a new Frame-Master project
+bun frame-master create my-app
+
+# Initialize Frame-Master in existing project
 bun frame-master init
 
 # Start development server
 bun frame-master dev
 
-# start production server
+# Start production server
 bun frame-master start
 
 # Get help
@@ -372,7 +378,7 @@ bun frame-master --help
 
 ## 📁 Project Structure
 
-After running `bun frame-master init`, your project will have:
+After running `bun frame-master create` or `bun frame-master init`, your project will have:
 
 ```
 my-project/
