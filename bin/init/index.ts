@@ -52,7 +52,7 @@ function copyDotFrameMasterDirToProject() {
 
 async function copyBunfigToProject() {
   const bunfigFile = Bun.file(
-    join(PATH_TO_FRAME_MASTER, "bin", "init", "bunfig.toml")
+    join(PATH_TO_FRAME_MASTER, "bin", "init", "bunfig.default")
   );
 
   const targetPath = join(process.cwd(), "bunfig.toml");
