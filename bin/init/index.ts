@@ -36,7 +36,7 @@ async function copyConfigFileToProject() {
     console.warn(`${Paths.configFile} already exists. Skipping copy.`);
     return;
   }
-  return targetFile.write(defaultConfigFile);
+  return targetFile.write(await defaultConfigFile.text());
 }
 
 function copyDotFrameMasterDirToProject() {
@@ -61,7 +61,7 @@ async function copyBunfigToProject() {
     console.warn(`bunfig.toml already exists. Skipping copy.`);
     return;
   }
-  return Bun.file(targetPath).write(bunfigFile);
+  return Bun.file(targetPath).write(await bunfigFile.text());
 }
 
 async function addScriptsToPackageJson() {

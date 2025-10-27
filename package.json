@@ -3,6 +3,7 @@
   "type": "module",
   "version": "1.0.0",
   "baseUrl": ".",
+  "license": "MIT",
   "devDependencies": {
     "@types/bun": "latest"
   },
