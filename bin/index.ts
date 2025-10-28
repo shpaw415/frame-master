@@ -2,6 +2,7 @@
 import { program } from "commander";
 import { version } from "../package.json";
 import { join } from "path";
+import pluginCommand from "./plugin";
 
 type CommandOptions = {
   install?: string;
@@ -67,5 +68,7 @@ program
     const createProject = (await import("./create")).default;
     await createProject({ name, type });
   });
+
+program.addCommand(pluginCommand);
 
 program.parse();
