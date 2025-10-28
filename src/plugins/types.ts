@@ -1,5 +1,6 @@
 import type { ClientIPCManager } from "./utils";
 import { masterRequest } from "../server/request-manager";
+import type { Builder } from "../build";
 
 export type WatchEventType = "change" | "rename";
 
@@ -92,6 +93,20 @@ export type PreBuildContextDefaultValues = { route: string };
 
 export type PluginOptions = {
   HTMLRewrite?: unknown;
+};
+
+export type BuildOptionsPlugin = {
+  buildConfig?: (builder: Builder) => Partial<Bun.BuildConfig>;
+  beforeBuild?: (
+    buildConfig: Bun.BuildConfig,
+    builder: Builder
+  ) => void | Promise<void>;
+  afterBuild?: (
+    buildConfig: Bun.BuildConfig,
+    result: Bun.BuildOutput,
+    builder: Builder
+  ) => void | Promise<void>;
+  enableLoging?: boolean;
 };
 
 export type FrameMasterPlugin<
@@ -346,4 +361,5 @@ export type FrameMasterPlugin<
       /** Called when the WebSocket connection is closed */
       onClose: (ws: Bun.ServerWebSocket<undefined>) => Promise<void> | void;
     }>;
+    build: BuildOptionsPlugin;
   }>;
