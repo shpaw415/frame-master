@@ -101,7 +101,7 @@ export class Builder {
    *   });
    * }
    */
-  async build(entrypoints: string[]): Promise<Bun.BuildOutput> {
+  async build(...entrypoints: string[]): Promise<Bun.BuildOutput> {
     this.clearBuildDir();
     const buildConfig = await this.getBuildConfig();
     buildConfig.entrypoints = [...buildConfig.entrypoints, ...entrypoints];
