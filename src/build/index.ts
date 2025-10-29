@@ -58,10 +58,10 @@ export class Builder {
    *   ]
    * });
    *
-   * const result = await builder.build([
+   * const result = await builder.build(
    *   "/path/to/src/index.tsx",
    *   "/path/to/src/client.ts"
-   * ]);
+   * );
    *
    * if (result.success) {
    *   console.log("Build successful!", result.outputs);
@@ -86,12 +86,12 @@ export class Builder {
    *   ]
    * });
    *
-   * await builder.build(["/src/app.tsx"]);
+   * await builder.build("/src/app.tsx");
    *
    * @example
    * // Access build outputs for further processing
    * const builder = Builder.createBuilder({ pluginBuildConfig: [config] });
-   * const result = await builder.build(["/src/index.ts"]);
+   * const result = await builder.build("/src/index.ts");
    *
    * if (result.success) {
    *   // Access built artifacts
@@ -157,7 +157,7 @@ export class Builder {
    *         ]
    *       });
    *
-   *       await builder.build(["/src/client.ts"]);
+   *       await builder.build("/src/client.ts");
    *     }
    *   };
    * }
@@ -527,7 +527,7 @@ const logIsEnabled = plugin.some((p) => p.pluginParent.enableLoging === true);
  *     }),
  *     build: async () => {
  *       // Use the shared builder instance
- *       const result = await builder.build(["/src/client.ts"]);
+ *       const result = await builder.build("/src/client.ts");
  *       return result.success;
  *     }
  *   };
@@ -537,7 +537,7 @@ const logIsEnabled = plugin.some((p) => p.pluginParent.enableLoging === true);
  * // Access build outputs after build completes
  * import { builder } from "frame-master/build";
  *
- * await builder.build(["/src/index.ts"]);
+ * await builder.build("/src/index.ts");
  *
  * builder.outputs?.forEach(artifact => {
  *   console.log("Generated:", artifact.path);
