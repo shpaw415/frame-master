@@ -276,24 +276,27 @@ export class Builder {
   private getBuildConfig(): Promise<Bun.BuildConfig> {
     return Promise.all(this.buildConfigFactory.map((factory) => factory(this)))
       .then((configs) =>
-        configs.reduce(this.mergeConfigSafely, {
-          entrypoints: [],
-          outdir: "",
-          splitting: true,
-          minify: process.env.NODE_ENV === "production",
-          sourcemap: process.env.NODE_ENV !== "production",
-          target: "browser",
-          external: [],
-          define: {},
-          loader: {},
-          plugins: [],
-          publicPath: "./",
-        } satisfies Bun.BuildConfig)
+        configs.reduce(
+          (prev, next) => this.mergeConfigSafely(prev as Bun.BuildConfig, next),
+          {
+            entrypoints: [],
+            outdir: "",
+            splitting: true,
+            minify: process.env.NODE_ENV === "production",
+            sourcemap: process.env.NODE_ENV !== "production",
+            target: "browser",
+            external: [],
+            define: {},
+            loader: {},
+            plugins: [],
+            publicPath: "./",
+          } satisfies Bun.BuildConfig
+        )
       )
       .then((mergedConfig) => {
-        this.currentBuildConfig = mergedConfig;
+        this.currentBuildConfig = mergedConfig as Bun.BuildConfig;
         return mergedConfig;
-      });
+      }) as Promise<Bun.BuildConfig>;
   }
 
   /**
