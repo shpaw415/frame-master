@@ -18,12 +18,14 @@ export class Builder {
   onAfterBuildHooks: Exclude<BuilderProps["afterBuilds"], undefined> = [];
   currentBuildConfig: Bun.BuildConfig | null = null;
 
-  isLogEnabled: boolean;
+  readonly isLogEnabled: boolean;
   outputs: Bun.BuildArtifact[] | null = null;
 
   constructor(props: BuilderProps) {
     this.isLogEnabled = props.enableLogging ?? true;
     this.buildConfigFactory = props.pluginBuildConfig;
+    this.onBeforeBuildHooks = props.beforeBuilds || [];
+    this.onAfterBuildHooks = props.afterBuilds || [];
   }
 
   /**
@@ -162,12 +164,7 @@ export class Builder {
    */
   static async createBuilder(props: BuilderProps): Promise<Builder> {
     const builder = new Builder(props);
-    await builder.setBuildConfig();
     return builder;
-  }
-
-  private async setBuildConfig() {
-    this.currentBuildConfig = await this.getBuildConfig();
   }
 
   /**
