@@ -6,13 +6,13 @@ import {
   type SetDataOptions,
 } from "@shpaw415/webtoken";
 import { formatHTML } from "./utils/html-formating";
-import { directiveToolSingleton, type Directives } from "../plugins/utils";
+import { directiveToolSingleton } from "../plugins/utils";
 import { resolve } from "path";
 import { pluginLoader } from "../plugins/plugin-loader";
-import type { BodyInit, MatchedRoute } from "bun";
+import type { BodyInit } from "bun";
 import { FrameMasterError } from "./error";
 import { renderToReadableStream, renderToString } from "react-dom/server";
-import type { FrameMasterConfig, Params } from "./type";
+import type { FrameMasterConfig } from "./type";
 import { errorToJSXPage } from "./utils/error-to-jsx";
 import NotFound from "./fallback/not-found";
 import ServerConfig from "./config";
@@ -40,14 +40,6 @@ export class ResponseNotSetError extends FrameMasterError {}
 export class NoServerSideMatchError extends FrameMasterError {}
 
 export type RequestState = "before_request" | "request" | "after_request";
-
-export type RequestMatch = {
-  pathname: string;
-  route: string;
-  filePaths: { build?: string; src: string };
-  params: Record<string, string | string[]> | undefined;
-  directive: Directives;
-};
 
 export type GlobalDataInjectionType = {
   data: Record<string, string>;
@@ -92,10 +84,6 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
    * normally the first HTML load
    */
   public readonly isAskingHTML: boolean;
-  /**
-   * Matching values applied when it is a client-side navigation or a first request to a route.
-   */
-  public readonly match?: RequestMatch;
 
   public readonly directivesTools = directiveToolSingleton;
 
@@ -130,6 +118,7 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
    */
   public serverConfig: FrameMasterConfig = ServerConfig;
   public serverInstance: Bun.Server<undefined>;
+  public isLogPrevented: boolean = false;
 
   constructor(props: { request: Request; server: Bun.Server<undefined> }) {
     this.request = props.request;
@@ -188,71 +177,9 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
     this._triggerAwaitingCookies();
     return this._response!;
   }
-
-  private sendErrorResponse(error: unknown): Response {
-    return new Response(renderToString(errorToJSXPage(error)), {
-      status: 500,
-      headers: { "Content-Type": "text/html" },
-    });
-  }
-
-  /*
-    private initMatch(): RequestMatch | undefined {
-        if (this.isClientNavigating) {
-            const pathname = this.URL.searchParams.get("__FrameMaster_PATHNAME__");
-            if (!pathname) throw new NoServerSideMatchError(`missing matching information for __FrameMaster_PATHNAME__`);
-            const matchServer = this.router.server.match(pathname);
-            const matchClient = this.router.client.match(pathname) || process.env.NODE_ENV === "development";
-            if (!matchServer || !matchClient) throw new NoServerSideMatchError(`no matching route found for __FrameMaster_PATHNAME__`);
-
-
-            const directive = this.directivesTools.getDirectiveFromFilePath(matchServer.filePath) as Directives;
-            return {
-                pathname: matchServer.pathname,
-                route: matchServer.name,
-                filePaths: {
-                    build: this.sanitizePath("." + pathname, join(CURRENT_PATH, this.manager.router.buildDir)),
-                    src: this.sanitizePath("." + pathname, join(CURRENT_PATH, this.manager.router.pageDir)),
-                },
-                params: this.formatParams(matchServer.params),
-                directive
-            };
-        } else if (this.isAskingHTML && this.manager.serverSide) {
-            const directive = this.directivesTools.getDirectiveFromFilePath(this.manager.serverSide.filePath) as Directives;
-            return {
-                pathname: this.manager.serverSide.pathname,
-                route: this.manager.serverSide.name,
-                filePaths: {
-                    build: this.manager.clientSide?.filePath,
-                    src: this.manager.serverSide.filePath
-                },
-                params: this.formatParams(this.manager.serverSide.params) as Record<string, string | string[]>,
-                directive
-            };
-        } else return undefined;
-    }
-    */
-
-  formatParams(match: MatchedRoute["params"] | undefined): Params {
-    if (!match) return {};
-    const params =
-      Object.entries(match).map(([key, value]) => {
-        const val = value.split("/");
-        if (val.length > 1) {
-          return [key, val];
-        }
-        return [key, val[0]];
-      }) || [];
-
-    return Object.fromEntries(params);
-  }
-
-  private sanitizePath(unsafePath: string, basePath: string) {
-    const resolvedPath = resolve(basePath, unsafePath);
-    if (!resolvedPath.startsWith(basePath)) {
-      throw new Error("Access to path is not allowed.");
-    }
-    return resolvedPath;
+  /** Prevent server logging */
+  preventLog() {
+    this.isLogPrevented = true;
   }
 
   /**
@@ -329,25 +256,9 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
     );
     this._response_setted = false;
     this._response_body = null;
+    this._response_init = {};
   }
 
-  private _setCookie<T extends Record<string, unknown>>(
-    name: string,
-    data: T,
-    options?: CookieOptions,
-    dataOptions?: SetDataOptions
-  ) {
-    this._ensureResponseIsSet("error when setting cookie");
-    const { encrypted, ...wtOptions } = options || {};
-    const wt = new webToken(this.request, { ...wtOptions, cookieName: name });
-    if (encrypted) {
-      wt.setData(data, dataOptions);
-      wt.setCookie(this._response as Response);
-    } else {
-      wt.setPlainJsonCookie(this._response as Response, name, data, wtOptions);
-    }
-    return this;
-  }
   /**
    * Sets a cookie for the response.
    * @param name The name of the cookie.
@@ -383,18 +294,7 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
 
     return res;
   }
-  private _deleteCookie(name: string, options?: DeleteCookieOptions) {
-    this._ensureResponseIsSet("error when deleting cookie");
-    const opts = options || {};
-    const parts = [`${name}=`, `path=${opts.path || "/"}`];
-    if (opts.domain) parts.push(`domain=${opts.domain}`);
-    parts.push("expires=Thu, 01 Jan 1970 00:00:00 GMT");
-    if (opts.secure) parts.push("secure");
-    if (opts.httpOnly) parts.push("httponly");
-    parts.push(`samesite=${opts.sameSite || "Lax"}`);
-    this._response?.headers.append("Set-Cookie", parts.join("; "));
-    return this;
-  }
+
   /**
    * Deletes a cookie from the response.
    * @param name The name of the cookie.
@@ -405,21 +305,6 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
     if (this.isResponseSetted()) return this._deleteCookie(name, options);
     this._awaitingCookieDeletion.push({ name, options });
     return this;
-  }
-  private _triggerAwaitingCookies() {
-    for (const cookie of this._awaitingCookies) {
-      this._setCookie(
-        cookie.name,
-        cookie.data,
-        cookie.options,
-        cookie.dataOptions
-      );
-    }
-    for (const cookie of this._awaitingCookieDeletion) {
-      this._deleteCookie(cookie.name, cookie.options);
-    }
-    this._awaitingCookies = [];
-    this._awaitingCookieDeletion = [];
   }
 
   setHeader(name: string, value: string) {
@@ -503,6 +388,48 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
   GlobalValueInjectionIsPrevented() {
     return this._prevent_global_values_injection;
   }
+
+  /**
+   * ** **FrameMaster Internal use only** **
+   *
+   * Converts global data to JS format for script injection
+   */
+  globalDataToJSFormat() {
+    return this.preloadToStringArray(this.globalDataInjection.data as any).join(
+      ";"
+    );
+  }
+
+  private _deleteCookie(name: string, options?: DeleteCookieOptions) {
+    this._ensureResponseIsSet("error when deleting cookie");
+    const opts = options || {};
+    const parts = [`${name}=`, `path=${opts.path || "/"}`];
+    if (opts.domain) parts.push(`domain=${opts.domain}`);
+    parts.push("expires=Thu, 01 Jan 1970 00:00:00 GMT");
+    if (opts.secure) parts.push("secure");
+    if (opts.httpOnly) parts.push("httponly");
+    parts.push(`samesite=${opts.sameSite || "Lax"}`);
+    this._response?.headers.append("Set-Cookie", parts.join("; "));
+    return this;
+  }
+  private _setCookie<T extends Record<string, unknown>>(
+    name: string,
+    data: T,
+    options?: CookieOptions,
+    dataOptions?: SetDataOptions
+  ) {
+    this._ensureResponseIsSet("error when setting cookie");
+    const { encrypted, ...wtOptions } = options || {};
+    const wt = new webToken(this.request, { ...wtOptions, cookieName: name });
+    if (encrypted) {
+      wt.setData(data, dataOptions);
+      wt.setCookie(this._response as Response);
+    } else {
+      wt.setPlainJsonCookie(this._response as Response, name, data, wtOptions);
+    }
+    return this;
+  }
+
   /**
    * **For FrameMaster internal use only**
    *
@@ -521,7 +448,7 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
    *
    * This method ensures that the response is only sent once and that all necessary headers are set appropriately.
    */
-  public async toResponse(): Promise<Response> {
+  private async toResponse(): Promise<Response> {
     if (this.__ERROR__) {
       const error = new FrameMasterError(
         "Error occured during serving",
@@ -648,6 +575,22 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
     }
   }
 
+  private _triggerAwaitingCookies() {
+    for (const cookie of this._awaitingCookies) {
+      this._setCookie(
+        cookie.name,
+        cookie.data,
+        cookie.options,
+        cookie.dataOptions
+      );
+    }
+    for (const cookie of this._awaitingCookieDeletion) {
+      this._deleteCookie(cookie.name, cookie.options);
+    }
+    this._awaitingCookies = [];
+    this._awaitingCookieDeletion = [];
+  }
+
   private setResponseThenReturn(res: Response) {
     this._response = res;
     return this._response;
@@ -755,16 +698,7 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
       throw new FrameMasterError(`Failed to create preload object: ${message}`);
     }
   }
-  /**
-   * ** **FrameMaster Internal use only** **
-   *
-   * Converts global data to JS format for script injection
-   */
-  globalDataToJSFormat() {
-    return this.preloadToStringArray(this.globalDataInjection.data as any).join(
-      ";"
-    );
-  }
+
   /**
    * Converts preload object to string array for script injection
    */
@@ -788,5 +722,19 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
     if (!this._response_setted) {
       throw new ResponseNotSetError(`Response not set: ${customMessage || ""}`);
     }
+  }
+  private sendErrorResponse(error: unknown): Response {
+    return new Response(renderToString(errorToJSXPage(error)), {
+      status: 500,
+      headers: { "Content-Type": "text/html" },
+    });
+  }
+
+  private sanitizePath(unsafePath: string, basePath: string) {
+    const resolvedPath = resolve(basePath, unsafePath);
+    if (!resolvedPath.startsWith(basePath)) {
+      throw new Error("Access to path is not allowed.");
+    }
+    return resolvedPath;
   }
 }

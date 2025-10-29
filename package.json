@@ -1,7 +1,7 @@
 {
   "name": "frame-master",
   "type": "module",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "baseUrl": ".",
   "license": "MIT",
   "devDependencies": {
@@ -46,6 +46,7 @@
     "./plugin/utils": "./src/plugins/utils.ts",
     "./config": "./src/server/config.ts",
     "./utils": "./src/utils.ts",
-    "./paths": "./src/paths.ts"
+    "./paths": "./src/paths.ts",
+    "./build": "./src/build/index.ts"
   }
 }

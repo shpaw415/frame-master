@@ -93,13 +93,16 @@ async function setEnvFile() {
   const envFileText = (await envFile.exists()) ? await envFile.text() : "";
 
   const modifiedText = [
-    ...envFileText.split("\n"),
+    ...envFileText
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0),
     !envFileText.includes("WEB_TOKEN_IV=") &&
       `WEB_TOKEN_IV=${webToken.generateSecureIV()}`,
     !envFileText.includes("WEB_TOKEN_SECRET=") &&
       `WEB_TOKEN_SECRET=${webToken.generateSecureSecret()}`,
   ]
-    .filter((e) => e != undefined && e != null)
+    .filter((e) => e != undefined && e != null && e !== false && e.length > 0)
     .join("\n")
     .trim();
 

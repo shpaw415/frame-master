@@ -94,10 +94,11 @@ export default async () => {
     ...(pluginServerConfig as {}),
     fetch: (request, server) => {
       // Log the incoming request
-      logRequest(request);
 
       const reqManager = new masterRequest({ request, server });
-      return reqManager.handleRequest();
+      const result = reqManager.handleRequest();
+      if (!reqManager.isLogPrevented) logRequest(request);
+      return result;
     },
     routes: { ...masterRoutes, ...pluginsRoutes, ...pluginServerConfig.routes },
     websocket: {

@@ -19,8 +19,6 @@ export type FrameMasterConfig = {
   }>;
 };
 
-export type Params = Record<string, string | string[]>;
-
 declare global {
   var __PROCESS_ENV__: Record<string, string>;
 }

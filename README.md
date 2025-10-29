@@ -67,14 +67,17 @@ export default config;
 ### Installation
 
 ```bash
-bun add frame-master
+bun add -g frame-master
 ```
 
-### Initialize Your Project
+### Create a New Project
 
 ```bash
-bun frame-master init
-# This creates frame-master.config.ts and .frame-master/ directory
+# Create a new project with the create command
+bunx frame-master create my-app
+
+# Or initialize Frame-Master in an existing project
+bunx frame-master init
 ```
 
 ### Configure Your Framework
@@ -133,9 +136,12 @@ import type { FrameMasterPlugin } from "frame-master/plugin/types";
 
 export function myCustomPlugin(options = {}): FrameMasterPlugin {
   return {
+    // Required fields
     name: "my-custom-plugin",
+    version: "1.0.0",
 
     // Server lifecycle hooks
+
     serverStart: {
       // Runs on main thread when server starts
       main: async () => {
@@ -163,17 +169,17 @@ export function myCustomPlugin(options = {}): FrameMasterPlugin {
         // Access and modify request
         console.log("Request:", master.request.url);
 
-        // Set the response and skip other request plugin to trigger on this request with sendNow
+        // Set the response and skip other request plugins with sendNow
         master
           .setResponse("new response body", {
-            header: { "x-header": "custom header" },
+            headers: { "x-header": "custom header" },
           })
           .sendNow();
       },
 
       // After request processing
       after_request: async (master) => {
-        // Modify response headers or make post request processing
+        // Modify response headers or perform post-request processing
         const response = master.response;
         if (response) {
           response.headers.set("X-Custom", "Header");
@@ -202,12 +208,34 @@ export function myCustomPlugin(options = {}): FrameMasterPlugin {
       },
     },
 
+    // WebSocket support
+    websocket: {
+      onOpen: async (ws) => {
+        console.log("WebSocket opened");
+      },
+      onMessage: async (ws, message) => {
+        console.log("Message received:", message);
+      },
+      onClose: async (ws) => {
+        console.log("WebSocket closed");
+      },
+    },
+
+    // Server configuration
+    serverConfig: {
+      routes: {
+        "/custom-route": (req, server) => {
+          return new Response("Custom route response");
+        },
+      },
+    },
+
     // File system change detection (dev mode only)
     onFileSystemChange: async (eventType, filePath, absolutePath) => {
       console.log("File changed:", filePath);
     },
-    // watch for changes in there paths
-    fileSystemWatchDir: ["path/to/watch"]
+    // Watch for changes in these paths
+    fileSystemWatchDir: ["path/to/watch"],
 
     // Plugin priority (lower number = higher priority)
     priority: 0,
@@ -221,7 +249,7 @@ export function myCustomPlugin(options = {}): FrameMasterPlugin {
       bunVersion: ">=1.2.0",
     },
 
-    // Custom directives for files for special operation or handling
+    // Custom directives for files for special operations or handling
     directives: [
       {
         name: "use-my-directive",
@@ -234,6 +262,20 @@ export function myCustomPlugin(options = {}): FrameMasterPlugin {
     runtimePlugins: [
       // Bun.BunPlugin instances
     ],
+
+    // Build configuration
+    build: {
+      buildConfig: (builder) => ({
+        // Return partial Bun.BuildConfig
+      }),
+      beforeBuild: async (buildConfig, builder) => {
+        console.log("Before build hook");
+      },
+      afterBuild: async (buildConfig, result, builder) => {
+        console.log("After build hook");
+      },
+      enableLoging: false,
+    },
   };
 }
 ```
@@ -357,13 +399,16 @@ Outgrown your current stack? With Frame-Master, you can:
 ## �️ Development Commands
 
 ```bash
-# Initialize a new Frame-Master project
+# Create a new Frame-Master project
+bun frame-master create my-app
+
+# Initialize Frame-Master in existing project
 bun frame-master init
 
 # Start development server
 bun frame-master dev
 
-# start production server
+# Start production server
 bun frame-master start
 
 # Get help
@@ -372,7 +417,7 @@ bun frame-master --help
 
 ## 📁 Project Structure
 
-After running `bun frame-master init`, your project will have:
+After running `bun frame-master create` or `bun frame-master init`, your project will have:
 
 ```
 my-project/

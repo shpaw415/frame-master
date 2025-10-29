@@ -10,9 +10,11 @@ const DEFAULT_CONFIG = {
 } satisfies FrameMasterConfig;
 
 async function loadConfig(): Promise<FrameMasterConfig> {
+  const filePath = join(process.cwd(), Paths.configFile);
+
   try {
     const config = (
-      (await import(join(process.cwd(), Paths.configFile))) as {
+      (await import(filePath)) as {
         default?: FrameMasterConfig;
       }
     )?.default;
@@ -23,6 +25,7 @@ async function loadConfig(): Promise<FrameMasterConfig> {
     return DEFAULT_CONFIG;
   } catch (error) {
     console.error(`Config file not found Fallback to minimal config.`);
+    console.log({ filePath, error });
     return DEFAULT_CONFIG;
   }
 }
