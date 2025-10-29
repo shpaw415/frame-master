@@ -13,17 +13,30 @@ export type BuilderProps = {
 };
 
 export class Builder {
-  buildConfigFactory: BuilderProps["pluginBuildConfig"];
-  onBeforeBuildHooks: Exclude<BuilderProps["beforeBuilds"], undefined> = [];
-  onAfterBuildHooks: Exclude<BuilderProps["afterBuilds"], undefined> = [];
-  currentBuildConfig: Bun.BuildConfig | null = null;
+  private buildConfigFactory: BuilderProps["pluginBuildConfig"];
+  private staticBuildConfig: Partial<Bun.BuildConfig>;
+  private onBeforeBuildHooks: Exclude<BuilderProps["beforeBuilds"], undefined> =
+    [];
+  private onAfterBuildHooks: Exclude<BuilderProps["afterBuilds"], undefined> =
+    [];
+  private currentBuildConfig: Bun.BuildConfig | null = null;
 
   readonly isLogEnabled: boolean;
-  outputs: Bun.BuildArtifact[] | null = null;
+  public outputs: Bun.BuildArtifact[] | null = null;
 
   constructor(props: BuilderProps) {
     this.isLogEnabled = props.enableLogging ?? true;
-    this.buildConfigFactory = props.pluginBuildConfig;
+
+    this.staticBuildConfig = props.pluginBuildConfig
+      .filter((c) => typeof c != "function")
+      .reduce(
+        (prev, next) => this.mergeConfigSafely(prev as Bun.BuildConfig, next),
+        {} as Partial<Bun.BuildConfig>
+      );
+    this.buildConfigFactory = props.pluginBuildConfig.filter(
+      (c) => typeof c == "function"
+    );
+
     this.onBeforeBuildHooks = props.beforeBuilds || [];
     this.onAfterBuildHooks = props.afterBuilds || [];
   }
@@ -274,7 +287,9 @@ export class Builder {
   }
 
   private getBuildConfig(): Promise<Bun.BuildConfig> {
-    return Promise.all(this.buildConfigFactory.map((factory) => factory(this)))
+    return Promise.all(
+      this.buildConfigFactory.map((factory) => (factory as Function)(this))
+    )
       .then((configs) =>
         configs.reduce(
           (prev, next) => this.mergeConfigSafely(prev as Bun.BuildConfig, next),
@@ -294,6 +309,10 @@ export class Builder {
         )
       )
       .then((mergedConfig) => {
+        mergedConfig = this.mergeConfigSafely(
+          mergedConfig as Bun.BuildConfig,
+          this.staticBuildConfig
+        );
         this.currentBuildConfig = mergedConfig as Bun.BuildConfig;
         return mergedConfig;
       }) as Promise<Bun.BuildConfig>;

@@ -95,17 +95,118 @@ export type PluginOptions = {
   HTMLRewrite?: unknown;
 };
 
+/**
+ * Build lifecycle hooks configuration for Frame-Master plugins.
+ *
+ * Provides control over the build process at different stages,
+ * allowing plugins to customize build configuration and perform
+ * operations before and after the build completes.
+ */
 export type BuildOptionsPlugin = {
-  buildConfig?: (builder: Builder) => Partial<Bun.BuildConfig>;
+  /**
+   * Function to return partial Bun build configuration.
+   *
+   * Merge custom build options with the default Frame-Master build config.
+   * Useful for adding external packages, custom plugins, build flags, etc.
+   *
+   * @param builder - The Builder instance with access to config and paths
+   * @returns Partial Bun.BuildConfig to merge with default config
+   *
+   * @example
+   * ```typescript
+   * buildConfig: (builder) => ({
+   *   external: ["react", "react-dom"],
+   *   minify: process.env.NODE_ENV === "production",
+   *   sourcemap: "external",
+   *   define: {
+   *     "process.env.API_URL": JSON.stringify(process.env.API_URL)
+   *   }
+   * })
+   * ```
+   */
+  buildConfig?:
+    | Partial<Bun.BuildConfig>
+    | ((builder: Builder) => Partial<Bun.BuildConfig>);
+
+  /**
+   * Hook executed before the build process starts.
+   *
+   * Perform setup tasks, file generation, directory cleaning, or any
+   * pre-build operations needed by your plugin.
+   *
+   * @param buildConfig - The complete Bun build configuration that will be used
+   * @param builder - The Builder instance with access to config and paths
+   *
+   * @example
+   * ```typescript
+   * beforeBuild: async (buildConfig, builder) => {
+   *   console.log("Preparing build...");
+   *
+   *   // Clean output directory
+   *   await Bun.$`rm -rf dist/*`;
+   *
+   *   // Generate build manifest
+   *   await Bun.write("dist/build-info.json", JSON.stringify({
+   *     timestamp: new Date().toISOString(),
+   *     version: builder.config.version
+   *   }));
+   * }
+   * ```
+   */
   beforeBuild?: (
     buildConfig: Bun.BuildConfig,
     builder: Builder
   ) => void | Promise<void>;
+
+  /**
+   * Hook executed after the build process completes.
+   *
+   * Process build outputs, copy additional files, generate reports,
+   * or perform any post-build operations.
+   *
+   * @param buildConfig - The build configuration that was used
+   * @param result - The Bun.BuildOutput containing all generated files
+   * @param builder - The Builder instance with access to config and paths
+   *
+   * @example
+   * ```typescript
+   * afterBuild: async (buildConfig, result, builder) => {
+   *   console.log(`Build completed: ${result.outputs.length} files generated`);
+   *
+   *   // Log all generated files
+   *   for (const output of result.outputs) {
+   *     console.log(`- ${output.path} (${output.kind})`);
+   *   }
+   *
+   *   // Copy static assets
+   *   await Bun.$`cp -r static/* dist/`;
+   *
+   *   // Generate type definitions
+   *   if (result.success) {
+   *     await generateTypeDefinitions(result.outputs);
+   *   }
+   * }
+   * ```
+   */
   afterBuild?: (
     buildConfig: Bun.BuildConfig,
     result: Bun.BuildOutput,
     builder: Builder
   ) => void | Promise<void>;
+
+  /**
+   * Enable detailed logging during build process.
+   *
+   * When true, the plugin's build operations will output detailed logs
+   * to help with debugging and understanding the build pipeline.
+   *
+   * @default false
+   *
+   * @example
+   * ```typescript
+   * enableLoging: process.env.DEBUG === "true"
+   * ```
+   */
   enableLoging?: boolean;
 };
 
@@ -361,5 +462,97 @@ export type FrameMasterPlugin<
       /** Called when the WebSocket connection is closed */
       onClose: (ws: Bun.ServerWebSocket<undefined>) => Promise<void> | void;
     }>;
+    /**
+     * Build lifecycle hooks for customizing the build process.
+     *
+     * Allows plugins to modify build configuration, perform pre/post-build operations,
+     * and integrate custom build logic into Frame-Master's build pipeline.
+     *
+     * @example
+     * Basic build configuration:
+     * ```typescript
+     * {
+     *   build: {
+     *     buildConfig: (builder) => ({
+     *       external: ["some-external-package"],
+     *       minify: true,
+     *       sourcemap: "external"
+     *     }),
+     *     enableLoging: true
+     *   }
+     * }
+     * ```
+     *
+     * @example
+     * Advanced build hooks:
+     * ```typescript
+     * {
+     *   build: {
+     *     buildConfig: (builder) => {
+     *      // Customize build configuration with access to builder
+     *      // Create dynamic config based on plugin props
+     *       return {
+     *         external: ["react", "react-dom"],
+     *         define: {
+     *           "process.env.NODE_ENV": JSON.stringify("production")
+     *         }
+     *       };
+     *     },
+     *
+     *     beforeBuild: async (buildConfig, builder) => {
+     *       // Perform operations before build starts
+     *       console.log("Starting build process...");
+     *
+     *       // Generate additional files, clean directories, etc.
+     *       await Bun.write("dist/manifest.json", JSON.stringify({
+     *         version: "1.0.0",
+     *         timestamp: Date.now()
+     *       }));
+     *     },
+     *
+     *     afterBuild: async (buildConfig, result, builder) => {
+     *       // Process build output
+     *       console.log("Build completed!");
+     *       console.log("Output files:", result.outputs.length);
+     *
+     *       // Post-process generated files
+     *       for (const output of result.outputs) {
+     *         console.log("Generated:", output.path);
+     *       }
+     *
+     *       // Perform additional tasks like copying assets,
+     *       // generating type definitions, etc.
+     *     },
+     *
+     *     enableLoging: true
+     *   }
+     * }
+     * ```
+     *
+     * @example
+     * Custom build plugins integration:
+     * ```typescript
+     * {
+     *   build: {
+     *     buildConfig: (builder) => ({
+     *       plugins: [
+     *         {
+     *           name: "custom-transform",
+     *           setup(build) {
+     *             build.onLoad({ filter: /\.custom$/ }, async (args) => {
+     *               const text = await Bun.file(args.path).text();
+     *               return {
+     *                 contents: transformCustomFile(text),
+     *                 loader: "tsx"
+     *               };
+     *             });
+     *           }
+     *         }
+     *       ]
+     *     })
+     *   }
+     * }
+     * ```
+     */
     build: BuildOptionsPlugin;
   }>;
