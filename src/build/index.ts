@@ -160,9 +160,14 @@ export class Builder {
    *   };
    * }
    */
-  static createBuilder(props: BuilderProps): Builder {
+  static async createBuilder(props: BuilderProps): Promise<Builder> {
     const builder = new Builder(props);
+    await builder.setBuildConfig();
     return builder;
+  }
+
+  private async setBuildConfig() {
+    this.currentBuildConfig = await this.getBuildConfig();
   }
 
   /**
@@ -271,24 +276,27 @@ export class Builder {
     };
   }
 
-  private getBuildConfig() {
-    return Promise.all(
-      this.buildConfigFactory.map((factory) => factory(this))
-    ).then((configs) =>
-      configs.reduce(this.mergeConfigSafely, {
-        entrypoints: [],
-        outdir: "",
-        splitting: true,
-        minify: process.env.NODE_ENV === "production",
-        sourcemap: process.env.NODE_ENV !== "production",
-        target: "browser",
-        external: [],
-        define: {},
-        loader: {},
-        plugins: [],
-        publicPath: "./",
-      } satisfies Bun.BuildConfig)
-    );
+  private getBuildConfig(): Promise<Bun.BuildConfig> {
+    return Promise.all(this.buildConfigFactory.map((factory) => factory(this)))
+      .then((configs) =>
+        configs.reduce(this.mergeConfigSafely, {
+          entrypoints: [],
+          outdir: "",
+          splitting: true,
+          minify: process.env.NODE_ENV === "production",
+          sourcemap: process.env.NODE_ENV !== "production",
+          target: "browser",
+          external: [],
+          define: {},
+          loader: {},
+          plugins: [],
+          publicPath: "./",
+        } satisfies Bun.BuildConfig)
+      )
+      .then((mergedConfig) => {
+        this.currentBuildConfig = mergedConfig;
+        return mergedConfig;
+      });
   }
 
   /**
@@ -538,7 +546,7 @@ const logIsEnabled = plugin.some((p) => p.pluginParent.enableLoging === true);
  *   console.log("Generated:", artifact.path);
  * });
  */
-export const builder = Builder.createBuilder({
+export const builder = await Builder.createBuilder({
   pluginBuildConfig: configFactories,
   beforeBuilds: beforeBuildHooks,
   afterBuilds: afterBuildHooks,
