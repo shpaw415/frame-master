@@ -1,65 +1,95 @@
 # 🚀 Frame-Master
 
-> **Build your perfect full-stack framework, one plugin at a time.**  
-> **⚡ Powered exclusively by Bun.js**
+> **The plugin-first meta-framework for Bun.js**  
+> **Build your stack, your way. No opinions, just possibilities.**
 
-Frame-Master isn't just another web framework—it's a **framework maker** built specifically for the Bun.js runtime. Choose your frontend, pick your backend, add your features. Create the exact full-stack development experience you want with Bun's lightning-fast performance.
+Frame-Master is **not a web framework**—it's a **plugin orchestration runtime** for Bun.js. There are no built-in routers, renderers, or build steps. Instead, **plugins define everything**: how requests are handled, how files are built, which frontend framework to use, and what features exist.
+
+**Think of it as:** Express.js middleware philosophy + Webpack plugin system + Bun's speed = Frame-Master
 
 ## ⚡ Why Frame-Master?
 
-**Tired of framework lock-in?** Frustrated by "almost perfect" solutions? Frame-Master gives you the power to compose your ideal development stack through configuration.
+**Tired of framework lock-in?** Frame-Master gives you **absolute freedom** through plugins. Use existing plugins or build your own framework.
 
 ```typescript
-// Want React + PostgreSQL?
-// frame-master.config.ts
+// Use React SSR plugin - or write your own!
 import type { FrameMasterConfig } from "frame-master/server/type";
-import reactPlugin from "frame-master-plugin-react-ssr/plugin";
-import postgresPlugin from "frame-master-plugin-postgres/plugin";
+import reactSSRPlugin from "frame-master-plugin-react-ssr/plugin";
 
 const config: FrameMasterConfig = {
   HTTPServer: { port: 3000 },
-  plugins: [reactPlugin(), postgresPlugin()],
+  plugins: [reactSSRPlugin()], // Defines routing, SSR, building
 };
 
 export default config;
 ```
 
-```typescript
-// Prefer Vue + SQLite? Just swap plugins!
-// frame-master.config.ts
-import type { FrameMasterConfig } from "frame-master/server/type";
-
-// only as exemple...
-import vuePlugin from "frame-master-plugin-vuejs/plugins/vue";
-import sqlitePlugin from "frame-master-plugin-sqlite/plugin";
-// only as exemple
-
-const config: FrameMasterConfig = {
-  HTTPServer: { port: 3000 },
-  plugins: [vuePlugin(), sqlitePlugin()],
-};
-
-export default config;
-```
+**The key:** Frame-Master provides **infrastructure** (HTTP server, plugin lifecycle, build orchestration). Plugins provide **behavior** (routing, rendering, features).
 
 ## 🎯 Core Philosophy
 
-### 🔧 **Framework Agnostic**
+## 🎯 Core Philosophy
 
-- React, Vue, Svelte, Vanilla JS—your choice
-- Built exclusively for Bun.js runtime
+### 🔌 **Plugins Define Everything**
 
-### 🔌 **Plugin Everything**
+Frame-Master has **zero built-in behavior**:
 
-- Authentication? There's a plugin for that
-- File uploads? Plugin
-- Real-time features? Plugin
-- Custom business logic? Build a plugin
+- No routing, renderer, or build step by default
+- No conventions unless plugins create them
+- Want a feature? Add or write a plugin
+
+### 🏗️ **Singleton Build Pipeline**
+
+All plugins contribute to **one unified build**:
+
+```typescript
+// Plugin A: buildConfig: { external: ["react"] }
+// Plugin B: buildConfig: { plugins: [myBunPlugin()] }
+// Result: ONE build with merged configs
+builder.build("/src/client.ts");
+```
+
+### 🎨 **Framework Agnostic**
+
+Frame-Master doesn't care about React, Vue, or Svelte. **Plugins decide everything.**
 
 ### 🌐 **Community Driven**
 
+Browse plugins at [frame-master.com](https://frame-master.com) - official and community solutions.
+
+### 🏗️ **Singleton Build Pipeline**
+
+All plugins contribute to a **single unified build**. When any plugin calls `builder.build()`, all plugin configurations merge intelligently:
+
+```typescript
+// Plugin A adds React externals
+buildConfig: {
+  external: ["react", "react-dom"];
+}
+
+// Plugin B adds Bun plugins
+buildConfig: {
+  plugins: [myBunPlugin()];
+}
+
+// Result: ONE build with both configs merged
+builder.build("/src/client.ts");
+```
+
+### 🎨 **Framework Agnostic**
+
+Frame-Master doesn't care about React, Vue, Svelte, or vanilla JS. It doesn't have opinions about SSR, SSG, or SPA. **Plugins decide the architecture.**
+
+Want to build the next Next.js? Write a plugin.  
+Want to build something completely new? Write a plugin.
+
+### 🌐 **Community Driven**
+
+Browse plugins at [frame-master.com](https://frame-master.com):
+
+- Official plugins (React SSR, Auth, Tailwind, etc.)
+- Community plugins (your custom solutions)
 - Share your plugin combinations
-- Contribute to the ecosystem
 - Build once, use everywhere
 
 ## 📦 Quick Start
@@ -108,295 +138,294 @@ bun frame-master dev
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────┐
-│          Your Application           │
-├─────────────────────────────────────┤
-│              Plugins                │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐│
-│  │ React   │ │  Auth   │ │Database ││
-│  │ Plugin  │ │ Plugin  │ │ Plugin  ││
-│  └─────────┘ └─────────┘ └─────────┘│
-├─────────────────────────────────────┤
-│         Frame-Master Core           │
-│   • Plugin System                   │
-│   • HTTP/Dev Server                 │
-│   • Runtime Loader                  │
-└─────────────────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│      Your Application (plugin-defined)         │
+├─────────────────────────────────────────────────┤
+│             Plugin Layer                        │
+│  [React SSR] [Auth] [Database] [Custom...]     │
+├─────────────────────────────────────────────────┤
+│      Frame-Master Core Runtime                  │
+│  • HTTP Server  • Plugin Lifecycle              │
+│  • Singleton Builder  • File Watcher (dev)      │
+└─────────────────────────────────────────────────┘
 ```
+
+**Key concepts:**
+
+- Plugin hooks: request handling, server startup, file changes, builds
+- Unified build: All plugins → one `builder` singleton
+- Runtime plugins: Modify Bun's module loader (import .svg as JSX)
+- No conventions: Plugins create structure
 
 ## 🔌 Plugin System
 
-Frame-Master's power comes from its extensible plugin architecture. Plugins handle everything from frontend frameworks to databases to authentication.
+Plugins can: define routes, render HTML, build bundles, add WebSockets, modify Bun's loader, watch files, handle auth, databases, and more.
 
-### Creating Custom Plugins
+### Core Plugin Structure
 
 ```typescript
-// my-custom-plugin.ts
 import type { FrameMasterPlugin } from "frame-master/plugin/types";
 
-export function myCustomPlugin(options = {}): FrameMasterPlugin {
+export function myPlugin(): FrameMasterPlugin {
   return {
-    // Required fields
-    name: "my-custom-plugin",
+    name: "my-plugin",
     version: "1.0.0",
 
-    // Server lifecycle hooks
-
+    // SERVER LIFECYCLE
     serverStart: {
-      // Runs on main thread when server starts
-      main: async () => {
-        console.log("Plugin initialized on main thread");
-      },
-
-      // Runs only in development mode
-      dev_main: async () => {
-        console.log("Plugin initialized in dev mode");
-      },
+      main: async () => {}, // Runs on server start
+      dev_main: async () => {}, // Dev mode only
     },
 
-    // Router hooks
+    // REQUEST LIFECYCLE
     router: {
-      // Before request processing
       before_request: async (master) => {
-        // Initialize context or inject global values
-        master.setContext({ customData: "value" });
-        // Access this value in a client context as global variable. ( globalThis.__MY_GLOBAL__ )
-        master.setGlobalValues({ __MY_GLOBAL__: "data" });
+        // Initialize context, auth, logging
+        master.setContext({ requestId: crypto.randomUUID() });
       },
-
-      // Intercept and modify requests
       request: async (master) => {
-        // Access and modify request
-        console.log("Request:", master.request.url);
-
-        // Set the response and skip other request plugins with sendNow
-        master
-          .setResponse("new response body", {
-            headers: { "x-header": "custom header" },
-          })
-          .sendNow();
-      },
-
-      // After request processing
-      after_request: async (master) => {
-        // Modify response headers or perform post-request processing
-        const response = master.response;
-        if (response) {
-          response.headers.set("X-Custom", "Header");
+        // Handle requests, define routes
+        if (new URL(master.request.url).pathname === "/api/hello") {
+          master.setResponse("Hello!").sendNow();
         }
       },
-
-      // HTML rewriting
+      after_request: async (master) => {
+        // Modify headers, cleanup
+      },
       html_rewrite: {
-        initContext: (req) => {
-          return { someData: "value" };
+        rewrite: async (rewriter, master, ctx) => {
+          // Transform HTML with HTMLRewriter
         },
+      },
+    },
 
-        rewrite: async (reWriter, master, context) => {
-          // Use HTMLRewriter to modify HTML
-          reWriter.on("div", {
-            element(element) {
-              element.setAttribute("data-custom", "true");
-            },
+    // BUILD SYSTEM (shared singleton)
+    build: {
+      buildConfig: { external: ["react"], target: "browser" }, // Static
+      // OR
+      buildConfig: async (builder) => ({ external: ["lib"] }), // Dynamic
+      beforeBuild: async (config, builder) => {},
+      afterBuild: async (config, result, builder) => {},
+    },
+
+    // RUNTIME PLUGINS (Bun module loader)
+    runtimePlugins: [
+      {
+        name: "svg-loader",
+        setup(build) {
+          build.onLoad({ filter: /\.svg$/ }, async (args) => {
+            // Transform .svg imports
           });
         },
-
-        after: async (HTML, master, context) => {
-          // Final HTML processing
-          console.log("HTML processed");
-        },
       },
-    },
+    ],
 
-    // WebSocket support
+    // FILE WATCHING (dev mode)
+    fileSystemWatchDir: ["./src"],
+    onFileSystemChange: async (type, path, abs) => {},
+
+    // WEBSOCKETS
     websocket: {
-      onOpen: async (ws) => {
-        console.log("WebSocket opened");
-      },
-      onMessage: async (ws, message) => {
-        console.log("Message received:", message);
-      },
-      onClose: async (ws) => {
-        console.log("WebSocket closed");
-      },
+      onOpen: async (ws) => {},
+      onMessage: async (ws, msg) => {},
+      onClose: async (ws) => {},
     },
 
-    // Server configuration
+    // CUSTOM ROUTES
     serverConfig: {
       routes: {
-        "/custom-route": (req, server) => {
-          return new Response("Custom route response");
-        },
+        "/health": () => new Response("OK"),
       },
     },
 
-    // File system change detection (dev mode only)
-    onFileSystemChange: async (eventType, filePath, absolutePath) => {
-      console.log("File changed:", filePath);
-    },
-    // Watch for changes in these paths
-    fileSystemWatchDir: ["path/to/watch"],
-
-    // Plugin priority (lower number = higher priority)
-    priority: 0,
-
-    // Plugin requirements
+    // METADATA
+    priority: 0, // Lower = runs first
     requirement: {
-      frameMasterPlugins: {
-        "some-required-plugin": "^1.0.0",
-      },
       frameMasterVersion: "^1.0.0",
       bunVersion: ">=1.2.0",
-    },
-
-    // Custom directives for files for special operations or handling
-    directives: [
-      {
-        name: "use-my-directive",
-        regex:
-          /^(?:\s*(?:\/\/.*?\n|\s)*)?['"]use[-\s]my-directive['"];?\s*(?:\/\/.*)?(?:\r?\n|$)/m,
-      },
-    ],
-
-    // Runtime plugins that will be loaded for the Bun runtime
-    runtimePlugins: [
-      // Bun.BunPlugin instances
-    ],
-
-    // Build configuration
-    build: {
-      buildConfig: (builder) => ({
-        // Return partial Bun.BuildConfig
-      }),
-      beforeBuild: async (buildConfig, builder) => {
-        console.log("Before build hook");
-      },
-      afterBuild: async (buildConfig, result, builder) => {
-        console.log("After build hook");
-      },
-      enableLoging: false,
     },
   };
 }
 ```
 
-Then use it in your configuration:
+### Singleton Builder Pattern
+
+**One builder, shared by all plugins:**
 
 ```typescript
-// frame-master.config.ts
-import type { FrameMasterConfig } from "frame-master/server/type";
-import { myCustomPlugin } from "./plugins/my-custom-plugin";
+import { builder } from "frame-master/build";
 
-const config: FrameMasterConfig = {
-  HTTPServer: { port: 3000 },
-  plugins: [
-    myCustomPlugin({
-      // plugin options
-    }),
-  ],
-};
+// Static config (merged on import)
+build: {
+  buildConfig: {
+    external: ["my-lib"];
+  }
+}
 
-export default config;
+// Dynamic config (called during builder.build())
+build: {
+  buildConfig: async (builder) => ({
+    external: ["my-lib"],
+    plugins: [customBunPlugin()],
+  });
+}
+
+// Trigger a build (includes all plugin configs)
+await builder.build("/src/client.ts");
 ```
 
-## 🎨 Example Configurations
+**Merging:** Static configs merge on import → Dynamic configs merge on `build()` → All merged for `Bun.build()`
 
-### Full-Stack React App
+**Example:**
 
 ```typescript
-// frame-master.config.ts
-import type { FrameMasterConfig } from "frame-master/server/type";
-import reactPlugin from "frame-master-plugin-react-ssr/plugin";
-
-const config: FrameMasterConfig = {
-  HTTPServer: { port: 3000 },
-  plugins: [
-    reactPlugin({
-      // React-plugin-specific options
-    }),
-  ],
-};
-
-export default config;
+// Plugin A: { external: ["react"] }
+// Plugin B: { external: ["lodash"], minify: true }
+// Result: { external: ["react", "lodash"], minify: true }
 ```
 
-### Multi-Plugin Setup
+### Runtime vs Build Plugins
+
+**Two separate systems:**
+
+| Runtime Plugins                 | Build Plugins               |
+| ------------------------------- | --------------------------- |
+| Modify Bun's module loader      | Bundle code for browser     |
+| Transform imports at runtime    | Run during `Bun.build()`    |
+| Example: `.svg` → JSX component | Example: Minify, tree-shake |
 
 ```typescript
-// frame-master.config.ts
-import type { FrameMasterConfig } from "frame-master/server/type";
-import reactPlugin from "frame-master-plugin-react-ssr/plugin";
-import { authPlugin } from "./plugins/auth-plugin";
-import { databasePlugin } from "./plugins/database-plugin";
-
-const config: FrameMasterConfig = {
-  HTTPServer: { port: 3000 },
-  plugins: [
-    reactPlugin({}),
-    authPlugin({
-      providers: ["google", "github"],
-    }),
-    databasePlugin({
-      type: "postgresql",
-      connection: process.env.DATABASE_URL,
-    }),
-  ],
-};
-
-export default config;
-```
-
-### Custom Development Setup
-
-```typescript
-// frame-master.config.ts
-import type { FrameMasterConfig } from "frame-master/server/type";
-import { myFrameworkPlugin } from "./plugins/my-framework";
-
-const config: FrameMasterConfig = {
-  HTTPServer: {
-    port: parseInt(process.env.PORT || "3000"),
-    host: "0.0.0.0",
+// Runtime: Transform .txt files into modules
+runtimePlugins: [
+  {
+    name: "txt-loader",
+    setup(build) {
+      build.onLoad({ filter: /\.txt$/ }, async (args) => ({
+        contents: `export default ${JSON.stringify(
+          await Bun.file(args.path).text()
+        )}`,
+        loader: "js",
+      }));
+    },
   },
-  plugins: [
-    myFrameworkPlugin({
-      // Your custom configuration
-    }),
-  ],
-};
+];
 
-export default config;
+// Build: Bundle for browser
+build: {
+  buildConfig: {
+    plugins: [
+      {
+        name: "browser-plugin",
+        setup(build) {
+          build.onLoad({ filter: /\.browser\.ts$/ }, async (args) => {
+            // Transform for browser
+          });
+        },
+      },
+    ];
+  }
+}
 ```
 
-## 🌟 What Makes Frame-Master Unique?
+## 🎨 Example Use Cases
 
-### 🎯 **True Flexibility**
+### React SSR App
 
-Unlike other frameworks that give you "configuration options," Frame-Master gives you **architectural freedom**. Don't like how Next.js handles routing? Use a different plugin. Need custom build logic? Write a plugin.
+```typescript
+import reactSSRPlugin from "frame-master-plugin-react-ssr/plugin";
 
-### 🔄 **Migration Made Easy**
+export default {
+  HTTPServer: { port: 3000 },
+  plugins: [reactSSRPlugin()], // Handles routing, SSR, bundling, HMR
+};
+```
 
-Outgrown your current stack? With Frame-Master, you can:
+### Custom API Server
 
-- Swap frontend frameworks by changing plugins
-- Add new features without framework constraints
-- Migrate gradually by replacing plugins one at a time
+```typescript
+// plugins/api.ts
+export function apiPlugin(routes): FrameMasterPlugin {
+  return {
+    name: "api",
+    router: {
+      request: async (master) => {
+        const url = new URL(master.request.url);
+        if (url.pathname.startsWith("/api/")) {
+          const data = await handlers[routes[url.pathname]]();
+          master
+            .setResponse(JSON.stringify(data), {
+              headers: { "Content-Type": "application/json" },
+            })
+            .sendNow();
+        }
+      },
+    },
+  };
+}
 
-### 🚀 **Performance by Design**
+// frame-master.config.ts
+export default {
+  HTTPServer: { port: 3000 },
+  plugins: [
+    dbPlugin({ connection: process.env.DATABASE_URL }),
+    apiPlugin({ "/api/users": "getUsers", "/api/posts": "getPosts" }),
+  ],
+};
+```
 
-- Only load what you need
-- Plugin-level optimization
-- Built specifically for Bun.js runtime
-- Hot reload during development
+### Static Site Generator
 
-### 👥 **Community First**
+```typescript
+export function ssgPlugin(options): FrameMasterPlugin {
+  return {
+    name: "ssg",
+    serverStart: {
+      main: async () => {
+        for (const page of options.pages) {
+          await Bun.write(
+            `${options.outputDir}/${page}.html`,
+            await generateHTML(page)
+          );
+        }
+      },
+    },
+    router: {
+      request: async (master) => {
+        const file = Bun.file(
+          `${options.outputDir}${new URL(master.request.url).pathname}.html`
+        );
+        if (await file.exists()) {
+          master.setResponse(await file.text()).sendNow();
+        }
+      },
+    },
+  };
+}
+```
 
-- Share your plugin combinations
-- Contribute to the ecosystem
-- Learn from others' solutions
-- Build reusable components
+## 🌟 What Makes Frame-Master Different?
 
-## �️ Development Commands
+### 🎯 Zero Built-in Behavior
+
+Most frameworks have opinions (Next.js: file routing, Remix: loaders). **Frame-Master has nothing** - it's a blank canvas. Add plugins for routing, SSR, or any feature you need.
+
+### 🔄 Plugin Composability
+
+Plugins compose through the singleton builder and lifecycle hooks. Order matters (priority system).
+
+### 🚀 Bun-First Architecture
+
+Built exclusively for Bun.js: `Bun.build()`, `Bun.serve()`, Bun plugins, Bun's speed.
+
+### �️ **Build Your Own Framework**
+
+Frame-Master is for:
+
+- **Framework authors** building custom frameworks
+- **Advanced developers** needing full control
+- **Companies** with unique requirements
+
+**Not for:** Quick starts, "batteries included" needs, or projects fitting Next.js/Remix.
 
 ```bash
 # Create a new Frame-Master project
@@ -417,60 +446,123 @@ bun frame-master --help
 
 ## 📁 Project Structure
 
-After running `bun frame-master create` or `bun frame-master init`, your project will have:
+Frame-Master enforces **no structure**. Plugins define conventions:
 
 ```
 my-project/
-├── frame-master.config.ts    # Main configuration
-├── .frame-master/           # Frame-Master internals
-    ├── build/              # Build utilities
-    ├── server.ts           # Server setup
-    ├── preload.ts          # Runtime preloader
-    └── frame-master-custom-type.d.ts
+├── frame-master.config.ts    # Plugin configuration
+├── .frame-master/             # Optional plugin files
+└── src/                       # Whatever your plugins expect
 ```
 
-## 📚 Available Exports
+Example: `frame-master-plugin-react-ssr` expects `src/pages/` for routing. Your custom plugin might use `routes/` instead.
 
-Frame-Master provides several entry points for different use cases:
+## 📚 Available Exports
 
 ```typescript
 // Plugin development
 import type { FrameMasterPlugin } from "frame-master/plugin/types";
 import { utils } from "frame-master/plugin/utils";
 
-// Server configuration
+// Configuration
 import type { FrameMasterConfig } from "frame-master/server/type";
+
+// Build system
+import { builder, Builder, defineBuildConfig } from "frame-master/build";
+```
+
+## 🔧 Builder API
+
+### Basic Operations
+
+```typescript
+import { builder, Builder, defineBuildConfig } from "frame-master/build";
+
+// Build
+await builder.build("/src/client.ts");
+
+// Access outputs
+builder.outputs?.forEach((a) => console.log(a.path, a.size));
+
+// Get merged config
+const config = builder.getConfig();
+```
+
+### Analysis & Reports
+
+```typescript
+// Analyze
+const analysis = builder.analyzeBuild();
+console.log("Total:", analysis.totalSize, "bytes");
+console.log("Largest:", analysis.largestFiles);
+
+// Reports
+console.log(builder.generateReport("text")); // Human
+const json = builder.generateReport("json"); // Machine
+
+// History
+const avg =
+  builder.getBuildHistory().reduce((s, b) => s + b.duration, 0) /
+  builder.getBuildHistory().length;
+```
+
+### Helpers
+
+```typescript
+// Type-safe config
+const config = defineBuildConfig({
+  target: "browser",
+  external: ["react"],
+});
+
+// Regex filter for Bun plugins
+const filter = Builder.pluginRegexMake({
+  path: ["src", "components"],
+  ext: ["tsx", "ts"],
+});
+
+// Stub server-only code
+Builder.returnEmptyFile("tsx", { serverFn: null });
+```
+
+### Example: Plugin with Analysis
+
+```typescript
+export function advancedPlugin(): FrameMasterPlugin {
+  return {
+    name: "advanced-plugin",
+    build: {
+      buildConfig: defineBuildConfig({
+        external: ["react"],
+        minify: process.env.NODE_ENV === "production",
+      }),
+      afterBuild: async (config, result, builder) => {
+        if (!result.success) return;
+
+        const analysis = builder.analyzeBuild();
+        if (analysis.totalSize > 1_000_000) {
+          console.warn(
+            `⚠️ Bundle: ${(analysis.totalSize / 1_000_000).toFixed(2)}MB`
+          );
+        }
+
+        // Save report
+        await Bun.write(
+          ".frame-master/report.json",
+          builder.generateReport("json")
+        );
+      },
+    },
+  };
+}
 ```
 
 ## 🤝 Contributing
 
-We love contributions! Whether it's:
+Contributions welcome: 🐛 bugs, 💡 features, 🔌 plugins, 📖 docs, 🎨 examples.
 
-- 🐛 Bug reports
-- 💡 Feature requests
-- 🔌 New plugins
-- 📖 Documentation improvements
-- 🎨 Example projects
-
-Check out our [Contributing Guide](CONTRIBUTING.md) to get started.
-
-## 🎉 Community
-
-- **GitHub Discussions**: Share your plugin combinations
-- **Issues**: Report bugs and request features
-- **Examples**: Check out community-built configurations
+See [Contributing Guide](CONTRIBUTING.md).
 
 ## 📄 License
 
 MIT © [shpaw415](https://github.com/shpaw415)
-
----
-
-<div align="center">
-
-**Stop settling for "almost perfect" frameworks.**  
-**Build the perfect one for your needs.**
-
-[Get Started](#-quick-start) • [Plugin System](#-plugin-system) • [Examples](#-example-configurations)
-
-</div>

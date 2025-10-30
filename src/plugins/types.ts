@@ -98,58 +98,192 @@ export type PluginOptions = {
 /**
  * Build lifecycle hooks configuration for Frame-Master plugins.
  *
+ * Frame-Master uses a **singleton builder** pattern where all plugins contribute
+ * to a single unified build pipeline. Build configurations from all plugins are
+ * intelligently merged, and any plugin can trigger a build that includes all
+ * plugin configurations.
+ *
+ * ## Build Configuration Types
+ *
+ * ### Static Configuration (Object)
+ * Merged once when `builder` is imported from "frame-master/build".
+ * Use for configs that don't change at build time.
+ *
+ * ```typescript
+ * buildConfig: {
+ *   external: ["react", "react-dom"],
+ *   target: "browser"
+ * }
+ * ```
+ *
+ * ### Dynamic Configuration (Function)
+ * Executed each time `builder.build()` is called.
+ * Use for configs that depend on runtime state or builder properties.
+ *
+ * ```typescript
+ * buildConfig: async (builder) => ({
+ *   external: builder.isLogEnabled ? ["debug-lib"] : [],
+ *   minify: process.env.NODE_ENV === "production"
+ * })
+ * ```
+ *
+ * ## Singleton Builder Pattern
+ *
+ * All plugins share the same `builder` instance:
+ *
+ * ```typescript
+ * import { builder } from "frame-master/build";
+ *
+ * // Plugin A contributes config
+ * buildConfig: { external: ["react"] }
+ *
+ * // Plugin B contributes config
+ * buildConfig: { plugins: [myBunPlugin()] }
+ *
+ * // Plugin C triggers the build (includes A + B configs)
+ * serverStart: {
+ *   main: async () => {
+ *     await builder.build("/src/client.ts");
+ *     // Build uses merged configs from A, B, and C
+ *   }
+ * }
+ * ```
+ *
+ * ## Intelligent Config Merging
+ *
+ * Frame-Master merges configs with smart strategies:
+ * - **Arrays**: Deduplicated and concatenated (e.g., `external`, `entrypoints`)
+ * - **Objects**: Deep merged (e.g., `define`, `loader`)
+ * - **Plugins**: Concatenated to preserve order
+ * - **Primitives**: Last plugin wins with warning
+ *
  * Provides control over the build process at different stages,
  * allowing plugins to customize build configuration and perform
  * operations before and after the build completes.
  */
 export type BuildOptionsPlugin = {
   /**
-   * Function to return partial Bun build configuration.
+   * Build configuration to merge into the unified build pipeline.
    *
-   * Merge custom build options with the default Frame-Master build config.
-   * Useful for adding external packages, custom plugins, build flags, etc.
+   * Can be either:
+   * - **Static object**: Merged once on import (for constant configs)
+   * - **Dynamic function**: Called on each `builder.build()` (for runtime configs)
    *
-   * @param builder - The Builder instance with access to config and paths
-   * @returns Partial Bun.BuildConfig to merge with default config
+   * The builder parameter in dynamic configs is the singleton Builder instance
+   * shared across all plugins, providing access to methods like:
+   * - `builder.getConfig()` - Get current merged config
+   * - `builder.analyzeBuild()` - Analyze build outputs
+   * - `builder.isLogEnabled` - Check if logging is enabled
+   *
+   * @param builder - The singleton Builder instance shared by all plugins
+   * @returns Partial Bun.BuildConfig to merge with other plugins' configs
    *
    * @example
    * ```typescript
-   * buildConfig: (builder) => ({
+   * // Static configuration (merged on import)
+   * buildConfig: {
    *   external: ["react", "react-dom"],
-   *   minify: process.env.NODE_ENV === "production",
-   *   sourcemap: "external",
-   *   define: {
-   *     "process.env.API_URL": JSON.stringify(process.env.API_URL)
+   *   target: "browser",
+   *   minify: true
+   * }
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Dynamic configuration (called on build)
+   * buildConfig: async (builder) => {
+   *   const isDev = process.env.NODE_ENV !== "production";
+   *
+   *   return {
+   *     external: ["react", "react-dom"],
+   *     minify: !isDev,
+   *     sourcemap: isDev ? "inline" : "external",
+   *     define: {
+   *       "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV),
+   *       "__DEBUG__": isDev.toString()
+   *     },
+   *     plugins: [
+   *       // Add Bun plugins dynamically
+   *       myCustomBunPlugin({ debug: isDev })
+   *     ]
+   *   };
+   * };
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Access builder properties in dynamic config
+   * buildConfig: (builder) => {
+   *   if (builder.isLogEnabled) {
+   *     console.log("Building with logging enabled");
    *   }
+   *
+   *   return {
+   *     external: ["my-lib"],
+   *     // Conditionally add config based on builder state
+   *   };
+   * };
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Type-safe config with helper
+   * import { defineBuildConfig } from "frame-master/build";
+   *
+   * buildConfig: defineBuildConfig({
+   *   target: "browser", // Full autocomplete!
+   *   external: ["react"],
+   *   minify: process.env.NODE_ENV === "production"
    * })
    * ```
    */
   buildConfig?:
     | Partial<Bun.BuildConfig>
-    | ((builder: Builder) => Partial<Bun.BuildConfig>);
+    | ((
+        builder: Builder
+      ) => Partial<Bun.BuildConfig> | Promise<Partial<Bun.BuildConfig>>);
 
   /**
    * Hook executed before the build process starts.
    *
-   * Perform setup tasks, file generation, directory cleaning, or any
-   * pre-build operations needed by your plugin.
+   * Runs after all configs are merged but before `Bun.build()` is called.
+   * All plugins' `beforeBuild` hooks execute in parallel.
    *
-   * @param buildConfig - The complete Bun build configuration that will be used
-   * @param builder - The Builder instance with access to config and paths
+   * Use for: setup tasks, file generation, validation, or pre-build operations.
+   *
+   * @param buildConfig - The final merged Bun.BuildConfig from all plugins
+   * @param builder - The singleton Builder instance with helper methods
    *
    * @example
    * ```typescript
    * beforeBuild: async (buildConfig, builder) => {
-   *   console.log("Preparing build...");
+   *   console.log("Building", buildConfig.entrypoints.length, "entrypoints");
    *
-   *   // Clean output directory
-   *   await Bun.$`rm -rf dist/*`;
+   *   // Validate configuration
+   *   if (!buildConfig.outdir) {
+   *     throw new Error("Output directory not specified");
+   *   }
    *
    *   // Generate build manifest
-   *   await Bun.write("dist/build-info.json", JSON.stringify({
+   *   await Bun.write(".frame-master/build-info.json", JSON.stringify({
    *     timestamp: new Date().toISOString(),
-   *     version: builder.config.version
+   *     entrypoints: buildConfig.entrypoints,
+   *     target: buildConfig.target
    *   }));
+   * }
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Clean and prepare output directory
+   * beforeBuild: async (buildConfig, builder) => {
+   *   const outdir = buildConfig.outdir || ".frame-master/build";
+   *
+   *   // Clean previous build
+   *   await Bun.$`rm -rf ${outdir}/*`;
+   *
+   *   // Copy static assets
+   *   await Bun.$`cp -r public/* ${outdir}/`;
    * }
    * ```
    */
@@ -161,30 +295,77 @@ export type BuildOptionsPlugin = {
   /**
    * Hook executed after the build process completes.
    *
-   * Process build outputs, copy additional files, generate reports,
-   * or perform any post-build operations.
+   * Runs after `Bun.build()` finishes, whether successful or failed.
+   * All plugins' `afterBuild` hooks execute (not in parallel).
+   *
+   * Use for: processing outputs, copying files, generating reports, or cleanup.
    *
    * @param buildConfig - The build configuration that was used
-   * @param result - The Bun.BuildOutput containing all generated files
-   * @param builder - The Builder instance with access to config and paths
+   * @param result - The Bun.BuildOutput with success status and artifacts
+   * @param builder - The singleton Builder instance (access outputs via `builder.outputs`)
    *
    * @example
    * ```typescript
    * afterBuild: async (buildConfig, result, builder) => {
-   *   console.log(`Build completed: ${result.outputs.length} files generated`);
+   *   if (!result.success) {
+   *     console.error("Build failed!");
+   *     return;
+   *   }
+   *
+   *   console.log("✅ Build successful!");
    *
    *   // Log all generated files
    *   for (const output of result.outputs) {
-   *     console.log(`- ${output.path} (${output.kind})`);
+   *     console.log(`  ${output.path} (${output.kind}) - ${output.size} bytes`);
    *   }
    *
-   *   // Copy static assets
-   *   await Bun.$`cp -r static/* dist/`;
+   *   // Generate build report
+   *   const report = builder.generateReport("text");
+   *   console.log(report);
+   * }
+   * ```
    *
-   *   // Generate type definitions
-   *   if (result.success) {
-   *     await generateTypeDefinitions(result.outputs);
+   * @example
+   * ```typescript
+   * // Analyze bundle sizes and warn about large files
+   * afterBuild: async (buildConfig, result, builder) => {
+   *   if (!result.success) return;
+   *
+   *   const analysis = builder.analyzeBuild();
+   *
+   *   if (analysis.totalSize > 1_000_000) {
+   *     console.warn("⚠️  Bundle size exceeds 1MB:", analysis.totalSize);
    *   }
+   *
+   *   // Check for large individual files
+   *   for (const file of analysis.largestFiles.slice(0, 3)) {
+   *     if (file.size > 500_000) {
+   *       console.warn(`⚠️  Large file: ${file.path} (${file.size} bytes)`);
+   *     }
+   *   }
+   * }
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Copy assets and generate metadata
+   * afterBuild: async (buildConfig, result, builder) => {
+   *   if (!result.success) return;
+   *
+   *   // Copy additional assets
+   *   await Bun.$`cp -r static/* ${buildConfig.outdir}/`;
+   *
+   *   // Generate asset manifest for caching
+   *   const manifest = result.outputs.reduce((acc, output) => {
+   *     const hash = Bun.hash(output.path).toString(36);
+   *     acc[output.path] = { hash, size: output.size };
+   *     return acc;
+   *   }, {});
+   *
+   *   await Bun.write(
+   *     `${buildConfig.outdir}/manifest.json`,
+   *     JSON.stringify(manifest, null, 2)
+   *   );
    * }
    * ```
    */
@@ -197,14 +378,28 @@ export type BuildOptionsPlugin = {
   /**
    * Enable detailed logging during build process.
    *
-   * When true, the plugin's build operations will output detailed logs
-   * to help with debugging and understanding the build pipeline.
+   * When ANY plugin sets this to true, the singleton builder enables logging
+   * for all build operations, helping with debugging and pipeline understanding.
+   *
+   * Logs include:
+   * - Merged configuration details
+   * - Entrypoint counts
+   * - Plugin counts
+   * - Config merge operations
+   * - Build errors
    *
    * @default false
    *
    * @example
    * ```typescript
-   * enableLoging: process.env.DEBUG === "true"
+   * // Enable in development only
+   * enableLoging: process.env.NODE_ENV !== "production"
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Enable with environment variable
+   * enableLoging: process.env.DEBUG_BUILD === "true"
    * ```
    */
   enableLoging?: boolean;

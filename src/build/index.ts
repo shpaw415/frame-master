@@ -20,6 +20,13 @@ export class Builder {
   private onAfterBuildHooks: Exclude<BuilderProps["afterBuilds"], undefined> =
     [];
   private currentBuildConfig: Bun.BuildConfig | null = null;
+  private buildHistory: Array<{
+    timestamp: number;
+    duration: number;
+    entrypoints: string[];
+    outputCount: number;
+    success: boolean;
+  }> = [];
 
   readonly isLogEnabled: boolean;
   public outputs: Bun.BuildArtifact[] | null = null;
@@ -115,6 +122,7 @@ export class Builder {
    * }
    */
   async build(...entrypoints: string[]): Promise<Bun.BuildOutput> {
+    const startTime = performance.now();
     this.clearBuildDir();
     const buildConfig = await this.getBuildConfig();
     buildConfig.entrypoints = [...buildConfig.entrypoints, ...entrypoints];
@@ -132,11 +140,23 @@ export class Builder {
     );
 
     return Bun.build(buildConfig).then((res) => {
+      const duration = performance.now() - startTime;
+
       if (res.success) {
         this.outputs = res.outputs;
       } else {
         this.error("Build failed with error:", res);
       }
+
+      // Track build history
+      this.buildHistory.push({
+        timestamp: Date.now(),
+        duration,
+        entrypoints: buildConfig.entrypoints,
+        outputCount: res.outputs.length,
+        success: res.success,
+      });
+
       this.onAfterBuildHooks.map((hook) => hook(buildConfig, res, this));
       return res;
     });
@@ -284,6 +304,236 @@ export class Builder {
         .join("\n"),
       loader,
     };
+  }
+
+  /**
+   * Get the current merged build configuration.
+   *
+   * **Public API** - Access the final merged configuration from all plugins.
+   *
+   * Useful for debugging, logging, or making decisions based on the current build setup.
+   * Note: Dynamic configs are only included after calling `getBuildConfig()` internally.
+   *
+   * @returns The current build configuration or null if not yet initialized
+   *
+   * @example
+   * import { builder } from "frame-master/build";
+   *
+   * const config = builder.getConfig();
+   * if (config) {
+   *   console.log("Building for target:", config.target);
+   *   console.log("External packages:", config.external);
+   * }
+   */
+  getConfig(): Bun.BuildConfig | null {
+    return this.currentBuildConfig;
+  }
+
+  /**
+   * Analyze build outputs and provide insights.
+   *
+   * **Public API** - Get detailed analysis of the last build's outputs.
+   *
+   * Returns information about file sizes, artifact types, and identifies
+   * the largest files that might benefit from optimization.
+   *
+   * @returns Build analysis object with size metrics and artifact details
+   * @throws Error if no build has been executed yet
+   *
+   * @example
+   * import { builder } from "frame-master/build";
+   *
+   * await builder.build("/src/client.ts");
+   *
+   * const analysis = builder.analyzeBuild();
+   * console.log("Total build size:", analysis.totalSize, "bytes");
+   * console.log("Largest files:", analysis.largestFiles);
+   *
+   * // Check if bundle is too large
+   * if (analysis.totalSize > 1_000_000) {
+   *   console.warn("Bundle exceeds 1MB, consider code splitting");
+   * }
+   */
+  analyzeBuild(): {
+    totalSize: number;
+    averageSize: number;
+    artifacts: Array<{
+      path: string;
+      size: number;
+      kind: string;
+    }>;
+    largestFiles: Array<{ path: string; size: number }>;
+    byKind: Record<string, { count: number; totalSize: number }>;
+  } {
+    if (!this.outputs || this.outputs.length === 0) {
+      throw new Error("No build outputs available. Run builder.build() first.");
+    }
+
+    const artifacts = this.outputs.map((output) => ({
+      path: output.path,
+      size: output.size || 0,
+      kind: output.kind,
+    }));
+
+    const totalSize = artifacts.reduce((sum, a) => sum + a.size, 0);
+    const averageSize = totalSize / artifacts.length;
+
+    const largestFiles = [...artifacts]
+      .sort((a, b) => b.size - a.size)
+      .slice(0, 10)
+      .map((a) => ({ path: a.path, size: a.size }));
+
+    const byKind: Record<string, { count: number; totalSize: number }> = {};
+    for (const artifact of artifacts) {
+      if (!byKind[artifact.kind]) {
+        byKind[artifact.kind] = { count: 0, totalSize: 0 };
+      }
+      const kindStats = byKind[artifact.kind];
+      if (kindStats) {
+        kindStats.count++;
+        kindStats.totalSize += artifact.size;
+      }
+    }
+
+    return {
+      totalSize,
+      averageSize,
+      artifacts,
+      largestFiles,
+      byKind,
+    };
+  }
+
+  /**
+   * Get build history including timing and success metrics.
+   *
+   * **Public API** - Access historical build data for analytics and monitoring.
+   *
+   * Useful for tracking build performance over time, detecting regressions,
+   * and understanding build patterns during development.
+   *
+   * @returns Array of build records with timestamps, durations, and results
+   *
+   * @example
+   * import { builder } from "frame-master/build";
+   *
+   * const history = builder.getBuildHistory();
+   * const avgDuration = history.reduce((sum, b) => sum + b.duration, 0) / history.length;
+   *
+   * console.log("Average build time:", avgDuration.toFixed(2), "ms");
+   * console.log("Success rate:", history.filter(b => b.success).length / history.length);
+   */
+  getBuildHistory(): Array<{
+    timestamp: number;
+    duration: number;
+    entrypoints: string[];
+    outputCount: number;
+    success: boolean;
+  }> {
+    return [...this.buildHistory];
+  }
+
+  /**
+   * Clear build history records.
+   *
+   * **Public API** - Reset the build history tracking.
+   *
+   * Useful for starting fresh analytics or freeing memory in long-running processes.
+   *
+   * @example
+   * import { builder } from "frame-master/build";
+   *
+   * // After analyzing history
+   * builder.clearBuildHistory();
+   */
+  clearBuildHistory(): void {
+    this.buildHistory = [];
+  }
+
+  /**
+   * Generate a formatted build report.
+   *
+   * **Public API** - Create human-readable build reports for logging or debugging.
+   *
+   * @param format - Output format: "text" for console, "json" for structured data
+   * @returns Formatted build report string
+   *
+   * @example
+   * import { builder } from "frame-master/build";
+   *
+   * await builder.build("/src/client.ts");
+   *
+   * // Console-friendly report
+   * console.log(builder.generateReport("text"));
+   *
+   * // Structured data for logging systems
+   * const jsonReport = builder.generateReport("json");
+   * await sendToMonitoring(JSON.parse(jsonReport));
+   */
+  generateReport(format: "text" | "json" = "text"): string {
+    if (!this.outputs || this.outputs.length === 0) {
+      return format === "json"
+        ? JSON.stringify({ error: "No build outputs available" })
+        : "No build outputs available. Run builder.build() first.";
+    }
+
+    const analysis = this.analyzeBuild();
+    const history = this.getBuildHistory();
+    const lastBuild = history[history.length - 1];
+
+    if (format === "json") {
+      return JSON.stringify(
+        {
+          summary: {
+            totalFiles: analysis.artifacts.length,
+            totalSize: analysis.totalSize,
+            averageSize: Math.round(analysis.averageSize),
+            buildDuration: lastBuild?.duration,
+            success: lastBuild?.success,
+          },
+          artifacts: analysis.artifacts,
+          largestFiles: analysis.largestFiles,
+          byKind: analysis.byKind,
+          history: history.slice(-5), // Last 5 builds
+        },
+        null,
+        2
+      );
+    }
+
+    // Text format
+    const formatSize = (bytes: number) => {
+      if (bytes < 1024) return `${bytes}B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)}KB`;
+      return `${(bytes / (1024 * 1024)).toFixed(2)}MB`;
+    };
+
+    let report = "📊 Build Report\n";
+    report += "═".repeat(50) + "\n\n";
+    report += `Total Files: ${analysis.artifacts.length}\n`;
+    report += `Total Size: ${formatSize(analysis.totalSize)}\n`;
+    report += `Average Size: ${formatSize(Math.round(analysis.averageSize))}\n`;
+    if (lastBuild) {
+      report += `Build Duration: ${lastBuild.duration.toFixed(2)}ms\n`;
+      report += `Status: ${lastBuild.success ? "✅ Success" : "❌ Failed"}\n`;
+    }
+    report += "\n";
+
+    report += "📦 By Artifact Kind:\n";
+    for (const [kind, stats] of Object.entries(analysis.byKind)) {
+      report += `  ${kind}: ${stats.count} files (${formatSize(
+        stats.totalSize
+      )})\n`;
+    }
+    report += "\n";
+
+    report += "🔝 Largest Files:\n";
+    for (const file of analysis.largestFiles.slice(0, 5)) {
+      const relativePath = file.path.split("/").slice(-3).join("/");
+      report += `  ${formatSize(file.size).padStart(10)} - ${relativePath}\n`;
+    }
+
+    return report;
   }
 
   private getBuildConfig(): Promise<Bun.BuildConfig> {
@@ -573,3 +823,57 @@ export const builder = await Builder.createBuilder({
 });
 
 export default Builder;
+
+/**
+ * Type-safe helper for defining build configurations in Frame-Master plugins.
+ *
+ * **Public API** - Use this to get full TypeScript autocomplete and validation
+ * when creating build configurations in your plugins.
+ *
+ * This is a simple identity function that provides type checking without
+ * runtime overhead. It helps catch configuration errors at development time.
+ *
+ * @param config - Partial Bun.BuildConfig to use in your plugin
+ * @returns The same config object with full type checking
+ *
+ * @example
+ * // In your Frame-Master plugin
+ * import { defineBuildConfig } from "frame-master/build";
+ *
+ * export function myPlugin(): FrameMasterPlugin {
+ *   return {
+ *     name: "my-plugin",
+ *     build: {
+ *       buildConfig: defineBuildConfig({
+ *         target: "browser", // Autocomplete works!
+ *         external: ["react", "react-dom"],
+ *         minify: true,
+ *         // TypeScript will catch typos and invalid values
+ *       }),
+ *     },
+ *   };
+ * }
+ *
+ * @example
+ * // Dynamic config with type safety
+ * buildConfig: async (builder) => defineBuildConfig({
+ *   external: builder.isLogEnabled ? ["debug-lib"] : [],
+ *   minify: process.env.NODE_ENV === "production",
+ * })
+ *
+ * @example
+ * // Extend with custom properties (type-safe)
+ * const config = defineBuildConfig({
+ *   target: "browser",
+ *   external: ["react"],
+ *   // Custom metadata for your plugin (fully typed)
+ *   naming: {
+ *     entryNames: "[dir]/[name].[hash]",
+ *   },
+ * });
+ */
+export function defineBuildConfig<T extends Partial<Bun.BuildConfig>>(
+  config: T
+): T {
+  return config;
+}
