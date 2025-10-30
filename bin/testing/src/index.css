@@ -1,0 +1,410 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Container */
+.test-gui-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font-family: system-ui;
+}
+
+/* Header */
+.test-gui-header {
+  background: #007acc;
+  padding: 15px 20px;
+  border-bottom: 2px solid #005a9e;
+}
+
+.test-gui-title {
+  margin: 0;
+  font-size: 24px;
+  color: white;
+}
+
+.test-gui-status {
+  font-size: 12px;
+  margin-top: 5px;
+  color: #e0e0e0;
+}
+
+.status-connected {
+  color: #4ec9b0;
+}
+
+.status-disconnected {
+  color: #f48771;
+}
+
+/* Controls */
+.test-controls {
+  background: #252526;
+  padding: 15px 20px;
+  border-bottom: 1px solid #333;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.method-select {
+  padding: 8px 12px;
+  background: #3c3c3c;
+  color: #d4d4d4;
+  border: 1px solid #555;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.path-input {
+  flex: 1;
+  padding: 8px 12px;
+  background: #3c3c3c;
+  color: #d4d4d4;
+  border: 1px solid #555;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.btn-primary {
+  padding: 8px 20px;
+  background: #007acc;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #005a9e;
+}
+
+.btn-primary:disabled {
+  background: #666;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  padding: 8px 16px;
+  background: #3c3c3c;
+  color: #d4d4d4;
+  border: 1px solid #555;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.btn-secondary:hover {
+  background: #4a4a4a;
+}
+
+/* Main Content */
+.main-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* History Sidebar */
+.history-sidebar {
+  width: 300px;
+  background: #252526;
+  border-right: 1px solid #333;
+  overflow: auto;
+}
+
+.history-header {
+  padding: 15px;
+  border-bottom: 1px solid #333;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.history-empty {
+  padding: 20px;
+  color: #888;
+  text-align: center;
+  font-size: 14px;
+}
+
+.history-item {
+  padding: 12px 15px;
+  border-bottom: 1px solid #333;
+  cursor: pointer;
+  background: transparent;
+}
+
+.history-item:hover {
+  background: #2d2d2d;
+}
+
+.history-item.selected {
+  background: #2d2d2d;
+}
+
+.history-item.success {
+  border-left: 3px solid #4ec9b0;
+}
+
+.history-item.error {
+  border-left: 3px solid #f48771;
+}
+
+.history-item-title {
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.history-item-meta {
+  font-size: 12px;
+  color: #888;
+  margin-top: 4px;
+}
+
+.status-badge {
+  padding: 2px 6px;
+  color: #1e1e1e;
+  border-radius: 3px;
+  margin-right: 8px;
+}
+
+.status-badge.success {
+  background: #4ec9b0;
+}
+
+.status-badge.error {
+  background: #f48771;
+}
+
+/* Results Panel */
+.results-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.results-content {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
+}
+
+.results-empty {
+  color: #888;
+  text-align: center;
+  margin-top: 40px;
+}
+
+.results-empty-icon {
+  font-size: 48px;
+  margin-bottom: 10px;
+}
+
+.section {
+  margin-bottom: 30px;
+}
+
+.section-title {
+  color: #4ec9b0;
+  margin-bottom: 15px;
+  font-size: 18px;
+}
+
+/* Response Summary */
+.response-summary {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.response-status {
+  padding: 6px 12px;
+  color: #1e1e1e;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.response-status.success {
+  background: #4ec9b0;
+}
+
+.response-status.error {
+  background: #f48771;
+}
+
+.response-duration {
+  color: #ce9178;
+}
+
+.response-size {
+  color: #4ec9b0;
+}
+
+.error-box {
+  margin-top: 10px;
+  padding: 10px;
+  background: #3c1f1f;
+  border: 1px solid #f48771;
+  border-radius: 4px;
+  color: #f48771;
+}
+
+/* Code Blocks */
+.code-block {
+  background: #2d2d2d;
+  padding: 15px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 13px;
+  overflow: auto;
+}
+
+.code-block.scrollable {
+  max-height: 300px;
+}
+
+.code-block.large {
+  max-height: 400px;
+}
+
+.code-block pre {
+  margin: 0;
+  color: #d4d4d4;
+}
+
+.code-block pre.wrapped {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.header-line {
+  margin-bottom: 2px;
+}
+
+.header-key {
+  color: #9cdcfe;
+}
+
+/* Console */
+.console-container {
+  height: 200px;
+  border-top: 1px solid #333;
+  background: #1e1e1e;
+  overflow: auto;
+}
+
+.console-header {
+  padding: 10px 20px;
+  background: #252526;
+  border-bottom: 1px solid #333;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.console-content {
+  padding: 10px 20px;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.console-empty {
+  color: #888;
+}
+
+.console-log {
+  margin-bottom: 4px;
+}
+
+.console-log.error {
+  color: #f48771;
+}
+
+.console-log.warn {
+  color: #dcdcaa;
+}
+
+.console-log.info {
+  color: #4fc1ff;
+}
+
+.console-log.log,
+.console-log.debug {
+  color: #4ec9b0;
+}
+
+/* HTML Preview */
+.html-preview {
+  background: #2d2d2d;
+  padding: 15px;
+  border-radius: 4px;
+}
+
+.html-preview iframe {
+  display: block;
+}
+
+/* Headers Configuration */
+.headers-config {
+  background: #252526;
+  padding: 15px 20px;
+  border-bottom: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.headers-config-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.header-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #d4d4d4;
+  display: flex;
+  align-items: center;
+}
+
+.custom-headers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.custom-header-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.btn-remove {
+  padding: 8px 12px;
+  background: #f48771;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  transition: background 0.2s;
+  min-width: 36px;
+}
+
+.btn-remove:hover {
+  background: #d76e5d;
+}
