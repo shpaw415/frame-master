@@ -131,7 +131,7 @@ export default async () => {
   });
 };
 
-async function runOnStartMainPlugins() {
+export async function runOnStartMainPlugins() {
   if (!cluster.isPrimary) return;
 
   await Promise.all(

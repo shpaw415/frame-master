@@ -9,6 +9,7 @@ import type { Server } from "bun";
 import { Command } from "commander";
 import { serve } from "bun";
 import index from "./src/index.html";
+import { runOnStartMainPlugins } from "../../src/server";
 
 export const testCommand = new Command("test");
 
@@ -109,9 +110,9 @@ class TestServer {
 
   private startGUIServer() {
     const port = 3001;
-    process.env.NODE_ENV = "production";
     return Bun.serve({
       port,
+      development: false,
       routes: {
         "/*": index,
         "/ws": (req, server) =>
@@ -283,6 +284,7 @@ testCommand
   .description("Start the test server with web GUI")
   .action(async () => {
     await InitAll();
+    await runOnStartMainPlugins();
     const server = new TestServer();
     await server.start();
 
