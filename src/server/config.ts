@@ -32,35 +32,30 @@ async function loadConfig(): Promise<FrameMasterConfig> {
     ) {
       console.error("\n" + "=".repeat(80));
       console.error(
-        chalk.red.bold("❌ CIRCULAR DEPENDENCY DETECTED IN CONFIG")
-      );
-      console.error("=".repeat(80));
-      console.error(
-        chalk.yellow(
-          "\n⚠️  Your configuration file has a circular dependency.\n"
-        )
+        [
+          chalk.red.bold("❌ CIRCULAR DEPENDENCY DETECTED IN CONFIG"),
+          "=".repeat(80),
+          "\n⚠️  Your configuration file has a circular dependency.\n",
+        ].join("\n")
       );
       console.error(chalk.white("Common causes:"));
       console.error(
         chalk.gray(
-          [
-            "  • Trying to access config values at the module level (top-level)",
-          ].join("\n")
-        )
+          ["Trying to access config values at the module level (top-level)"]
+            .map((e) => `  • ${e}`)
+            .join("\n")
+        ) + "\n"
       );
       console.error(chalk.white("Solution:"));
       console.error(
         chalk.green(
-          "  ✓ Access config values inside plugin hooks (serverStart, router, etc.)"
-        )
-      );
-      console.error(
-        chalk.green(
-          "  ✓ set config as module scopped variable via import inside serverStart hook"
-        )
-      );
-      console.error(
-        chalk.green("  ✓ Move config-dependent code into lifecycle hooks\n")
+          [
+            "Access config values inside plugin hooks (serverStart, router, etc.)",
+            "Move config-dependent code into lifecycle hooks",
+          ]
+            .map((e) => `  ✓ ${e}`)
+            .join("\n")
+        ) + "\n"
       );
       console.error(
         chalk.cyan(
@@ -68,6 +63,7 @@ async function loadConfig(): Promise<FrameMasterConfig> {
         )
       );
       console.error("=".repeat(80) + "\n");
+
       throw new Error(
         "Frame-Master: Circular dependency in configuration file. Cannot continue.",
         {
