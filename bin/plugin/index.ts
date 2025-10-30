@@ -7,8 +7,6 @@ import _packageJson_ from "../../package.json";
 import { loadConfig, getConfig } from "../../src/server/config";
 
 const pluginCommand = new Command("plugin");
-await loadConfig();
-const config = getConfig();
 
 pluginCommand.description("Manage Frame-Master plugins").addHelpText(
   "after",
@@ -30,6 +28,8 @@ pluginCommand
   .option("-v, --verbose", "Show detailed plugin information")
   .action(async (options: { verbose?: boolean }) => {
     try {
+      await loadConfig();
+      const config = getConfig();
       const plugins = config!.plugins;
 
       if (plugins.length === 0) {
@@ -92,6 +92,8 @@ pluginCommand
   .description("Show detailed information about a plugin")
   .action(async (pluginName: string) => {
     try {
+      await loadConfig();
+      const config = getConfig();
       const plugin = config!.plugins.find((p: any) => p.name === pluginName);
 
       if (!plugin) {
@@ -198,7 +200,8 @@ pluginCommand
   .action(async () => {
     try {
       console.log(chalk.bold.blue("\n🔍 Validating configuration...\n"));
-
+      await loadConfig();
+      const config = getConfig();
       const plugins = config!.plugins;
       let errors = 0;
       let warnings = 0;
