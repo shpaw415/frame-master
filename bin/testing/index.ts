@@ -7,7 +7,7 @@ import { getConfig } from "../../src/server/config";
 import { InitAll } from "../../src/server/init";
 import type { Server } from "bun";
 import { Command } from "commander";
-import { serve } from "bun";
+import { fileURLToPath, serve } from "bun";
 import index from "./src/index.html";
 import { runOnStartMainPlugins } from "../../src/server";
 
@@ -112,9 +112,34 @@ class TestServer {
     const port = 3001;
     return Bun.serve({
       port,
-      development: false,
       routes: {
-        "/*": index,
+        "/*": async () =>
+          new Response(
+            await Bun.file(
+              fileURLToPath(import.meta.resolve("./src/index.html"))
+            ).text(),
+            {
+              headers: { "Content-Type": "text/html" },
+            }
+          ),
+        "/index.css": async () =>
+          new Response(
+            await Bun.file(
+              fileURLToPath(import.meta.resolve("./src/index.css"))
+            ).text(),
+            {
+              headers: { "Content-Type": "text/css" },
+            }
+          ),
+        "/frontend.js": async () =>
+          new Response(
+            await Bun.file(
+              fileURLToPath(import.meta.resolve("./src/frontend.js"))
+            ).text(),
+            {
+              headers: { "Content-Type": "application/javascript" },
+            }
+          ),
         "/ws": (req, server) =>
           server.upgrade(req)
             ? new Response("Welcome!", { status: 101 })

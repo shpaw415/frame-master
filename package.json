@@ -35,7 +35,8 @@
     "bun": ">=1.2.0"
   },
   "scripts": {
-    "dev": "bun bin/index.ts dev"
+    "dev": "bun bin/index.ts dev",
+    "build:tool:test": "bun build bin/testing/src/frontend.tsx --outfile=bin/testing/src/frontend.js"
   },
   "exports": {
     "./runtime": "./src/server/runtime-loader.ts",
