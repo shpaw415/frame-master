@@ -133,6 +133,21 @@ pluginCommand
           console.log(chalk.gray("    ✓ dev_main"));
       }
 
+      if (plugin.build) {
+        console.log(chalk.gray("  Build Lifecycle:"));
+        if (plugin.build.buildConfig) {
+          const configType =
+            typeof plugin.build.buildConfig === "function"
+              ? "dynamic"
+              : "static";
+          console.log(chalk.gray(`    ✓ buildConfig (${configType})`));
+        }
+        if (plugin.build.beforeBuild)
+          console.log(chalk.gray("    ✓ beforeBuild"));
+        if (plugin.build.afterBuild)
+          console.log(chalk.gray("    ✓ afterBuild"));
+      }
+
       if (plugin.websocket) {
         console.log(chalk.gray("  WebSocket:"));
         if (plugin.websocket.onOpen) console.log(chalk.gray("    ✓ onOpen"));
