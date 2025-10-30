@@ -4,9 +4,12 @@ import {
   masterRequest,
   type RequestState,
 } from "../../src/server/request-manager";
-import { getConfig, loadConfig } from "../../src/server/config";
+import { getConfig } from "../../src/server/config";
 import { InitAll } from "../../src/server/init";
 import type { Server } from "bun";
+import { Command } from "commander";
+
+export const testCommand = new Command("plugin");
 
 type TestResult = {
   pathname: string;
@@ -686,6 +689,11 @@ class FrameMasterTester {
   }
 }
 
-// Start the tester
-const tester = new FrameMasterTester();
-tester.start();
+testCommand
+  .command("test")
+  .description("Start the interactive tester")
+  .action(async () => {
+    // Start the tester
+    const tester = new FrameMasterTester();
+    await tester.start();
+  });

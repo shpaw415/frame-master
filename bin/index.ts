@@ -4,6 +4,7 @@ import { version } from "../package.json";
 import { join } from "path";
 import pluginCommand from "./plugin";
 import { getConfig, loadConfig } from "../src/server/config";
+import { testCommand } from "./testing";
 
 type CommandOptions = {
   install?: string;
@@ -69,5 +70,6 @@ program
   });
 
 program.addCommand(pluginCommand);
+program.addCommand(testCommand);
 
 program.parse();
