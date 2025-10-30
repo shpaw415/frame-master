@@ -1,11 +1,13 @@
 import { pluginLoader } from "../plugins/plugin-loader";
 import { plugin, type BunPlugin } from "bun";
+import { InitAll } from "./init";
 
 /**
  * Load runtime plugins using Bun's plugin system.
  */
-export function load() {
-  for (const { name, pluginParent } of pluginLoader.getPluginByName(
+export async function load() {
+  await InitAll();
+  for (const { name, pluginParent } of pluginLoader!.getPluginByName(
     "runtimePlugins"
   )) {
     pluginParent.forEach((plugin) => {

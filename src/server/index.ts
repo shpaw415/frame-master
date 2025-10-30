@@ -1,10 +1,11 @@
-import config from "./config";
+import { getConfig } from "./config";
 import { masterRequest } from "./request-manager";
 import masterRoutes from "./frame-master-routes";
 import { logRequest } from "./log";
 import { pluginLoader } from "../plugins";
 import cluster from "node:cluster";
 import { createWatcher, type FileSystemWatcher } from "./watch";
+import { InitAll } from "./init";
 
 declare global {
   var __FILESYSTEM_WATCHER__: FileSystemWatcher[];
@@ -13,8 +14,11 @@ declare global {
 globalThis.__FILESYSTEM_WATCHER__ ??= [];
 globalThis.__DRY_RUN__ ??= true;
 
-const serverConfigPlugins = pluginLoader.getPluginByName("serverConfig");
-const websockeretPlugins = pluginLoader.getPluginByName("websocket");
+await InitAll();
+const config = getConfig();
+
+const serverConfigPlugins = pluginLoader!.getPluginByName("serverConfig");
+const websockeretPlugins = pluginLoader!.getPluginByName("websocket");
 
 function deepMergeServerConfig(target: any, source: any): any {
   const result = { ...target };
@@ -31,7 +35,7 @@ function deepMergeServerConfig(target: any, source: any): any {
 
     // Check for conflicts on non-object values
     if (
-      !config.pluginsOptions?.disableHttpServerOptionsConflictWarning &&
+      !config!.pluginsOptions?.disableHttpServerOptionsConflictWarning &&
       typeof targetValue !== "object" &&
       typeof sourceValue !== "object" &&
       targetValue !== sourceValue
@@ -71,8 +75,8 @@ const pluginServerConfig = deepMergeServerConfig(
   serverConfigPlugins
     .map((p) => p.pluginParent)
     .reduce((curr, prev) => deepMergeServerConfig(curr, prev), {}),
-  config.HTTPServer
-) as typeof config.HTTPServer;
+  config!.HTTPServer
+) as Exclude<typeof config, null>["HTTPServer"];
 
 const pluginsRoutes = Object.assign(
   {},
@@ -131,7 +135,7 @@ async function runOnStartMainPlugins() {
   if (!cluster.isPrimary) return;
 
   await Promise.all(
-    pluginLoader.getPluginByName("serverStart").map(async (plugin) => {
+    pluginLoader!.getPluginByName("serverStart").map(async (plugin) => {
       try {
         await plugin.pluginParent.main?.();
       } catch (error) {
@@ -153,14 +157,14 @@ async function runFileSystemWatcherPlugin() {
 
   const DirToWatch = [
     ...new Set(
-      pluginLoader
+      pluginLoader!
         .getPluginByName("fileSystemWatchDir")
         .map((p) => p.pluginParent)
         .reduce((curr, prev) => [...curr, ...prev], [])
     ),
   ];
 
-  const OnFileSystemChangeCallbacks = pluginLoader
+  const OnFileSystemChangeCallbacks = pluginLoader!
     .getPluginByName("onFileSystemChange")
     .map((p) => p.pluginParent);
 

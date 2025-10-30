@@ -15,7 +15,7 @@ import { renderToReadableStream, renderToString } from "react-dom/server";
 import type { FrameMasterConfig } from "./type";
 import { errorToJSXPage } from "./utils/error-to-jsx";
 import NotFound from "./fallback/not-found";
-import ServerConfig from "./config";
+import { getConfig } from "./config";
 import { fixReactJSXDEV } from "./react-fix";
 
 fixReactJSXDEV();
@@ -116,7 +116,7 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
   /**
    * Server configuration
    */
-  public serverConfig: FrameMasterConfig = ServerConfig;
+  public serverConfig: FrameMasterConfig = getConfig()!;
   public serverInstance: Bun.Server<undefined>;
   public isLogPrevented: boolean = false;
 
@@ -135,7 +135,7 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
   }
 
   async handleRequest(): Promise<Response> {
-    const routerPlugins = pluginLoader.getPluginByName("router");
+    const routerPlugins = pluginLoader!.getPluginByName("router");
 
     this.currentState = "before_request";
 
@@ -604,7 +604,7 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
   private async applyRewritePlugins(html: string): Promise<string> {
     if (this._prevent_rewrite) return html;
     const rewriter = new HTMLRewriter();
-    const plugins = pluginLoader.getSubPluginsByParentName(
+    const plugins = pluginLoader!.getSubPluginsByParentName(
       "router",
       "html_rewrite"
     );

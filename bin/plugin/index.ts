@@ -3,14 +3,12 @@ import { Command } from "commander";
 import chalk from "chalk";
 import { readFile } from "fs/promises";
 import { join } from "path";
-import type { FrameMasterConfig } from "../../src/server/type";
 import _packageJson_ from "../../package.json";
-
-async function getConfig(): Promise<FrameMasterConfig> {
-  return (await import("../../src/server/config")).default;
-}
+import { loadConfig, getConfig } from "../../src/server/config";
 
 const pluginCommand = new Command("plugin");
+await loadConfig();
+const config = getConfig();
 
 pluginCommand.description("Manage Frame-Master plugins").addHelpText(
   "after",
@@ -32,8 +30,7 @@ pluginCommand
   .option("-v, --verbose", "Show detailed plugin information")
   .action(async (options: { verbose?: boolean }) => {
     try {
-      const config = await getConfig();
-      const plugins = config.plugins;
+      const plugins = config!.plugins;
 
       if (plugins.length === 0) {
         console.log(chalk.yellow("No plugins installed"));
@@ -95,8 +92,7 @@ pluginCommand
   .description("Show detailed information about a plugin")
   .action(async (pluginName: string) => {
     try {
-      const config = await getConfig();
-      const plugin = config.plugins.find((p: any) => p.name === pluginName);
+      const plugin = config!.plugins.find((p: any) => p.name === pluginName);
 
       if (!plugin) {
         console.log(chalk.red(`Plugin "${pluginName}" not found`));
@@ -203,8 +199,7 @@ pluginCommand
     try {
       console.log(chalk.bold.blue("\n🔍 Validating configuration...\n"));
 
-      const config = await getConfig();
-      const plugins = config.plugins;
+      const plugins = config!.plugins;
       let errors = 0;
       let warnings = 0;
 

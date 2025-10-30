@@ -754,25 +754,6 @@ export class Builder {
     console.error("[Frame-Master-plugin-react-ssr Builder]:", ...data);
   }
 }
-
-const plugin = pluginLoader.getPluginByName("build");
-const configFactories = plugin
-  .map((plugin) => plugin.pluginParent.buildConfig)
-  .filter((p) => p != undefined);
-const beforeBuildHooks = plugin
-  .map((plugin) => plugin.pluginParent.beforeBuild)
-  .filter((p) => p != undefined) as Exclude<
-  BuilderProps["beforeBuilds"],
-  undefined
->;
-const afterBuildHooks = plugin
-  .map((plugin) => plugin.pluginParent.afterBuild)
-  .filter((p) => p != undefined) as Exclude<
-  BuilderProps["afterBuilds"],
-  undefined
->;
-const logIsEnabled = plugin.some((p) => p.pluginParent.enableLoging === true);
-
 /**
  * Singleton Builder instance pre-configured with all Frame-Master plugin build configurations.
  *
@@ -815,14 +796,36 @@ const logIsEnabled = plugin.some((p) => p.pluginParent.enableLoging === true);
  *   console.log("Generated:", artifact.path);
  * });
  */
-export const builder = await Builder.createBuilder({
-  pluginBuildConfig: configFactories,
-  beforeBuilds: beforeBuildHooks,
-  afterBuilds: afterBuildHooks,
-  enableLogging: logIsEnabled,
-});
-
+export let builder: Builder | null = null;
 export default Builder;
+
+export async function InitBuilder() {
+  if (builder) return;
+  const plugin = pluginLoader!.getPluginByName("build");
+  const configFactories = plugin
+    .map((plugin) => plugin.pluginParent.buildConfig)
+    .filter((p) => p != undefined);
+  const beforeBuildHooks = plugin
+    .map((plugin) => plugin.pluginParent.beforeBuild)
+    .filter((p) => p != undefined) as Exclude<
+    BuilderProps["beforeBuilds"],
+    undefined
+  >;
+  const afterBuildHooks = plugin
+    .map((plugin) => plugin.pluginParent.afterBuild)
+    .filter((p) => p != undefined) as Exclude<
+    BuilderProps["afterBuilds"],
+    undefined
+  >;
+  const logIsEnabled = plugin.some((p) => p.pluginParent.enableLoging === true);
+
+  builder = await Builder.createBuilder({
+    pluginBuildConfig: configFactories,
+    beforeBuilds: beforeBuildHooks,
+    afterBuilds: afterBuildHooks,
+    enableLogging: logIsEnabled,
+  });
+}
 
 /**
  * Type-safe helper for defining build configurations in Frame-Master plugins.

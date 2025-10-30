@@ -10,72 +10,157 @@ const DEFAULT_CONFIG = {
   plugins: [],
 } satisfies FrameMasterConfig;
 
-async function loadConfig(): Promise<FrameMasterConfig> {
-  const filePath = join(process.cwd(), Paths.configFile);
+/**
+ * ConfigManager handles Frame-Master configuration loading and access.
+ *
+ * Uses lazy initialization pattern to prevent circular dependency issues.
+ * Config is `null` until `loadConfig()` is called by Frame-Master's initialization.
+ *
+ * @internal - Use exported functions instead of direct instantiation
+ */
+class ConfigManager {
+  public mergedConfig: FrameMasterConfig | null = null;
 
-  try {
-    const config = (
-      (await import(filePath)) as {
-        default?: FrameMasterConfig;
+  /**
+   * Getter for accessing the merged configuration.
+   * @returns The current configuration or null if not yet loaded
+   */
+  public get config() {
+    return this.mergedConfig;
+  }
+
+  /**
+   * Loads the Frame-Master configuration from `frame-master.config.ts`.
+   *
+   * If config is already loaded, returns cached version.
+   * Falls back to minimal default config if file is missing or empty.
+   *
+   * @returns Promise resolving to the loaded configuration
+   * @internal - Called by Frame-Master during initialization
+   */
+  async loadConfig(): Promise<FrameMasterConfig> {
+    if (this.mergedConfig != null) return this.mergedConfig;
+    const filePath = join(process.cwd(), Paths.configFile);
+    try {
+      const configModule = await import(filePath);
+      const config = configModule?.default as FrameMasterConfig | undefined;
+
+      if (config) {
+        this.mergedConfig = config;
+        return this.mergedConfig;
       }
-    )?.default;
 
-    if (config) return config;
-
-    console.error(`Config file is empty. Fallback to minimal config.`);
-    return DEFAULT_CONFIG;
-  } catch (error) {
-    const _e: Error = error as Error;
-    if (
-      _e.message.trim().startsWith("Cannot access") &&
-      _e.message.trim().endsWith("before initialization.")
-    ) {
-      console.error("\n" + "=".repeat(80));
       console.error(
-        [
-          chalk.red.bold("❌ CIRCULAR DEPENDENCY DETECTED IN CONFIG"),
-          "=".repeat(80),
-          "\n⚠️  Your configuration file has a circular dependency.\n",
-        ].join("\n")
+        chalk.red(`Config file is empty. Fallback to minimal config.`)
       );
-      console.error(chalk.white("Common causes:"));
+      this.mergedConfig = DEFAULT_CONFIG;
+      return this.mergedConfig;
+    } catch (error) {
       console.error(
-        chalk.gray(
-          ["Trying to access config values at the module level (top-level)"]
-            .map((e) => `  • ${e}`)
-            .join("\n")
-        ) + "\n"
+        chalk.red(`Config file not found Fallback to minimal config.`)
       );
-      console.error(chalk.white("Solution:"));
-      console.error(
-        chalk.green(
-          [
-            "Access config values inside plugin hooks (serverStart, router, etc.)",
-            "Move config-dependent code into lifecycle hooks",
-          ]
-            .map((e) => `  ✓ ${e}`)
-            .join("\n")
-        ) + "\n"
-      );
-      console.error(
-        chalk.cyan(
-          "📖 Documentation: https://frame-master.com/docs/configuration#limitations"
-        )
-      );
-      console.error("=".repeat(80) + "\n");
-
-      throw new Error(
-        "Frame-Master: Circular dependency in configuration file. Cannot continue.",
-        {
-          cause: error,
-        }
-      );
+      this.mergedConfig = DEFAULT_CONFIG;
+      return this.mergedConfig;
     }
-    console.error(`Config file not found Fallback to minimal config.`);
-    return DEFAULT_CONFIG;
+  }
+
+  /**
+   * Reloads the configuration by clearing cache and re-importing.
+   *
+   * Useful for hot-reloading or testing scenarios.
+   *
+   * @returns Promise resolving to the reloaded configuration
+   */
+  async reloadConfig(): Promise<FrameMasterConfig> {
+    this.mergedConfig = null;
+    return this.loadConfig();
+  }
+
+  /**
+   * Returns the current configuration without loading.
+   *
+   * @returns The configuration object or null if not yet loaded
+   */
+  getConfig(): FrameMasterConfig | null {
+    return this.mergedConfig;
   }
 }
 
-const config = { DEFAULT_CONFIG, ...(await loadConfig()) };
+/**
+ * Singleton instance of ConfigManager.
+ *
+ * @public
+ */
+export const configManager = new ConfigManager();
 
-export default config;
+/**
+ * Loads the Frame-Master configuration file.
+ *
+ * This function is called automatically during Frame-Master initialization.
+ * If you need to access config, use `getConfig()` instead.
+ *
+ * @returns Promise resolving to the loaded configuration
+ *
+ * @example
+ * ```typescript
+ * // Usually called internally by Frame-Master
+ * const config = await loadConfig();
+ * ```
+ */
+export async function loadConfig(): Promise<FrameMasterConfig> {
+  return configManager.loadConfig();
+}
+
+/**
+ * Reloads the Frame-Master configuration.
+ *
+ * Clears the cached configuration and re-imports from disk.
+ * Useful for development hot-reloading scenarios.
+ *
+ * @returns Promise resolving to the reloaded configuration
+ *
+ * @example
+ * ```typescript
+ * // Hot reload config after changes
+ * const newConfig = await reloadConfig();
+ * ```
+ */
+export async function reloadConfig(): Promise<FrameMasterConfig> {
+  return configManager.reloadConfig();
+}
+
+/**
+ * Gets the current Frame-Master configuration.
+ *
+ * Returns `null` if configuration hasn't been loaded yet.
+ * This is the **only safe way** to access config - prevents circular dependencies.
+ *
+ * @returns The configuration object or null if not yet initialized
+ *
+ * @example
+ * ```typescript
+ * import { getConfig } from "frame-master/server/config";
+ *
+ * const config = getConfig();
+ * if (config) {
+ *   console.log("Port:", config.HTTPServer.port);
+ * }
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // In a Frame-Master plugin (best practice)
+ * export function myPlugin(): FrameMasterPlugin {
+ *   return {
+ *     name: "my-plugin",
+ *     serverStart: async (server, config) => {
+ *       // Access config through hook parameter
+ *       console.log("Port:", config.HTTPServer.port);
+ *     }
+ *   };
+ * }
+ * ```
+ */
+export function getConfig(): FrameMasterConfig | null {
+  return configManager.getConfig();
+}

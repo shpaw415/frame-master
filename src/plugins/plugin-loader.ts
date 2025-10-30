@@ -1,7 +1,7 @@
 "server only";
 
 import type { FrameMasterPlugin } from "./types";
-import config from "../server/config";
+import { getConfig } from "../server/config";
 import FrameMasterPackageJson from "../../package.json";
 
 class PluginLoader {
@@ -16,8 +16,9 @@ class PluginLoader {
   private sub_plugin_cache: Map<string, Array<any>> = new Map();
 
   constructor() {
+    const config = getConfig();
     this.Plugins.push(
-      ...(config.plugins.map((p) => ({ ...p, filePath: "client-plugin" })) ??
+      ...(config!.plugins.map((p) => ({ ...p, filePath: "client-plugin" })) ??
         [])
     );
 
@@ -163,6 +164,9 @@ class PluginLoader {
   }
 }
 
-const pluginLoader = new PluginLoader();
-
-export { pluginLoader };
+export let pluginLoader: PluginLoader | null = null;
+export function InitPluginLoader() {
+  if (!pluginLoader) {
+    pluginLoader = new PluginLoader();
+  }
+}

@@ -3,6 +3,8 @@ import { program } from "commander";
 import { version } from "../package.json";
 import { join } from "path";
 import pluginCommand from "./plugin";
+import { getConfig } from "../src/server/config";
+import { InitAll } from "frame-master/server/init";
 
 type CommandOptions = {
   install?: string;
@@ -11,7 +13,8 @@ type CommandOptions = {
   search?: string;
 };
 
-const config = async () => (await import("../src/server/config")).default;
+await InitAll();
+const config = getConfig();
 
 const importServerStart = () =>
   import(join(process.cwd(), ".frame-master", "server.ts"));
@@ -35,9 +38,7 @@ program
   .action(async () => {
     process.env.NODE_ENV = "development";
     console.log(
-      `Dev server running at http://localhost:${
-        (await config()).HTTPServer.port
-      }`
+      `Dev server running at http://localhost:${config!.HTTPServer.port}`
     );
     await importServerStart();
   });
