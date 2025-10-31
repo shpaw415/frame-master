@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, expect, test, describe } from "bun:test";
+import { beforeAll, beforeEach, expect, test } from "bun:test";
 import { masterRequest } from "../src/server/request-manager";
 import { webToken } from "@shpaw415/webtoken";
 import { setMockConfig } from "../src/server/config";

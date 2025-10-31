@@ -115,7 +115,6 @@ const TS_CONFIG_WITH_CUSTOM_TYPE = {
   include: [CUSTOM_D_TS_PATH],
 };
 
-// TODO : Update tsconfig.json to include .frame-master/frame-master-custom-type.d.ts
 async function InitTsConfig() {
   const projectTsConfigFile = Bun.file(join(process.cwd(), "tsconfig.json"));
 

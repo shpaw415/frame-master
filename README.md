@@ -28,8 +28,6 @@ export default config;
 
 ## 🎯 Core Philosophy
 
-## 🎯 Core Philosophy
-
 ### 🔌 **Plugins Define Everything**
 
 Frame-Master has **zero built-in behavior**:
@@ -56,41 +54,6 @@ Frame-Master doesn't care about React, Vue, or Svelte. **Plugins decide everythi
 ### 🌐 **Community Driven**
 
 Browse plugins at [frame-master.com](https://frame-master.com) - official and community solutions.
-
-### 🏗️ **Singleton Build Pipeline**
-
-All plugins contribute to a **single unified build**. When any plugin calls `builder.build()`, all plugin configurations merge intelligently:
-
-```typescript
-// Plugin A adds React externals
-buildConfig: {
-  external: ["react", "react-dom"],
-}
-
-// Plugin B adds Bun plugins
-buildConfig: {
-  plugins: [myBunPlugin()],
-}
-
-// Result: ONE build with both configs merged
-builder.build("/src/client.ts");
-```
-
-### 🎨 **Framework Agnostic**
-
-Frame-Master doesn't care about React, Vue, Svelte, or vanilla JS. It doesn't have opinions about SSR, SSG, or SPA. **Plugins decide the architecture.**
-
-Want to build the next Next.js? Write a plugin.  
-Want to build something completely new? Write a plugin.
-
-### 🌐 **Community Driven**
-
-Browse plugins at [frame-master.com](https://frame-master.com):
-
-- Official plugins (React SSR, Auth, Tailwind, etc.)
-- Community plugins (your custom solutions)
-- Share your plugin combinations
-- Build once, use everywhere
 
 ## 📦 Quick Start
 
