@@ -3,7 +3,12 @@ import { program } from "commander";
 import { version } from "../package.json";
 import { join } from "path";
 import pluginCommand from "./plugin";
-import { getConfig, loadConfig } from "../src/server/config";
+import {
+  DEFAULT_CONFIG,
+  getConfig,
+  loadConfig,
+  setMockConfig,
+} from "../src/server/config";
 import { testCommand } from "./testing";
 
 type CommandOptions = {

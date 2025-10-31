@@ -1,9 +1,8 @@
 import type { FrameMasterConfig } from "./type";
 import { join } from "path";
 import Paths from "../paths";
-import chalk from "chalk";
 
-const DEFAULT_CONFIG = {
+export const DEFAULT_CONFIG = {
   HTTPServer: {
     port: 3000,
   },
@@ -76,6 +75,9 @@ class ConfigManager {
    */
   getConfig(): FrameMasterConfig | null {
     return this.mergedConfig;
+  }
+  setMockConfig(mockConfig: FrameMasterConfig) {
+    this.mergedConfig = mockConfig;
   }
 }
 
@@ -156,4 +158,8 @@ export async function reloadConfig(): Promise<FrameMasterConfig> {
  */
 export function getConfig(): FrameMasterConfig | null {
   return configManager.getConfig();
+}
+
+export function setMockConfig(mockConfig: FrameMasterConfig) {
+  configManager.setMockConfig(mockConfig);
 }

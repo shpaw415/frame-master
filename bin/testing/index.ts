@@ -72,6 +72,34 @@ class TestServer {
     this.guiServer = this.startGUIServer();
   }
 
+  public cleanup() {
+    // Restore original console methods
+    console.log = this.originalConsole.log;
+    console.error = this.originalConsole.error;
+    console.warn = this.originalConsole.warn;
+    console.info = this.originalConsole.info;
+    console.debug = this.originalConsole.debug;
+
+    this.server.stop();
+    this.guiServer.stop();
+  }
+
+  public async start() {
+    if (!getConfig()) await InitAll();
+    const config = getConfig();
+    if (!config) {
+      console.error("Failed to load configuration");
+      process.exit(1);
+    }
+
+    console.log(`\n🧪 Frame-Master Test Server Started`);
+    console.log(`\n📊 GUI available at: http://localhost:3001`);
+    console.log(`\nPress Ctrl+C to stop\n`);
+  }
+  public stop() {
+    this.cleanup();
+  }
+
   private interceptConsole() {
     const createInterceptor = (level: string) => {
       return (...args: any[]) => {
@@ -274,34 +302,6 @@ class TestServer {
   private broadcastToGUI(message: any) {
     const data = JSON.stringify(message);
     this.wsClients.forEach((ws) => ws.send(data));
-  }
-
-  public cleanup() {
-    // Restore original console methods
-    console.log = this.originalConsole.log;
-    console.error = this.originalConsole.error;
-    console.warn = this.originalConsole.warn;
-    console.info = this.originalConsole.info;
-    console.debug = this.originalConsole.debug;
-
-    this.server.stop();
-    this.guiServer.stop();
-  }
-
-  async start() {
-    if (!getConfig()) await InitAll();
-    const config = getConfig();
-    if (!config) {
-      console.error("Failed to load configuration");
-      process.exit(1);
-    }
-
-    console.log(`\n🧪 Frame-Master Test Server Started`);
-    console.log(`\n📊 GUI available at: http://localhost:3001`);
-    console.log(`\nPress Ctrl+C to stop\n`);
-  }
-  stop() {
-    this.cleanup();
   }
 }
 

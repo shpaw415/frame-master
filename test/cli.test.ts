@@ -11,7 +11,7 @@ import { tmpdir } from "os";
  */
 
 const TEST_DIR = join(tmpdir(), `frame-master-cli-test-${Date.now()}`);
-const CLI_PATH = join(process.cwd(), "bin", "index.ts");
+const CLI_PATH = join(process.cwd(), "bin", "index.ts") as "<cwd>/bin/index.ts";
 
 beforeAll(() => {
   // Create test directory
@@ -74,35 +74,20 @@ describe("frame-master CLI", () => {
 
   describe("create command", () => {
     test("should display help for create command", async () => {
-      const proc = Bun.spawn(["bun", CLI_PATH, "create", "--help"], {
-        cwd: TEST_DIR,
-        stdout: "pipe",
-      });
-
-      const output = await new Response(proc.stdout).text();
-      await proc.exited;
+      const output = await Bun.$`bun ${CLI_PATH} create --help`.text();
 
       expect(output).toContain("Create a new frame-master project");
       expect(output).toContain("minimal");
       expect(output).toContain("-t, --type");
-      expect(proc.exitCode).toBe(0);
     });
 
     test("should create a minimal project", async () => {
       const projectName = "test-minimal-project";
       const projectPath = join(TEST_DIR, projectName);
-
-      const proc = Bun.spawn(
-        ["bun", CLI_PATH, "create", projectName, "--type", "minimal"],
-        {
-          cwd: TEST_DIR,
-          stdout: "pipe",
-          stderr: "pipe",
-        }
-      );
-
-      const output = await new Response(proc.stdout).text();
-      await proc.exited;
+      const output =
+        await Bun.$`bun ${CLI_PATH} create ${projectName} --type minimal`
+          .cwd(TEST_DIR)
+          .text();
 
       // Check if project was created
       expect(existsSync(projectPath)).toBe(true);
@@ -116,7 +101,6 @@ describe("frame-master CLI", () => {
       // Check success message
       expect(output).toContain("Successfully created");
       expect(output).toContain(projectName);
-      expect(proc.exitCode).toBe(0);
     }, 30000); // Longer timeout for project creation
 
     test("should create project with default type when not specified", async () => {
@@ -286,14 +270,9 @@ export default {
 `;
       writeFileSync(join(projectPath, "frame-master.config.ts"), configContent);
 
-      const proc = Bun.spawn(["bun", CLI_PATH, "plugin", "list"], {
-        cwd: projectPath,
-        stdout: "pipe",
-        stderr: "pipe",
-      });
-
-      const output = await new Response(proc.stdout).text();
-      await proc.exited;
+      const output = await Bun.$`bun ${CLI_PATH} plugin list`
+        .cwd(projectPath)
+        .text();
 
       expect(output).toContain("Installed Plugins");
       expect(output).toContain("test-plugin");
@@ -368,6 +347,136 @@ export default {
 
       expect(output).toContain("No plugins installed");
       expect(proc.exitCode).toBe(0);
+    }, 15000);
+  });
+
+  describe("test command", () => {
+    test("should display help for test command", async () => {
+      const proc = Bun.spawn(["bun", CLI_PATH, "test", "--help"], {
+        cwd: process.cwd(),
+        stdout: "pipe",
+      });
+
+      const output = await new Response(proc.stdout).text();
+      await proc.exited;
+
+      expect(output).toContain("test");
+      expect(output).toContain("start");
+      expect(proc.exitCode).toBe(0);
+    });
+
+    test("should display help for test start command", async () => {
+      const proc = Bun.spawn(["bun", CLI_PATH, "test", "start", "--help"], {
+        cwd: process.cwd(),
+        stdout: "pipe",
+      });
+
+      const output = await new Response(proc.stdout).text();
+      await proc.exited;
+
+      expect(output).toContain("test server");
+      expect(output).toContain("web GUI");
+      expect(proc.exitCode).toBe(0);
+    });
+
+    test("should start test server and output GUI URL", async () => {
+      // Create a minimal test project
+      const projectName = "test-server-project";
+      const projectPath = join(TEST_DIR, projectName);
+      mkdirSync(projectPath, { recursive: true });
+
+      // Create minimal config
+      const configContent = `
+import type { FrameMasterConfig } from "frame-master/server/type";
+
+export default {
+  HTTPServer: {
+    port: 3050,
+  },
+  plugins: [],
+} satisfies FrameMasterConfig;
+`;
+      writeFileSync(join(projectPath, "frame-master.config.ts"), configContent);
+
+      // Create minimal package.json
+      writeFileSync(
+        join(projectPath, "package.json"),
+        JSON.stringify(
+          {
+            name: projectName,
+            version: "1.0.0",
+            type: "module",
+          },
+          null,
+          2
+        )
+      );
+
+      // Create pages directory
+      mkdirSync(join(projectPath, "src", "pages"), { recursive: true });
+      writeFileSync(
+        join(projectPath, "src", "pages", "index.tsx"),
+        `export default function Index() { return <div>Test</div>; }`
+      );
+
+      // Start test server with timeout
+      const proc = Bun.spawn(["bun", CLI_PATH, "test", "start"], {
+        cwd: projectPath,
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+
+      // Wait for initial output
+      const reader = proc.stdout.getReader();
+      const decoder = new TextDecoder();
+      let output = "";
+      let attempts = 0;
+      const maxAttempts = 20;
+
+      while (attempts < maxAttempts) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        output += decoder.decode(value);
+
+        // Check if we have the expected output
+        if (
+          output.includes("Test Server") ||
+          output.includes("GUI available")
+        ) {
+          break;
+        }
+
+        attempts++;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      // Kill the process
+      proc.kill();
+      await proc.exited;
+
+      // Verify output contains expected messages
+      expect(output).toMatch(/Test Server|GUI available|localhost:3001/);
+    }, 30000);
+
+    test("should fail gracefully without config file", async () => {
+      const projectName = "test-no-config";
+      const projectPath = join(TEST_DIR, projectName);
+      mkdirSync(projectPath, { recursive: true });
+
+      const proc = Bun.spawn(["bun", CLI_PATH, "test", "start"], {
+        cwd: projectPath,
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+
+      const stderr = await new Response(proc.stderr).text();
+      const stdout = await new Response(proc.stdout).text();
+      await proc.exited;
+
+      const output = stderr + stdout;
+      expect(output).toMatch(/config|configuration|not found/i);
+      expect(proc.exitCode).not.toBe(0);
     }, 15000);
   });
 
