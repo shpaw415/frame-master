@@ -160,6 +160,7 @@ export function getConfig(): FrameMasterConfig | null {
   return configManager.getConfig();
 }
 
+/** Override Config for testing perpose or something else */
 export function setMockConfig(mockConfig: FrameMasterConfig) {
   configManager.setMockConfig(mockConfig);
 }

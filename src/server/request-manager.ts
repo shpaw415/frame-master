@@ -58,6 +58,9 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
   private _response?: Response;
 
   private _response_setted: boolean = false;
+  /** the name of the plugin who set the response */
+  public responseSetBy: string | null = null;
+  private currentPluginName: string | null = null;
   private _response_body: BodyInit | null = null;
   private _response_init: Writable<ResponseInit> = {};
 
@@ -129,9 +132,6 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
     this.isAskingHTML = Boolean(
       this.request.headers.get("accept")?.includes("text/html")
     );
-    /*
-        this.match = this.initMatch();
-        */
   }
 
   async handleRequest(): Promise<Response> {
@@ -152,6 +152,7 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
     this.currentState = "request";
 
     for await (const { pluginParent, name } of routerPlugins) {
+      this.currentPluginName = name;
       try {
         await pluginParent.request?.(this);
       } catch (e) {
@@ -230,7 +231,10 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
       "You can only set the response in the request state."
     );
     if (this._response_setted)
-      throw new ResponseAlreadySetError("Response already set");
+      throw new ResponseAlreadySetError(
+        `Response already set by: ${this.responseSetBy}`
+      );
+    this.responseSetBy = this.currentPluginName;
     this._response_body = body;
     this._response_init = {
       ...this._response_init,
@@ -247,7 +251,7 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
    * @returns True if the response has been set, false otherwise.
    */
   isResponseSetted(): boolean {
-    return Boolean(this._response);
+    return this._response_setted;
   }
   unsetResponse(): void {
     this._ensureisInState(
@@ -257,6 +261,7 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
     this._response_setted = false;
     this._response_body = null;
     this._response_init = {};
+    this.responseSetBy = null;
   }
 
   /**
@@ -728,13 +733,5 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
       status: 500,
       headers: { "Content-Type": "text/html" },
     });
-  }
-
-  private sanitizePath(unsafePath: string, basePath: string) {
-    const resolvedPath = resolve(basePath, unsafePath);
-    if (!resolvedPath.startsWith(basePath)) {
-      throw new Error("Access to path is not allowed.");
-    }
-    return resolvedPath;
   }
 }

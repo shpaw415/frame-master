@@ -170,3 +170,7 @@ export function InitPluginLoader() {
     pluginLoader = new PluginLoader();
   }
 }
+
+export function reloadPluginLoader() {
+  pluginLoader = new PluginLoader();
+}
