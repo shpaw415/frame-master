@@ -106,11 +106,11 @@ class TestServer {
         const timestamp = new Date().toLocaleTimeString();
         const message = args
           .map((arg) => {
-            if (arg !== null && typeof arg == "object") {
+            if (arg !== null && typeof arg === "object") {
               try {
                 return JSON.stringify(arg, null, 2);
               } catch {
-                return "[object object]";
+                return "[Non-serializable Object]";
               }
             }
             return String(arg);

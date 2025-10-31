@@ -134,9 +134,9 @@ async function InitTsConfig() {
     return;
   }
   tsconfig.include ??= [];
-  tsconfig.include.includes(CUSTOM_D_TS_PATH)
-    ? "already-exists"
-    : tsconfig.include.push(CUSTOM_D_TS_PATH);
+  if (!tsconfig.include.includes(CUSTOM_D_TS_PATH)) {
+    tsconfig.include.push(CUSTOM_D_TS_PATH);
+  }
 
   return projectTsConfigFile.write(JSON.stringify(tsconfig, null, 2));
 }

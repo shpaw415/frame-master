@@ -11,7 +11,7 @@ import { tmpdir } from "os";
  */
 
 const TEST_DIR = join(tmpdir(), `frame-master-cli-test-${Date.now()}`);
-const CLI_PATH = join(process.cwd(), "bin", "index.ts") as "<cwd>/bin/index.ts";
+const CLI_PATH = join(process.cwd(), "bin", "index.ts");
 
 beforeAll(() => {
   // Create test directory

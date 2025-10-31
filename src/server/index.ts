@@ -33,7 +33,7 @@ function deepMergeServerConfig(
 
     // Check for conflicts on non-object values
     if (
-      disableWarning &&
+      !disableWarning &&
       typeof targetValue !== "object" &&
       typeof sourceValue !== "object" &&
       targetValue !== sourceValue
@@ -85,10 +85,10 @@ export default async () => {
     process.exit(1);
   }
 
-  const serverConfigPlugins = pluginLoader!.getPluginByName("serverConfig");
-  const websockeretPlugins = pluginLoader!.getPluginByName("websocket");
+  const serverConfigPlugins = pluginLoader.getPluginByName("serverConfig");
+  const websocketPlugins = pluginLoader.getPluginByName("websocket");
   const disableWarning = Boolean(
-    config!.pluginsOptions?.disableHttpServerOptionsConflictWarning
+    config.pluginsOptions?.disableHttpServerOptionsConflictWarning
   );
   const pluginServerConfig = deepMergeServerConfig(
     serverConfigPlugins
@@ -97,7 +97,7 @@ export default async () => {
         (curr, prev) => deepMergeServerConfig(curr, prev, disableWarning),
         {}
       ),
-    config!.HTTPServer,
+    config.HTTPServer,
     disableWarning
   ) as Exclude<typeof config, null>["HTTPServer"];
 
@@ -135,17 +135,17 @@ export default async () => {
         return deepMergeServerConfig(curr, prev || {}, disableWarning);
       }, {}),
       message: (ws, message) => {
-        websockeretPlugins.forEach((plugin) => {
+        websocketPlugins.forEach((plugin) => {
           plugin.pluginParent.onMessage?.(ws, message);
         });
       },
       open: (ws) => {
-        websockeretPlugins.forEach((plugin) => {
+        websocketPlugins.forEach((plugin) => {
           plugin.pluginParent.onOpen?.(ws);
         });
       },
       close: (ws) => {
-        websockeretPlugins.forEach((plugin) => {
+        websocketPlugins.forEach((plugin) => {
           plugin.pluginParent.onClose?.(ws);
         });
       },
@@ -155,9 +155,9 @@ export default async () => {
 
 export async function runOnStartMainPlugins() {
   if (!cluster.isPrimary) return;
-
+  if (!pluginLoader) throw new Error("Plugin loader not initialized");
   await Promise.all(
-    pluginLoader!.getPluginByName("serverStart").map(async (plugin) => {
+    pluginLoader.getPluginByName("serverStart").map(async (plugin) => {
       try {
         await plugin.pluginParent.main?.();
       } catch (error) {
@@ -176,17 +176,17 @@ export async function runOnStartMainPlugins() {
 
 async function runFileSystemWatcherPlugin() {
   if (!globalThis.__DRY_RUN__ || process.env.NODE_ENV == "production") return;
-
+  if (!pluginLoader) throw new Error("Plugin loader not initialized");
   const DirToWatch = [
     ...new Set(
-      pluginLoader!
+      pluginLoader
         .getPluginByName("fileSystemWatchDir")
         .map((p) => p.pluginParent)
         .reduce((curr, prev) => [...curr, ...prev], [])
     ),
   ];
 
-  const OnFileSystemChangeCallbacks = pluginLoader!
+  const OnFileSystemChangeCallbacks = pluginLoader
     .getPluginByName("onFileSystemChange")
     .map((p) => p.pluginParent);
 

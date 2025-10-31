@@ -114,7 +114,9 @@ export function join(...parts: string[]) {
  */
 export function pluginRegex({ path, ext }: { path: string[]; ext: string[] }) {
   return new RegExp(
-    `^${escapeRegExp(join(...path))}.*\\.(${ext.map(escapeRegExp).join("|")})$`
+    `^${escapeRegExp(join(...path))}(\\/|$).*\\.(${ext
+      .map(escapeRegExp)
+      .join("|")})$`
   );
 }
 function escapeRegExp(string: string) {
