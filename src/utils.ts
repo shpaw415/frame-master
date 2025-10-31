@@ -81,7 +81,7 @@ export function join(...parts: string[]) {
  *
  * @example
  * // Match TypeScript files in src/components
- * const filter = Builder.pluginRegexMake({
+ * const filter = pluginRegex({
  *   path: ["src", "components"],
  *   ext: ["ts", "tsx"]
  * });
@@ -93,7 +93,7 @@ export function join(...parts: string[]) {
  * const plugin: BunPlugin = {
  *   name: "my-plugin",
  *   setup(build) {
- *     const filter = Builder.pluginRegexMake({
+ *     const filter = pluginRegex({
  *       path: ["src", "server"],
  *       ext: ["ts", "js"]
  *     });
@@ -107,15 +107,16 @@ export function join(...parts: string[]) {
  *
  * @example
  * // Match all CSS/SCSS in styles directory
- * const styleFilter = Builder.pluginRegexMake({
+ * const styleFilter = pluginRegex({
  *   path: ["src", "styles"],
  *   ext: ["css", "scss", "sass"]
  * });
  */
 export function pluginRegex({ path, ext }: { path: string[]; ext: string[] }) {
   return new RegExp(
-    `^${join(...path).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}.*\\.(${ext.join(
-      "|"
-    )})$`
+    `^${escapeRegExp(join(...path))}.*\\.(${ext.map(escapeRegExp).join("|")})$`
   );
+}
+function escapeRegExp(string: string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

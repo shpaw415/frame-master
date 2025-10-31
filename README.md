@@ -64,12 +64,12 @@ All plugins contribute to a **single unified build**. When any plugin calls `bui
 ```typescript
 // Plugin A adds React externals
 buildConfig: {
-  external: ["react", "react-dom"];
+  external: ["react", "react-dom"],
 }
 
 // Plugin B adds Bun plugins
 buildConfig: {
-  plugins: [myBunPlugin()];
+  plugins: [myBunPlugin()],
 }
 
 // Result: ONE build with both configs merged
@@ -258,7 +258,7 @@ import { builder } from "frame-master/build";
 // Static config (merged on import)
 build: {
   buildConfig: {
-    external: ["my-lib"];
+    external: ["my-lib"],
   }
 }
 

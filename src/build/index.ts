@@ -1,7 +1,7 @@
 import { mkdirSync, rmSync } from "fs";
-import { join } from "path";
 import type { BuildOptionsPlugin } from "../plugins/types";
-import { pluginLoader } from "frame-master/plugins";
+import { pluginLoader } from "../plugins";
+import { pluginRegex } from "../utils";
 
 type RequiredBuilOptions = Required<BuildOptionsPlugin>;
 
@@ -139,27 +139,29 @@ export class Builder {
       this.onBeforeBuildHooks.map((hook) => hook(buildConfig, this))
     );
 
-    return Bun.build(buildConfig).then((res) => {
-      const duration = performance.now() - startTime;
+    const res = await Bun.build(buildConfig);
 
-      if (res.success) {
-        this.outputs = res.outputs;
-      } else {
-        this.error("Build failed with error:", res);
-      }
+    const duration = performance.now() - startTime;
 
-      // Track build history
-      this.buildHistory.push({
-        timestamp: Date.now(),
-        duration,
-        entrypoints: buildConfig.entrypoints,
-        outputCount: res.outputs.length,
-        success: res.success,
-      });
+    if (res.success) {
+      this.outputs = res.outputs;
+    } else {
+      this.error("Build failed with error:", res);
+    }
 
-      this.onAfterBuildHooks.map((hook) => hook(buildConfig, res, this));
-      return res;
+    // Track build history
+    this.buildHistory.push({
+      timestamp: Date.now(),
+      duration,
+      entrypoints: buildConfig.entrypoints,
+      outputCount: res.outputs.length,
+      success: res.success,
     });
+
+    await Promise.all(
+      this.onAfterBuildHooks.map((hook) => hook(buildConfig, res, this))
+    );
+    return res;
   }
 
   /**
@@ -249,11 +251,7 @@ export class Builder {
    * });
    */
   static pluginRegexMake({ path, ext }: { path: string[]; ext: string[] }) {
-    return new RegExp(
-      `^${join(...path).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}.*\\.(${ext.join(
-        "|"
-      )})$`
-    );
+    return pluginRegex({ path, ext });
   }
 
   /**
@@ -845,6 +843,7 @@ export async function InitBuilder() {
  * @example
  * // In your Frame-Master plugin
  * import { defineBuildConfig } from "frame-master/build";
+import { pluginRegex } from '../utils';
  *
  * export function myPlugin(): FrameMasterPlugin {
  *   return {

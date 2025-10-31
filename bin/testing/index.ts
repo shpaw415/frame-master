@@ -105,9 +105,16 @@ class TestServer {
       return (...args: any[]) => {
         const timestamp = new Date().toLocaleTimeString();
         const message = args
-          .map((arg) =>
-            typeof arg === "object" ? JSON.stringify(arg, null, 2) : String(arg)
-          )
+          .map((arg) => {
+            if (arg !== null && typeof arg == "object") {
+              try {
+                return JSON.stringify(arg, null, 2);
+              } catch {
+                return "[object object]";
+              }
+            }
+            return String(arg);
+          })
           .join(" ");
 
         const logEntry: ConsoleLog = { timestamp, level, message };

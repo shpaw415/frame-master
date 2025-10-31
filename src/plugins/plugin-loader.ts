@@ -17,8 +17,13 @@ class PluginLoader {
 
   constructor() {
     const config = getConfig();
+    if (!config) {
+      throw new Error(
+        "Frame Master config has not been loaded. Call loadConfig() before InitPluginLoader()."
+      );
+    }
     this.Plugins.push(
-      ...(config!.plugins.map((p) => ({ ...p, filePath: "client-plugin" })) ??
+      ...(config.plugins.map((p) => ({ ...p, filePath: "client-plugin" })) ??
         [])
     );
 

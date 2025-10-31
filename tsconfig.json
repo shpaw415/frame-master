@@ -37,9 +37,9 @@
     }
   },
   "include": [
-    "src/**/*",
-    "bin/**/*",
-    "config/**/*",
+    "src",
+    "bin",
+    "config",
     ".frame-master/frame-master-custom-type.d.ts"
   ]
 }
