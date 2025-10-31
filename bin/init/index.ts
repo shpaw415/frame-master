@@ -88,6 +88,22 @@ async function addScriptsToPackageJson() {
   return packageJsonFile.write(JSON.stringify(packageJson, null, 2));
 }
 
+async function UpdateTsConfig() {
+  const projectTsConfigFile = Bun.file(join(process.cwd(), "tsconfig.json"));
+
+  const tsconfig: { include?: Array<string> } =
+    (await projectTsConfigFile.exists())
+      ? JSON.parse(await projectTsConfigFile.text())
+      : {};
+
+  if (typeof tsconfig.include == "undefined")
+    tsconfig.include = [".frame-master/frame-master-custom-type.d.ts"];
+  else if (
+    !tsconfig.include.includes(".frame-master/frame-master-custom-type.d.ts")
+  )
+    tsconfig.include.push(".frame-master/frame-master-custom-type.d.ts");
+}
+
 async function setEnvFile() {
   const envFile = Bun.file(join("./.env"));
   const envFileText = (await envFile.exists()) ? await envFile.text() : "";
