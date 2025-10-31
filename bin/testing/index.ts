@@ -8,7 +8,6 @@ import { InitAll } from "../../src/server/init";
 import type { Server } from "bun";
 import { Command } from "commander";
 import { fileURLToPath, serve } from "bun";
-import index from "./src/index.html";
 import { runOnStartMainPlugins } from "../../src/server";
 
 export const testCommand = new Command("test");
@@ -277,7 +276,7 @@ class TestServer {
     this.wsClients.forEach((ws) => ws.send(data));
   }
 
-  private cleanup() {
+  public cleanup() {
     // Restore original console methods
     console.log = this.originalConsole.log;
     console.error = this.originalConsole.error;
@@ -290,9 +289,8 @@ class TestServer {
   }
 
   async start() {
-    await InitAll();
+    if (!getConfig()) await InitAll();
     const config = getConfig();
-
     if (!config) {
       console.error("Failed to load configuration");
       process.exit(1);
@@ -302,13 +300,16 @@ class TestServer {
     console.log(`\n📊 GUI available at: http://localhost:3001`);
     console.log(`\nPress Ctrl+C to stop\n`);
   }
+  stop() {
+    this.cleanup();
+  }
 }
 
 testCommand
   .command("start")
   .description("Start the test server with web GUI")
   .action(async () => {
-    await InitAll();
+    if (!getConfig()) await InitAll();
     await runOnStartMainPlugins();
     const server = new TestServer();
     await server.start();
@@ -316,6 +317,7 @@ testCommand
     // Keep process alive
     process.on("SIGINT", () => {
       console.log("\n\nShutting down test server...");
+      server.stop();
       process.exit(0);
     });
   });

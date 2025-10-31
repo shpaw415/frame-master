@@ -17,6 +17,14 @@ globalThis.__DRY_RUN__ ??= true;
 await InitAll();
 const config = getConfig();
 
+if (!config) {
+  console.error("Configuration not loaded after InitAll");
+  process.exit(1);
+} else if (!pluginLoader) {
+  console.error("Plugin loader not initialized after InitAll");
+  process.exit(1);
+}
+
 const serverConfigPlugins = pluginLoader!.getPluginByName("serverConfig");
 const websockeretPlugins = pluginLoader!.getPluginByName("websocket");
 

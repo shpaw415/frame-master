@@ -1,12 +1,11 @@
 {
   "name": "frame-master",
   "type": "module",
-  "version": "1.2.0",
+  "version": "2.0.0",
   "baseUrl": ".",
   "license": "MIT",
   "devDependencies": {
-    "@types/bun": "latest",
-    "@types/blessed": "0.1.25"
+    "@types/bun": "latest"
   },
   "peerDependencies": {
     "typescript": "^5.9.3"

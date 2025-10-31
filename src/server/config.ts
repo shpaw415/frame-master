@@ -38,29 +38,22 @@ class ConfigManager {
    * @returns Promise resolving to the loaded configuration
    * @internal - Called by Frame-Master during initialization
    */
-  async loadConfig(): Promise<FrameMasterConfig> {
+  async loadConfig(withSuffix?: string): Promise<FrameMasterConfig> {
     if (this.mergedConfig != null) return this.mergedConfig;
-    const filePath = join(process.cwd(), Paths.configFile);
+    const filePath = join(process.cwd(), Paths.configFile, withSuffix ?? "");
     try {
       const configModule = await import(filePath);
       const config = configModule?.default as FrameMasterConfig | undefined;
 
-      if (config) {
-        this.mergedConfig = config;
-        return this.mergedConfig;
-      }
+      if (!config)
+        throw new Error("Config file does not export the config as default.");
 
-      console.error(
-        chalk.red(`Config file is empty. Fallback to minimal config.`)
-      );
-      this.mergedConfig = DEFAULT_CONFIG;
+      this.mergedConfig = config;
       return this.mergedConfig;
     } catch (error) {
-      console.error(
-        chalk.red(`Config file not found Fallback to minimal config.`)
-      );
-      this.mergedConfig = DEFAULT_CONFIG;
-      return this.mergedConfig;
+      throw new Error(`Failed to load config file at ${filePath}`, {
+        cause: error,
+      });
     }
   }
 
@@ -73,7 +66,7 @@ class ConfigManager {
    */
   async reloadConfig(): Promise<FrameMasterConfig> {
     this.mergedConfig = null;
-    return this.loadConfig();
+    return this.loadConfig(`?t=${Date.now()}`);
   }
 
   /**

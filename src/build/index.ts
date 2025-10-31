@@ -801,7 +801,10 @@ export default Builder;
 
 export async function InitBuilder() {
   if (builder) return;
-  const plugin = pluginLoader!.getPluginByName("build");
+  if (!pluginLoader) {
+    throw new Error("Plugin loader not initialized. Cannot create builder.");
+  }
+  const plugin = pluginLoader.getPluginByName("build");
   const configFactories = plugin
     .map((plugin) => plugin.pluginParent.buildConfig)
     .filter((p) => p != undefined);
