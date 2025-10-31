@@ -39,7 +39,7 @@ class ConfigManager {
    */
   async loadConfig(withSuffix?: string): Promise<FrameMasterConfig> {
     if (this.mergedConfig != null) return this.mergedConfig;
-    const filePath = join(process.cwd(), Paths.configFile, withSuffix ?? "");
+    const filePath = join(process.cwd(), Paths.configFile) + (withSuffix ?? "");
     try {
       const configModule = await import(filePath);
       const config = configModule?.default as FrameMasterConfig | undefined;
