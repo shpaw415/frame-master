@@ -843,7 +843,7 @@ export async function InitBuilder() {
  * @example
  * // In your Frame-Master plugin
  * import { defineBuildConfig } from "frame-master/build";
-import { pluginRegex } from '../utils';
+ * import { pluginRegex } from 'frame-master/utils';
  *
  * export function myPlugin(): FrameMasterPlugin {
  *   return {

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { pluginRegex } from "../src/utils";
+import { join } from "path";
 
 describe("utils tests", () => {
   test("pluginRegex creates correct regex", () => {
@@ -21,6 +22,7 @@ describe("utils tests", () => {
       "src/components/style.css",
       "src/components/subdir/image.png",
       "src/components2/Button.tsx",
+      join(process.cwd(), "src", "components", "Button.tsx"),
     ].map((path) => {
       expect(regex.test(path)).toBe(false);
     });

@@ -5,7 +5,7 @@ import { getConfig } from "../server/config";
 import FrameMasterPackageJson from "../../package.json";
 
 class PluginLoader {
-  protected Plugins: Array<FrameMasterPlugin & { filePath: string }> = [];
+  protected Plugins: Array<FrameMasterPlugin> = [];
   private plugin_cache: Map<
     keyof FrameMasterPlugin,
     Array<{
@@ -22,10 +22,7 @@ class PluginLoader {
         "Frame Master config has not been loaded. Call loadConfig() before InitPluginLoader()."
       );
     }
-    this.Plugins.push(
-      ...(config.plugins.map((p) => ({ ...p, filePath: "client-plugin" })) ??
-        [])
-    );
+    this.Plugins = config.plugins ?? [];
 
     this.Plugins = this.Plugins.sort((a, b) => {
       return (a?.priority ?? 1000) - (b?.priority ?? 1000);
