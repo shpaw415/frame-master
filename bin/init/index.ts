@@ -1,21 +1,12 @@
-import packageJson from "../../package.json";
 import { join } from "path";
 import Paths from "../../src/paths";
 import { cpSync, existsSync } from "fs";
 import { webToken } from "@shpaw415/webtoken";
 
-export const PATH_TO_FRAME_MASTER = join(
-  process.cwd(),
-  "node_modules",
-  packageJson.name
-) as `<cwd>/node_modules/frame-master`;
-
 export const PATH_TO_DEFAULT_CONFIG_FILE = join(
-  PATH_TO_FRAME_MASTER,
-  "bin",
-  "init",
+  import.meta.dir,
   "config.default.ts"
-) as `<frame-master-path>/config.default.ts`;
+) as `<frame-master-path>/bin/init/config.default.ts`;
 
 async function init() {
   await Promise.all([
@@ -23,6 +14,7 @@ async function init() {
     copyBunfigToProject(),
     addScriptsToPackageJson(),
     setEnvFile(),
+    InitTsConfig(),
   ]);
   copyDotFrameMasterDirToProject();
   console.log("frame-master has been initialized in your project.");
@@ -45,15 +37,13 @@ function copyDotFrameMasterDirToProject() {
     console.warn(`.frame-master directory already exists. Skipping copy.`);
     return;
   }
-  cpSync(join(PATH_TO_FRAME_MASTER, ".frame-master"), targetDirPath, {
+  cpSync(join(import.meta.dir, "..", "..", ".frame-master"), targetDirPath, {
     recursive: true,
   });
 }
 
 async function copyBunfigToProject() {
-  const bunfigFile = Bun.file(
-    join(PATH_TO_FRAME_MASTER, "bin", "init", "bunfig.default")
-  );
+  const bunfigFile = Bun.file(join(import.meta.dir, "bunfig.default"));
 
   const targetPath = join(process.cwd(), "bunfig.toml");
   const targetFile = Bun.file(targetPath);
@@ -88,20 +78,68 @@ async function addScriptsToPackageJson() {
   return packageJsonFile.write(JSON.stringify(packageJson, null, 2));
 }
 
-async function UpdateTsConfig() {
+const DEFAULT_TS_CONFIG = {
+  compilerOptions: {
+    // Environment setup & latest features
+    lib: ["ESNext"],
+    target: "ESNext",
+    module: "Preserve",
+    moduleDetection: "force",
+    jsx: "react-jsx",
+    allowJs: true,
+
+    // Bundler mode
+    moduleResolution: "bundler",
+    allowImportingTsExtensions: true,
+    verbatimModuleSyntax: true,
+    noEmit: true,
+
+    // Best practices
+    strict: true,
+    skipLibCheck: true,
+    noFallthroughCasesInSwitch: true,
+    noUncheckedIndexedAccess: true,
+    noImplicitOverride: true,
+
+    // Some stricter flags (disabled by default)
+    noUnusedLocals: false,
+    noUnusedParameters: false,
+    noPropertyAccessFromIndexSignature: false,
+  },
+};
+
+const CUSTOM_D_TS_PATH = ".frame-master/frame-master-custom-type.d.ts";
+
+const TS_CONFIG_WITH_CUSTOM_TYPE = {
+  ...DEFAULT_TS_CONFIG,
+  include: [CUSTOM_D_TS_PATH],
+};
+
+// TODO : Update tsconfig.json to include .frame-master/frame-master-custom-type.d.ts
+async function InitTsConfig() {
   const projectTsConfigFile = Bun.file(join(process.cwd(), "tsconfig.json"));
 
-  const tsconfig: { include?: Array<string> } =
-    (await projectTsConfigFile.exists())
-      ? JSON.parse(await projectTsConfigFile.text())
-      : {};
+  if (!(await projectTsConfigFile.exists()))
+    return projectTsConfigFile.write(
+      JSON.stringify(TS_CONFIG_WITH_CUSTOM_TYPE, null, 2)
+    );
 
-  if (typeof tsconfig.include == "undefined")
-    tsconfig.include = [".frame-master/frame-master-custom-type.d.ts"];
-  else if (
-    !tsconfig.include.includes(".frame-master/frame-master-custom-type.d.ts")
-  )
-    tsconfig.include.push(".frame-master/frame-master-custom-type.d.ts");
+  let tsconfig: { include?: Array<string> } = {};
+
+  try {
+    tsconfig = JSON.parse(await projectTsConfigFile.text());
+  } catch (e) {
+    console.warn(
+      `tsconfig.json is not a valid JSON file. Skipping tsconfig initialisation.`
+    );
+    return;
+  }
+  tsconfig.include ??= [];
+  tsconfig.include.includes(CUSTOM_D_TS_PATH)
+    ? "already-exists"
+    : tsconfig.include.push(CUSTOM_D_TS_PATH);
+
+  return projectTsConfigFile.write(JSON.stringify(tsconfig, null, 2));
 }
 
 async function setEnvFile() {
