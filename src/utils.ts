@@ -73,6 +73,8 @@ export function join(...parts: string[]) {
  * and file extension. The generated regex escapes special characters in paths and creates
  * an extension matcher with OR logic.
  *
+ *  **If the path is in the current path add `process.cwd()` to the path.**
+ *
  * @param options - Configuration for the regex pattern
  * @param options.path - Array of path segments to match (e.g., ["src", "components"])
  * @param options.ext - Array of file extensions without dots (e.g., ["ts", "tsx", "js"])

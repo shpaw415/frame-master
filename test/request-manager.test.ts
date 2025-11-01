@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, expect, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, expect, test } from "bun:test";
 import { masterRequest } from "../src/server/request-manager";
 import { webToken } from "@shpaw415/webtoken";
 import { setMockConfig } from "../src/server/config";
@@ -256,6 +256,8 @@ beforeEach(() => {
   contextTest = { testKey: "", requestKey: "" };
   counterValue = 0;
 });
+
+afterAll(() => server.stop(true));
 
 test("set cookie to response", async () => {
   master.currentState = "request";

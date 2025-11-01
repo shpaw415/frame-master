@@ -81,7 +81,7 @@ async function addScriptsToPackageJson() {
 const DEFAULT_TS_CONFIG = {
   compilerOptions: {
     // Environment setup & latest features
-    lib: ["ESNext"],
+    lib: ["ESNext", "DOM", "DOM.Iterable"],
     target: "ESNext",
     module: "Preserve",
     moduleDetection: "force",
@@ -112,7 +112,7 @@ const CUSTOM_D_TS_PATH = ".frame-master/frame-master-custom-type.d.ts";
 
 const TS_CONFIG_WITH_CUSTOM_TYPE = {
   ...DEFAULT_TS_CONFIG,
-  include: [CUSTOM_D_TS_PATH],
+  include: ["**/*", CUSTOM_D_TS_PATH],
 };
 
 async function InitTsConfig() {
@@ -124,7 +124,7 @@ async function InitTsConfig() {
     );
 
   let tsconfig: { include?: Array<string> } = {};
-
+  let modified = false;
   try {
     tsconfig = JSON.parse(await projectTsConfigFile.text());
   } catch (e) {
@@ -133,12 +133,17 @@ async function InitTsConfig() {
     );
     return;
   }
-  tsconfig.include ??= [];
-  if (!tsconfig.include.includes(CUSTOM_D_TS_PATH)) {
-    tsconfig.include.push(CUSTOM_D_TS_PATH);
+  if (typeof tsconfig.include === "undefined") {
+    tsconfig.include = ["**/*", CUSTOM_D_TS_PATH];
+    modified = true;
+  } else if (!tsconfig.include.includes(CUSTOM_D_TS_PATH)) {
+    tsconfig.include = [...tsconfig.include, CUSTOM_D_TS_PATH];
+    modified = true;
   }
 
-  return projectTsConfigFile.write(JSON.stringify(tsconfig, null, 2));
+  if (modified) {
+    return projectTsConfigFile.write(JSON.stringify(tsconfig, null, 2));
+  }
 }
 
 async function setEnvFile() {
