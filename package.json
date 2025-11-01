@@ -5,7 +5,8 @@
   "baseUrl": ".",
   "license": "MIT",
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/react-dom": "^19.2.1"
   },
   "peerDependencies": {
     "typescript": "^5.9.3"
@@ -15,7 +16,6 @@
   },
   "dependencies": {
     "@shpaw415/webtoken": "^1.0.0",
-    "@types/react-dom": "^19.2.1",
     "chalk": "^5.6.2",
     "commander": "^14.0.1",
     "react": "19.2.0",
