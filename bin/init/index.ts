@@ -116,14 +116,15 @@ const TS_CONFIG_WITH_CUSTOM_TYPE = {
 };
 
 async function InitTsConfig() {
-  const projectTsConfigFile = Bun.file(join(process.cwd(), "tsconfig.json"));
+  const pathToTsConfig = join(process.cwd(), "tsconfig.json");
+  const projectTsConfigFile = Bun.file(pathToTsConfig);
 
   if (!(await projectTsConfigFile.exists()))
     return projectTsConfigFile.write(
       JSON.stringify(TS_CONFIG_WITH_CUSTOM_TYPE, null, 2)
     );
 
-  let tsconfig: { include?: Array<string> } = {};
+  let tsconfig: { include?: Array<string> } = await import(pathToTsConfig);
   let modified = false;
   try {
     tsconfig = JSON.parse(await projectTsConfigFile.text());
