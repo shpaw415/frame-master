@@ -1,12 +1,13 @@
-import { pluginLoader } from "../plugins/plugin-loader";
+import { InitPluginLoader, pluginLoader } from "../plugins/plugin-loader";
 import { plugin, type BunPlugin } from "bun";
-import { InitAll } from "./init";
+import { InitConfig } from "./config";
 
 /**
  * Load runtime plugins using Bun's plugin system.
  */
 export async function load() {
-  await InitAll();
+  await InitConfig();
+  InitPluginLoader();
   if (!pluginLoader) throw new Error("Plugin loader not initialized");
   await Promise.all(
     pluginLoader

@@ -108,9 +108,6 @@ export default async () => {
       .filter((r) => r != undefined)
   ) as Bun.Serve.Routes<undefined, string>;
 
-  await runOnStartMainPlugins();
-  await runFileSystemWatcherPlugin();
-
   globalThis.__DRY_RUN__ = false;
 
   return Bun.serve({
@@ -152,54 +149,3 @@ export default async () => {
     },
   });
 };
-
-export async function runOnStartMainPlugins() {
-  if (!cluster.isPrimary) return;
-  if (!pluginLoader) throw new Error("Plugin loader not initialized");
-  await Promise.all(
-    pluginLoader.getPluginByName("serverStart").map(async (plugin) => {
-      try {
-        await plugin.pluginParent.main?.();
-      } catch (error) {
-        console.error(`Error in plugin ${plugin.name} main():`, error);
-      }
-      if (process.env.NODE_ENV != "production") {
-        try {
-          await plugin.pluginParent.dev_main?.();
-        } catch (error) {
-          console.error(`Error in plugin ${plugin.name} dev_main():`, error);
-        }
-      }
-    })
-  );
-}
-
-async function runFileSystemWatcherPlugin() {
-  if (!globalThis.__DRY_RUN__ || process.env.NODE_ENV == "production") return;
-  if (!pluginLoader) throw new Error("Plugin loader not initialized");
-  const DirToWatch = [
-    ...new Set(
-      pluginLoader
-        .getPluginByName("fileSystemWatchDir")
-        .map((p) => p.pluginParent)
-        .reduce((curr, prev) => [...curr, ...prev], [])
-    ),
-  ];
-
-  const OnFileSystemChangeCallbacks = pluginLoader
-    .getPluginByName("onFileSystemChange")
-    .map((p) => p.pluginParent);
-
-  globalThis.__FILESYSTEM_WATCHER__ = await Promise.all(
-    DirToWatch.map((DirToWatch) =>
-      createWatcher({
-        path: DirToWatch,
-        callback(event, file, absolutePath) {
-          OnFileSystemChangeCallbacks.forEach((callback) =>
-            callback(event, file, absolutePath)
-          );
-        },
-      })
-    )
-  );
-}

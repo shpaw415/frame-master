@@ -37,7 +37,7 @@ function copyDotFrameMasterDirToProject() {
     console.warn(`.frame-master directory already exists. Skipping copy.`);
     return;
   }
-  cpSync(join(import.meta.dir, "..", "..", ".frame-master"), targetDirPath, {
+  cpSync(join(import.meta.dir, ".frame-master"), targetDirPath, {
     recursive: true,
   });
 }

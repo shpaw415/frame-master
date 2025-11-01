@@ -37,7 +37,7 @@ class ConfigManager {
    * @returns Promise resolving to the loaded configuration
    * @internal - Called by Frame-Master during initialization
    */
-  async loadConfig(withSuffix?: string): Promise<FrameMasterConfig> {
+  async initConfig(withSuffix?: string): Promise<FrameMasterConfig> {
     if (this.mergedConfig != null) return this.mergedConfig;
     const filePath = join(process.cwd(), Paths.configFile) + (withSuffix ?? "");
     try {
@@ -65,7 +65,7 @@ class ConfigManager {
    */
   async reloadConfig(): Promise<FrameMasterConfig> {
     this.mergedConfig = null;
-    return this.loadConfig(`?t=${Date.now()}`);
+    return this.initConfig(`?t=${Date.now()}`);
   }
 
   /**
@@ -102,8 +102,8 @@ export const configManager = new ConfigManager();
  * const config = await loadConfig();
  * ```
  */
-export async function loadConfig(): Promise<FrameMasterConfig> {
-  return configManager.loadConfig();
+export async function InitConfig(): Promise<FrameMasterConfig> {
+  return configManager.initConfig();
 }
 
 /**

@@ -36,10 +36,5 @@
       "frame-master/server/request": ["./src/server/request-manager.ts"]
     }
   },
-  "include": [
-    "src",
-    "bin",
-    "config",
-    ".frame-master/frame-master-custom-type.d.ts"
-  ]
+  "include": ["src", "bin", "config"]
 }
