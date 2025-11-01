@@ -63,3 +63,64 @@ export function join(...parts: string[]) {
     .filter((part) => part.length > 0)
     .join("/");
 }
+
+/**
+ * Creates a RegExp for filtering files in Bun.build plugins based on path and extensions.
+ *
+ * **Public API** - Use this helper to create file filters for Bun plugins in your build config.
+ *
+ * Useful for creating filter patterns in Bun plugins to match specific files by directory
+ * and file extension. The generated regex escapes special characters in paths and creates
+ * an extension matcher with OR logic.
+ *
+ *  **If the path is in the current path add `process.cwd()` to the path.**
+ *
+ * @param options - Configuration for the regex pattern
+ * @param options.path - Array of path segments to match (e.g., ["src", "components"])
+ * @param options.ext - Array of file extensions without dots (e.g., ["ts", "tsx", "js"])
+ *
+ * @returns RegExp that matches files in the specified path with any of the given extensions
+ *
+ * @example
+ * // Match TypeScript files in src/components
+ * const filter = pluginRegex({
+ *   path: ["src", "components"],
+ *   ext: ["ts", "tsx"]
+ * });
+ * // Matches: src/components/Button.tsx, src/components/utils/helper.ts
+ * // Doesn't match: src/pages/index.tsx, src/components/style.css
+ *
+ * @example
+ * // Use in a Bun.build plugin
+ * const plugin: BunPlugin = {
+ *   name: "my-plugin",
+ *   setup(build) {
+ *     const filter = pluginRegex({
+ *       path: ["src", "server"],
+ *       ext: ["ts", "js"]
+ *     });
+ *
+ *     build.onLoad({ filter }, async (args) => {
+ *       // Handle server-side files
+ *       return { contents: "...", loader: "ts" };
+ *     });
+ *   }
+ * };
+ *
+ * @example
+ * // Match all CSS/SCSS in styles directory
+ * const styleFilter = pluginRegex({
+ *   path: ["src", "styles"],
+ *   ext: ["css", "scss", "sass"]
+ * });
+ */
+export function pluginRegex({ path, ext }: { path: string[]; ext: string[] }) {
+  return new RegExp(
+    `^${escapeRegExp(join(...path))}\\/.*\\.(${ext
+      .map(escapeRegExp)
+      .join("|")})$`
+  );
+}
+function escapeRegExp(string: string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}

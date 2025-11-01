@@ -1,17 +1,31 @@
 import { pluginLoader } from "../plugins/plugin-loader";
 import { plugin, type BunPlugin } from "bun";
+import { InitAll } from "./init";
 
 /**
  * Load runtime plugins using Bun's plugin system.
  */
-export function load() {
-  for (const { name, pluginParent } of pluginLoader.getPluginByName(
-    "runtimePlugins"
-  )) {
-    pluginParent.forEach((plugin) => {
-      Bun.plugin(plugin);
-    });
-  }
+export async function load() {
+  await InitAll();
+  if (!pluginLoader) throw new Error("Plugin loader not initialized");
+  await Promise.all(
+    pluginLoader
+      .getPluginByName("runtimePlugins")
+      .map(async ({ pluginParent, name }) => {
+        await Promise.all(
+          pluginParent.map((plugin) => {
+            try {
+              return Bun.plugin(plugin);
+            } catch (e) {
+              throw new Error(
+                `Failed to load Runtime-Plugin from plugin: "${name}"`,
+                { cause: e }
+              );
+            }
+          })
+        );
+      })
+  );
 }
 
 const reactFix: BunPlugin = {

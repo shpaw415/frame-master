@@ -1,11 +1,11 @@
 "server only";
 
 import type { FrameMasterPlugin } from "./types";
-import config from "../server/config";
+import { getConfig } from "../server/config";
 import FrameMasterPackageJson from "../../package.json";
 
 class PluginLoader {
-  protected Plugins: Array<FrameMasterPlugin & { filePath: string }> = [];
+  protected Plugins: Array<FrameMasterPlugin> = [];
   private plugin_cache: Map<
     keyof FrameMasterPlugin,
     Array<{
@@ -16,10 +16,13 @@ class PluginLoader {
   private sub_plugin_cache: Map<string, Array<any>> = new Map();
 
   constructor() {
-    this.Plugins.push(
-      ...(config.plugins.map((p) => ({ ...p, filePath: "client-plugin" })) ??
-        [])
-    );
+    const config = getConfig();
+    if (!config) {
+      throw new Error(
+        "Frame Master config has not been loaded. Call loadConfig() before InitPluginLoader()."
+      );
+    }
+    this.Plugins = config.plugins ?? [];
 
     this.Plugins = this.Plugins.sort((a, b) => {
       return (a?.priority ?? 1000) - (b?.priority ?? 1000);
@@ -163,6 +166,13 @@ class PluginLoader {
   }
 }
 
-const pluginLoader = new PluginLoader();
+export let pluginLoader: PluginLoader | null = null;
+export function InitPluginLoader() {
+  if (!pluginLoader) {
+    pluginLoader = new PluginLoader();
+  }
+}
 
-export { pluginLoader };
+export function reloadPluginLoader() {
+  pluginLoader = new PluginLoader();
+}

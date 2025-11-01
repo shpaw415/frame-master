@@ -1,10 +1,11 @@
-import config from "./config";
+import { getConfig } from "./config";
 import { masterRequest } from "./request-manager";
 import masterRoutes from "./frame-master-routes";
 import { logRequest } from "./log";
 import { pluginLoader } from "../plugins";
 import cluster from "node:cluster";
 import { createWatcher, type FileSystemWatcher } from "./watch";
+import { InitAll } from "./init";
 
 declare global {
   var __FILESYSTEM_WATCHER__: FileSystemWatcher[];
@@ -13,10 +14,11 @@ declare global {
 globalThis.__FILESYSTEM_WATCHER__ ??= [];
 globalThis.__DRY_RUN__ ??= true;
 
-const serverConfigPlugins = pluginLoader.getPluginByName("serverConfig");
-const websockeretPlugins = pluginLoader.getPluginByName("websocket");
-
-function deepMergeServerConfig(target: any, source: any): any {
+function deepMergeServerConfig(
+  target: any,
+  source: any,
+  disableWarning: boolean
+): any {
   const result = { ...target };
 
   for (const [key, sourceValue] of Object.entries(source)) {
@@ -31,7 +33,7 @@ function deepMergeServerConfig(target: any, source: any): any {
 
     // Check for conflicts on non-object values
     if (
-      !config.pluginsOptions?.disableHttpServerOptionsConflictWarning &&
+      !disableWarning &&
       typeof targetValue !== "object" &&
       typeof sourceValue !== "object" &&
       targetValue !== sourceValue
@@ -43,7 +45,11 @@ function deepMergeServerConfig(target: any, source: any): any {
 
     // Deep merge objects
     if (isPlainObject(targetValue) && isPlainObject(sourceValue)) {
-      result[key] = deepMergeServerConfig(targetValue, sourceValue);
+      result[key] = deepMergeServerConfig(
+        targetValue,
+        sourceValue,
+        disableWarning
+      );
     } else if (Array.isArray(targetValue) && Array.isArray(sourceValue)) {
       // Concatenate arrays
       result[key] = [...targetValue, ...sourceValue];
@@ -67,21 +73,41 @@ function isPlainObject(value: any): boolean {
   );
 }
 
-const pluginServerConfig = deepMergeServerConfig(
-  serverConfigPlugins
-    .map((p) => p.pluginParent)
-    .reduce((curr, prev) => deepMergeServerConfig(curr, prev), {}),
-  config.HTTPServer
-) as typeof config.HTTPServer;
-
-const pluginsRoutes = Object.assign(
-  {},
-  ...serverConfigPlugins
-    .map((p) => p.pluginParent.routes)
-    .filter((r) => r != undefined)
-) as Bun.Serve.Routes<undefined, string>;
-
 export default async () => {
+  await InitAll();
+  const config = getConfig();
+
+  if (!config) {
+    console.error("Configuration not loaded after InitAll");
+    process.exit(1);
+  } else if (!pluginLoader) {
+    console.error("Plugin loader not initialized after InitAll");
+    process.exit(1);
+  }
+
+  const serverConfigPlugins = pluginLoader.getPluginByName("serverConfig");
+  const websocketPlugins = pluginLoader.getPluginByName("websocket");
+  const disableWarning = Boolean(
+    config.pluginsOptions?.disableHttpServerOptionsConflictWarning
+  );
+  const pluginServerConfig = deepMergeServerConfig(
+    serverConfigPlugins
+      .map((p) => p.pluginParent)
+      .reduce(
+        (curr, prev) => deepMergeServerConfig(curr, prev, disableWarning),
+        {}
+      ),
+    config.HTTPServer,
+    disableWarning
+  ) as Exclude<typeof config, null>["HTTPServer"];
+
+  const pluginsRoutes = Object.assign(
+    {},
+    ...serverConfigPlugins
+      .map((p) => p.pluginParent.routes)
+      .filter((r) => r != undefined)
+  ) as Bun.Serve.Routes<undefined, string>;
+
   await runOnStartMainPlugins();
   await runFileSystemWatcherPlugin();
 
@@ -106,20 +132,20 @@ export default async () => {
         ...serverConfigPlugins.map((p) => p.pluginParent.websocket),
         ...[pluginServerConfig.websocket],
       ].reduce((curr, prev) => {
-        return deepMergeServerConfig(curr, prev || {});
+        return deepMergeServerConfig(curr, prev || {}, disableWarning);
       }, {}),
       message: (ws, message) => {
-        websockeretPlugins.forEach((plugin) => {
+        websocketPlugins.forEach((plugin) => {
           plugin.pluginParent.onMessage?.(ws, message);
         });
       },
       open: (ws) => {
-        websockeretPlugins.forEach((plugin) => {
+        websocketPlugins.forEach((plugin) => {
           plugin.pluginParent.onOpen?.(ws);
         });
       },
       close: (ws) => {
-        websockeretPlugins.forEach((plugin) => {
+        websocketPlugins.forEach((plugin) => {
           plugin.pluginParent.onClose?.(ws);
         });
       },
@@ -127,9 +153,9 @@ export default async () => {
   });
 };
 
-async function runOnStartMainPlugins() {
+export async function runOnStartMainPlugins() {
   if (!cluster.isPrimary) return;
-
+  if (!pluginLoader) throw new Error("Plugin loader not initialized");
   await Promise.all(
     pluginLoader.getPluginByName("serverStart").map(async (plugin) => {
       try {
@@ -150,7 +176,7 @@ async function runOnStartMainPlugins() {
 
 async function runFileSystemWatcherPlugin() {
   if (!globalThis.__DRY_RUN__ || process.env.NODE_ENV == "production") return;
-
+  if (!pluginLoader) throw new Error("Plugin loader not initialized");
   const DirToWatch = [
     ...new Set(
       pluginLoader

@@ -3,12 +3,8 @@ import { Command } from "commander";
 import chalk from "chalk";
 import { readFile } from "fs/promises";
 import { join } from "path";
-import type { FrameMasterConfig } from "../../src/server/type";
 import _packageJson_ from "../../package.json";
-
-async function getConfig(): Promise<FrameMasterConfig> {
-  return (await import("../../src/server/config")).default;
-}
+import { loadConfig, getConfig } from "../../src/server/config";
 
 const pluginCommand = new Command("plugin");
 
@@ -32,8 +28,9 @@ pluginCommand
   .option("-v, --verbose", "Show detailed plugin information")
   .action(async (options: { verbose?: boolean }) => {
     try {
-      const config = await getConfig();
-      const plugins = config.plugins;
+      await loadConfig();
+      const config = getConfig();
+      const plugins = config!.plugins;
 
       if (plugins.length === 0) {
         console.log(chalk.yellow("No plugins installed"));
@@ -95,8 +92,9 @@ pluginCommand
   .description("Show detailed information about a plugin")
   .action(async (pluginName: string) => {
     try {
-      const config = await getConfig();
-      const plugin = config.plugins.find((p: any) => p.name === pluginName);
+      await loadConfig();
+      const config = getConfig();
+      const plugin = config!.plugins.find((p: any) => p.name === pluginName);
 
       if (!plugin) {
         console.log(chalk.red(`Plugin "${pluginName}" not found`));
@@ -133,6 +131,21 @@ pluginCommand
         if (plugin.serverStart.main) console.log(chalk.gray("    ✓ main"));
         if (plugin.serverStart.dev_main)
           console.log(chalk.gray("    ✓ dev_main"));
+      }
+
+      if (plugin.build) {
+        console.log(chalk.gray("  Build Lifecycle:"));
+        if (plugin.build.buildConfig) {
+          const configType =
+            typeof plugin.build.buildConfig === "function"
+              ? "dynamic"
+              : "static";
+          console.log(chalk.gray(`    ✓ buildConfig (${configType})`));
+        }
+        if (plugin.build.beforeBuild)
+          console.log(chalk.gray("    ✓ beforeBuild"));
+        if (plugin.build.afterBuild)
+          console.log(chalk.gray("    ✓ afterBuild"));
       }
 
       if (plugin.websocket) {
@@ -202,9 +215,9 @@ pluginCommand
   .action(async () => {
     try {
       console.log(chalk.bold.blue("\n🔍 Validating configuration...\n"));
-
-      const config = await getConfig();
-      const plugins = config.plugins;
+      await loadConfig();
+      const config = getConfig();
+      const plugins = config!.plugins;
       let errors = 0;
       let warnings = 0;
 

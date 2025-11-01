@@ -3,6 +3,13 @@ import { program } from "commander";
 import { version } from "../package.json";
 import { join } from "path";
 import pluginCommand from "./plugin";
+import {
+  DEFAULT_CONFIG,
+  getConfig,
+  loadConfig,
+  setMockConfig,
+} from "../src/server/config";
+import { testCommand } from "./testing";
 
 type CommandOptions = {
   install?: string;
@@ -10,8 +17,6 @@ type CommandOptions = {
   list?: boolean;
   search?: string;
 };
-
-const config = async () => (await import("../src/server/config")).default;
 
 const importServerStart = () =>
   import(join(process.cwd(), ".frame-master", "server.ts"));
@@ -34,10 +39,10 @@ program
   .description("Start the development server")
   .action(async () => {
     process.env.NODE_ENV = "development";
+    await loadConfig();
+    const config = getConfig()!;
     console.log(
-      `Dev server running at http://localhost:${
-        (await config()).HTTPServer.port
-      }`
+      `Dev server running at http://localhost:${config.HTTPServer.port}`
     );
     await importServerStart();
   });
@@ -70,5 +75,6 @@ program
   });
 
 program.addCommand(pluginCommand);
+program.addCommand(testCommand);
 
 program.parse();
