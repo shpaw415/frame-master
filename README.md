@@ -13,7 +13,7 @@ Frame-Master is **not a web framework**—it's a **plugin orchestration runtime*
 
 ```typescript
 // Use React SSR plugin - or write your own!
-import type { FrameMasterConfig } from "frame-master/server/type";
+import type { FrameMasterConfig } from "frame-master/server/types";
 import reactSSRPlugin from "frame-master-plugin-react-ssr/plugin";
 
 const config: FrameMasterConfig = {
@@ -77,7 +77,7 @@ bunx frame-master init
 
 ```typescript
 // frame-master.config.ts (created by init command)
-import type { FrameMasterConfig } from "frame-master/server/type";
+import type { FrameMasterConfig } from "frame-master/server/types";
 
 const config: FrameMasterConfig = {
   HTTPServer: {
@@ -428,7 +428,7 @@ import type { FrameMasterPlugin } from "frame-master/plugin/types";
 import { utils } from "frame-master/plugin/utils";
 
 // Configuration
-import type { FrameMasterConfig } from "frame-master/server/type";
+import type { FrameMasterConfig } from "frame-master/server/types";
 
 // Build system
 import { builder, Builder, defineBuildConfig } from "frame-master/build";
