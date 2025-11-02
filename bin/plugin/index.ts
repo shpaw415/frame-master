@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
 import chalk from "chalk";
-import { readFile } from "fs/promises";
 import { join } from "path";
 import _packageJson_ from "../../package.json";
 import { getConfig, InitConfig } from "../../src/server/config";
@@ -239,9 +238,7 @@ pluginCommand
         if (plugin.requirement) {
           // Check Frame-Master version
           if (plugin.requirement.frameMasterVersion) {
-            const frameMasterPkg = JSON.parse(
-              await readFile(join(__dirname, "../package.json"), "utf-8")
-            );
+            const frameMasterPkg = _packageJson_;
             const currentVersion = frameMasterPkg.version;
 
             if (
