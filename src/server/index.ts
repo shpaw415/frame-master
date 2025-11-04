@@ -3,8 +3,7 @@ import { masterRequest } from "./request-manager";
 import masterRoutes from "./frame-master-routes";
 import { logRequest } from "./log";
 import { pluginLoader } from "../plugins";
-import cluster from "node:cluster";
-import { createWatcher, type FileSystemWatcher } from "./watch";
+import { type FileSystemWatcher } from "./watch";
 import { InitAll } from "./init";
 
 declare global {

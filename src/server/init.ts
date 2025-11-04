@@ -20,9 +20,9 @@ export async function InitAll() {
   if (inited) return;
   await InitConfig();
   InitPluginLoader();
+  await InitBuilder();
   await runOnStartMainPlugins();
   await runFileSystemWatcherPlugin();
-  await InitBuilder();
   inited = true;
 }
 
