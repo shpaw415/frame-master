@@ -939,6 +939,10 @@ export async function InitBuilder() {
   });
 }
 
+export function getBuilder() {
+  return builder;
+}
+
 /**
  * Type-safe helper for defining build configurations in Frame-Master plugins.
  *
