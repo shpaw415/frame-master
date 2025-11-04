@@ -126,14 +126,7 @@ async function InitTsConfig() {
 
   let tsconfig: { include?: Array<string> } = await import(pathToTsConfig);
   let modified = false;
-  try {
-    tsconfig = JSON.parse(await projectTsConfigFile.text());
-  } catch (e) {
-    console.warn(
-      `tsconfig.json is not a valid JSON file. Skipping tsconfig initialisation.`
-    );
-    return;
-  }
+
   if (typeof tsconfig.include === "undefined") {
     tsconfig.include = ["**/*", CUSTOM_D_TS_PATH];
     modified = true;
