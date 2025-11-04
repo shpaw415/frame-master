@@ -5,96 +5,15 @@ import { join } from "path";
 import pluginCommand from "./plugin";
 import { getConfig, InitConfig } from "../src/server/config";
 import { testCommand } from "./testing";
+import { buildCommand } from "./build";
 import chalk from "chalk";
+import { ensureNodeEnv } from "./share";
 
 type CommandOptions = {
   install?: string;
   uninstall?: string;
   list?: boolean;
   search?: string;
-};
-
-const ensureNodeEnv = () => {
-  if (process.env.NODE_ENV === undefined) {
-    console.error(
-      [
-        "\n" +
-          chalk.bold.red(
-            "┌─────────────────────────────────────────────────────────┐"
-          ),
-        chalk.bold.red("│") +
-          chalk.bold.white(
-            "  ⚠️  NODE_ENV is not set                              "
-          ) +
-          chalk.bold.red("   │"),
-        chalk.bold.red(
-          "├─────────────────────────────────────────────────────────┤"
-        ),
-        chalk.bold.red("│") +
-          "  " +
-          chalk.yellow("Please set NODE_ENV before running the server:      ") +
-          chalk.bold.red("   │"),
-        chalk.bold.red("│") +
-          "                                                         " +
-          chalk.bold.red("│"),
-        chalk.bold.red("│") +
-          "  " +
-          chalk.gray("Option 1: Inline with command                       ") +
-          chalk.bold.red("   │"),
-        chalk.bold.red("│") +
-          "  " +
-          chalk.cyan("  $ NODE_ENV=development bun run dev                 ") +
-          chalk.bold.red("  │"),
-        chalk.bold.red("│") +
-          "  " +
-          chalk.cyan("  $ NODE_ENV=production bun run start                ") +
-          chalk.bold.red("  │"),
-        chalk.bold.red("│") +
-          "                                                         " +
-          chalk.bold.red("│"),
-        chalk.bold.red("│") +
-          "  " +
-          chalk.gray("Option 2: Add to .env file                          ") +
-          chalk.bold.red("   │"),
-        chalk.bold.red("│") +
-          "  " +
-          chalk.cyan("  NODE_ENV=development                               ") +
-          chalk.bold.red("  │"),
-        chalk.bold.red(
-          "└─────────────────────────────────────────────────────────┘"
-        ) + "\n",
-      ].join("\n")
-    );
-    process.exit(1);
-  } else if (
-    process.env.NODE_ENV !== "development" &&
-    process.env.NODE_ENV !== "production"
-  ) {
-    console.error(
-      [
-        "\n" +
-          chalk.bold.red(
-            "┌───────────────────────────────────────────────────────────────┐"
-          ),
-        chalk.bold.red("│") +
-          chalk.bold.white("  ⚠️  NODE_ENV is set to an invalid value") +
-          chalk.bold.red("                       │"),
-        chalk.bold.red(
-          "├───────────────────────────────────────────────────────────────┤"
-        ),
-        chalk.bold.red("│") +
-          "  " +
-          chalk.yellow(
-            "Please set NODE_ENV to either 'development' or 'production'"
-          ) +
-          chalk.bold.red("  │"),
-        chalk.bold.red(
-          "└───────────────────────────────────────────────────────────────┘"
-        ) + "\n",
-      ].join("\n")
-    );
-    process.exit(1);
-  }
 };
 
 function LogServerInfo() {
@@ -183,5 +102,6 @@ program
 
 program.addCommand(pluginCommand);
 program.addCommand(testCommand);
+program.addCommand(buildCommand);
 
 program.parse();

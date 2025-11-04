@@ -30,6 +30,9 @@ export class Builder {
 
   readonly isLogEnabled: boolean;
   public outputs: Bun.BuildArtifact[] | null = null;
+  private _isBuilding = false;
+  private buildPromise: Promise<Bun.BuildOutput> | null = null;
+  private buildResolver: ((value: Bun.BuildOutput) => void) | null = null;
 
   constructor(props: BuilderProps) {
     this.isLogEnabled = props.enableLogging ?? true;
@@ -122,6 +125,16 @@ export class Builder {
    * }
    */
   async build(...entrypoints: string[]): Promise<Bun.BuildOutput> {
+    if (this._isBuilding) {
+      throw new Error(
+        "Build already in progress. Concurrent builds are not supported. Use awaitBuildFinish() to wait for the current build."
+      );
+    }
+    this._isBuilding = true;
+    const self = this;
+    this.buildPromise = new Promise<Bun.BuildOutput>((resolve) => {
+      self.buildResolver = resolve;
+    });
     const startTime = performance.now();
     this.clearBuildDir();
     const buildConfig = await this.getBuildConfig();
@@ -161,7 +174,105 @@ export class Builder {
     await Promise.all(
       this.onAfterBuildHooks.map((hook) => hook(buildConfig, res, this))
     );
+    this._isBuilding = false;
+    if (this.buildResolver) {
+      this.buildResolver(res);
+      this.buildResolver = null;
+    }
+    this.buildPromise = null;
     return res;
+  }
+
+  /**
+   * Check if a build is currently in progress.
+   *
+   * **Public API** - Use this to check build status before starting a new build.
+   *
+   * Returns `true` if a build is currently running, `false` otherwise.
+   * Useful for preventing concurrent builds or showing loading states.
+   *
+   * @returns Boolean indicating whether a build is currently executing
+   *
+   * @example
+   * import { builder } from "frame-master/build";
+   *
+   * if (builder.isBuilding()) {
+   *   console.log("Build in progress, please wait...");
+   * } else {
+   *   await builder.build("/src/client.ts");
+   * }
+   *
+   * @example
+   * // In a watch mode handler
+   * function onFileChange() {
+   *   if (builder.isBuilding()) {
+   *     console.log("Skipping rebuild - build already in progress");
+   *     return;
+   *   }
+   *   builder.build("/src/index.ts");
+   * }
+   */
+  public isBuilding() {
+    return this._isBuilding;
+  }
+
+  /**
+   * Get a promise that resolves when the current build finishes.
+   *
+   * **Public API** - Use this to await the completion of an ongoing build.
+   *
+   * Returns a promise that resolves with the build output if a build is in progress,
+   * or `null` if no build is currently running. The promise will resolve even if the
+   * build fails, allowing you to check the `success` property of the result.
+   *
+   * **Note:** This method is safe to call from multiple places - all callers will
+   * receive the same promise instance and will be notified when the build completes.
+   *
+   * @returns Promise resolving to Bun.BuildOutput if building, null otherwise
+   *
+   * @example
+   * import { builder } from "frame-master/build";
+   *
+   * // Wait for ongoing build to complete
+   * const buildPromise = builder.awaitBuildFinish();
+   * if (buildPromise) {
+   *   const result = await buildPromise;
+   *   console.log("Build completed:", result.success);
+   * } else {
+   *   console.log("No build in progress");
+   * }
+   *
+   * @example
+   * // Coordinate with other tasks
+   * async function deployAfterBuild() {
+   *   const ongoing = builder.awaitBuildFinish();
+   *   if (ongoing) {
+   *     console.log("Waiting for build to finish...");
+   *     const result = await ongoing;
+   *     if (!result.success) {
+   *       console.error("Build failed, skipping deployment");
+   *       return;
+   *     }
+   *   }
+   *   await deployToServer();
+   * }
+   *
+   * @example
+   * // Safe concurrent usage
+   * async function handleFileChange() {
+   *   // Check if build is already running
+   *   if (builder.isBuilding()) {
+   *     console.log("Build in progress, waiting...");
+   *     await builder.awaitBuildFinish();
+   *     // Start new build after current one finishes
+   *     await builder.build("/src/index.ts");
+   *   } else {
+   *     await builder.build("/src/index.ts");
+   *   }
+   * }
+   */
+  public awaitBuildFinish(): null | Promise<Bun.BuildOutput> {
+    return this.buildPromise;
   }
 
   /**
