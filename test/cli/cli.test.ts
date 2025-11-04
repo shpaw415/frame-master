@@ -350,6 +350,84 @@ export default {
     }, 15000);
   });
 
+  describe("build command", () => {
+    test("should display help for build command", async () => {
+      const proc = await Bun.$`bun ${CLI_PATH} build --help`.cwd(process.cwd());
+
+      expect(Bun.stripANSI(proc.text())).toContain(
+        "Build the Frame Master project"
+      );
+      expect(proc.exitCode).toBe(0);
+    });
+
+    test("should build project successfully", async () => {
+      const projectName = "test-build-project";
+      const projectPath = join(TEST_DIR, projectName);
+
+      // Create project structure
+      mkdirSync(join(projectPath, "src"), { recursive: true });
+      mkdirSync(join(projectPath, ".frame-master"), { recursive: true });
+
+      const testProjectEntryPoint = join(projectPath, "src", "index.ts");
+
+      // Create minimal config
+      const configContent = (
+        await Bun.file(join(import.meta.dir, "default.config.ts")).text()
+      ).replaceAll("{{TEST_PROJECT_ENTRYPOINT}}", testProjectEntryPoint);
+
+      writeFileSync(join(projectPath, "frame-master.config.ts"), configContent);
+
+      // Create a simple entrypoint
+      writeFileSync(testProjectEntryPoint, `console.log("Hello from build");`);
+
+      // Set NODE_ENV
+      process.env.NODE_ENV = "development";
+
+      const stdout = await Bun.$`bun ${CLI_PATH} build`
+        .cwd(projectPath)
+        .env({ ...process.env, NODE_ENV: "development" });
+
+      const output = Bun.stripANSI(stdout.text());
+
+      expect(output).toMatch(/Starting Frame Master Build|Build Completed/);
+      expect(stdout.exitCode).toBe(0);
+    }, 30000);
+
+    test("should handle build errors gracefully", async () => {
+      const projectName = "test-build-error";
+      const projectPath = join(TEST_DIR, projectName);
+
+      mkdirSync(join(projectPath, ".frame-master"), { recursive: true });
+
+      const proc = await Bun.$`bun ${CLI_PATH} build`
+        .env({ NODE_ENV: "development" })
+        .cwd(projectPath)
+        .catch((e) => e);
+
+      expect(proc.exitCode).toBe(1);
+    }, 30000);
+
+    test("should require NODE_ENV to be set", async () => {
+      const projectName = "test-build-no-env";
+      const projectPath = join(TEST_DIR, projectName);
+
+      mkdirSync(projectPath, { recursive: true });
+
+      const proc = Bun.spawn(["bun", CLI_PATH, "build"], {
+        cwd: projectPath,
+        stdout: "pipe",
+        stderr: "pipe",
+        env: { ...process.env, NODE_ENV: undefined },
+      });
+
+      const stderr = await new Response(proc.stderr).text();
+      await proc.exited;
+
+      expect(stderr).toContain("NODE_ENV");
+      expect(proc.exitCode).toBe(1);
+    }, 15000);
+  });
+
   describe("test command", () => {
     test("should display help for test command", async () => {
       const proc = Bun.spawn(["bun", CLI_PATH, "test", "--help"], {

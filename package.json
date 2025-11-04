@@ -1,7 +1,7 @@
 {
   "name": "frame-master",
   "type": "module",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "baseUrl": ".",
   "license": "MIT",
   "devDependencies": {
@@ -35,7 +35,8 @@
   },
   "scripts": {
     "dev": "bun bin/index.ts dev",
-    "build:tool:test": "bun build bin/testing/src/frontend.tsx --outfile=bin/testing/src/frontend.js"
+    "build:tool:test": "bun build bin/testing/src/frontend.tsx --outfile=bin/testing/src/frontend.js",
+    "start": "NODE_ENV=production bun frame-master start"
   },
   "exports": {
     "./runtime": "./src/server/runtime-loader.ts",

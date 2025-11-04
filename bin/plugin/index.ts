@@ -1,10 +1,9 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
 import chalk from "chalk";
-import { readFile } from "fs/promises";
 import { join } from "path";
 import _packageJson_ from "../../package.json";
-import { loadConfig, getConfig } from "../../src/server/config";
+import { getConfig, InitConfig } from "../../src/server/config";
 
 const pluginCommand = new Command("plugin");
 
@@ -28,7 +27,7 @@ pluginCommand
   .option("-v, --verbose", "Show detailed plugin information")
   .action(async (options: { verbose?: boolean }) => {
     try {
-      await loadConfig();
+      await InitConfig();
       const config = getConfig();
       const plugins = config!.plugins;
 
@@ -92,7 +91,7 @@ pluginCommand
   .description("Show detailed information about a plugin")
   .action(async (pluginName: string) => {
     try {
-      await loadConfig();
+      await InitConfig();
       const config = getConfig();
       const plugin = config!.plugins.find((p: any) => p.name === pluginName);
 
@@ -215,7 +214,7 @@ pluginCommand
   .action(async () => {
     try {
       console.log(chalk.bold.blue("\n🔍 Validating configuration...\n"));
-      await loadConfig();
+      await InitConfig();
       const config = getConfig();
       const plugins = config!.plugins;
       let errors = 0;
@@ -239,9 +238,7 @@ pluginCommand
         if (plugin.requirement) {
           // Check Frame-Master version
           if (plugin.requirement.frameMasterVersion) {
-            const frameMasterPkg = JSON.parse(
-              await readFile(join(__dirname, "../package.json"), "utf-8")
-            );
+            const frameMasterPkg = _packageJson_;
             const currentVersion = frameMasterPkg.version;
 
             if (

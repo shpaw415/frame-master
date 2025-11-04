@@ -257,7 +257,7 @@ beforeEach(() => {
   counterValue = 0;
 });
 
-afterAll(() => server.stop(true));
+afterAll(() => server?.stop(true));
 
 test("set cookie to response", async () => {
   master.currentState = "request";

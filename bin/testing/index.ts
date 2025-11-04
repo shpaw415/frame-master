@@ -1,14 +1,11 @@
 #!/usr/bin/env bun
-import {
-  masterRequest,
-  type RequestState,
-} from "../../src/server/request-manager";
+import { masterRequest } from "../../src/server/request-manager";
 import { getConfig } from "../../src/server/config";
 import { InitAll } from "../../src/server/init";
 import type { Server } from "bun";
 import { Command } from "commander";
 import { fileURLToPath, serve } from "bun";
-import { runOnStartMainPlugins } from "../../src/server";
+import { InitBuilder } from "frame-master/build";
 
 export const testCommand = new Command("test");
 
@@ -85,7 +82,6 @@ class TestServer {
   }
 
   public async start() {
-    if (!getConfig()) await InitAll();
     const config = getConfig();
     if (!config) {
       console.error("Failed to load configuration");
@@ -316,8 +312,7 @@ testCommand
   .command("start")
   .description("Start the test server with web GUI")
   .action(async () => {
-    if (!getConfig()) await InitAll();
-    await runOnStartMainPlugins();
+    await InitAll();
     const server = new TestServer();
     await server.start();
 

@@ -1,10 +1,78 @@
-import { InitPluginLoader } from "frame-master/plugins";
-import { loadConfig } from "./config";
-import { InitBuilder } from "frame-master/build";
+import { InitPluginLoader, pluginLoader } from "../plugins";
+import { InitConfig } from "./config";
+import { InitBuilder } from "../build";
+import cluster from "node:cluster";
+import { createWatcher } from "./watch";
 
-// Load configuration and Core Plugins before starting the server
+let inited = false;
+
+/**
+ * Loads and initializes all core components of the server.
+ *
+ * This function sets up the configuration, plugin loader, and runs
+ * any main plugins that need to be initialized at server start.
+ *
+ * It is typically called once during server startup to ensure all
+ * necessary systems are in place before handling requests. And orderly called
+ *
+ */
 export async function InitAll() {
-  await loadConfig();
+  if (inited) return;
+  await InitConfig();
   InitPluginLoader();
+  await runOnStartMainPlugins();
+  await runFileSystemWatcherPlugin();
   await InitBuilder();
+  inited = true;
+}
+
+async function runOnStartMainPlugins() {
+  if (!cluster.isPrimary) return;
+  if (!pluginLoader) throw new Error("Plugin loader not initialized");
+  await Promise.all(
+    pluginLoader.getPluginByName("serverStart").map(async (plugin) => {
+      try {
+        await plugin.pluginParent.main?.();
+      } catch (error) {
+        console.error(`Error in plugin ${plugin.name} main():`, error);
+      }
+      if (process.env.NODE_ENV != "production") {
+        try {
+          await plugin.pluginParent.dev_main?.();
+        } catch (error) {
+          console.error(`Error in plugin ${plugin.name} dev_main():`, error);
+        }
+      }
+    })
+  );
+}
+
+async function runFileSystemWatcherPlugin() {
+  if (!globalThis.__DRY_RUN__ || process.env.NODE_ENV == "production") return;
+  if (!pluginLoader) throw new Error("Plugin loader not initialized");
+  const DirToWatch = [
+    ...new Set(
+      pluginLoader
+        .getPluginByName("fileSystemWatchDir")
+        .map((p) => p.pluginParent)
+        .reduce((curr, prev) => [...curr, ...prev], [])
+    ),
+  ];
+
+  const OnFileSystemChangeCallbacks = pluginLoader
+    .getPluginByName("onFileSystemChange")
+    .map((p) => p.pluginParent);
+
+  globalThis.__FILESYSTEM_WATCHER__ = await Promise.all(
+    DirToWatch.map((DirToWatch) =>
+      createWatcher({
+        path: DirToWatch,
+        callback(event, file, absolutePath) {
+          OnFileSystemChangeCallbacks.forEach((callback) =>
+            callback(event, file, absolutePath)
+          );
+        },
+      })
+    )
+  );
 }
