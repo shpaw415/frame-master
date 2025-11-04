@@ -57,8 +57,7 @@ async function copyBunfigToProject() {
 async function addScriptsToPackageJson() {
   const packageJsonPath = join(process.cwd(), "package.json");
   const packageJsonFile = Bun.file(packageJsonPath);
-  const packageJsonText = await packageJsonFile.text();
-  const packageJson = JSON.parse(packageJsonText);
+  const packageJson = (await import(packageJsonPath)).default;
 
   packageJson.scripts ??= {};
   if (packageJson.scripts["dev"]) {
@@ -124,7 +123,10 @@ async function InitTsConfig() {
       JSON.stringify(TS_CONFIG_WITH_CUSTOM_TYPE, null, 2)
     );
 
-  let tsconfig: { include?: Array<string> } = await import(pathToTsConfig);
+  let tsconfig = (await import(pathToTsConfig)).default as {
+    include?: Array<string>;
+  };
+
   let modified = false;
 
   if (typeof tsconfig.include === "undefined") {
