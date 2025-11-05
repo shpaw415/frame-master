@@ -151,8 +151,23 @@ export class Builder {
     await Promise.all(
       this.onBeforeBuildHooks.map((hook) => hook(buildConfig, this))
     );
+    let res: Bun.BuildOutput = {
+      logs: [],
+      outputs: [],
+      success: true,
+    };
 
-    const res = await Bun.build(buildConfig);
+    try {
+      res = await Bun.build(buildConfig);
+    } catch (e) {
+      const _e = e as Error;
+      console.error(e);
+      res = {
+        logs: [],
+        outputs: [],
+        success: false,
+      };
+    }
 
     const duration = performance.now() - startTime;
 
@@ -656,6 +671,7 @@ export class Builder {
             entrypoints: [],
             outdir: "",
             splitting: true,
+            throw: false,
             minify: process.env.NODE_ENV === "production",
             sourcemap: process.env.NODE_ENV !== "production",
             target: "browser",
