@@ -2,6 +2,8 @@ import { mkdirSync, rmSync } from "fs";
 import type { BuildOptionsPlugin } from "../plugins/types";
 import { pluginLoader } from "../plugins";
 import { pluginRegex } from "../utils";
+import chalk from "chalk";
+import { join } from "path";
 
 type RequiredBuilOptions = Required<BuildOptionsPlugin>;
 
@@ -160,22 +162,14 @@ export class Builder {
     try {
       res = await Bun.build(buildConfig);
     } catch (e) {
-      const _e = e as Error;
       console.error(e);
-      res = {
-        logs: [],
-        outputs: [],
-        success: false,
-      };
+      res.success = false;
     }
 
     const duration = performance.now() - startTime;
 
-    if (res.success) {
-      this.outputs = res.outputs;
-    } else {
-      this.error("Build failed with error:", res);
-    }
+    this.outputs = res.outputs;
+    await this.cleanUpOutputDir();
 
     // Track build history
     this.buildHistory.push({
@@ -185,10 +179,13 @@ export class Builder {
       outputCount: res.outputs.length,
       success: res.success,
     });
+    if (res.success) {
+      await Promise.all(
+        this.onAfterBuildHooks.map((hook) => hook(buildConfig, res, this))
+      );
+    } else
+      console.log(chalk.red("✗ Build failed. Skipping after-build hooks."));
 
-    await Promise.all(
-      this.onAfterBuildHooks.map((hook) => hook(buildConfig, res, this))
-    );
     this._isBuilding = false;
     if (this.buildResolver) {
       this.buildResolver(res);
@@ -196,6 +193,22 @@ export class Builder {
     }
     this.buildPromise = null;
     return res;
+  }
+  /** Remove leftOver files from previous build */
+  public async cleanUpOutputDir(): Promise<void> {
+    const cwd = process.cwd();
+    const outDir = this.getConfig()?.outdir;
+    if (!outDir || !this.outputs) return Promise.resolve();
+    const filesInResult = this.outputs.map((output) => output.path);
+    const fileToRemove = Array.from(
+      new Bun.Glob("**/*").scanSync({
+        cwd: join(cwd, outDir),
+        onlyFiles: true,
+        absolute: true,
+      })
+    ).filter((filePath) => !filesInResult.includes(filePath));
+
+    await Promise.all(fileToRemove.map((output) => Bun.file(output).delete()));
   }
 
   /**
