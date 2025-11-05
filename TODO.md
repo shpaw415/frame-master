@@ -1,2 +1,0 @@
-- afterbuilds plugins are not triggerd when CLI frame-master build is called
-- cleanup buildDir after build
