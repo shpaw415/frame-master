@@ -4,5 +4,17 @@ export default {
   HTTPServer: {
     port: 3000,
   },
-  plugins: [],
+  plugins: [
+    {
+      name: "extend-cli",
+      version: "1.0.0",
+      cli: (prog) =>
+        prog
+          .command("deploy")
+          .description("Deploy to cloudFlare Pages")
+          .action(() => {
+            console.log("Dwploying to CloudFlare Pages...");
+          }),
+    },
+  ],
 } satisfies FrameMasterConfig;

@@ -11,7 +11,7 @@ import { tmpdir } from "os";
  */
 
 const TEST_DIR = join(tmpdir(), `frame-master-cli-test-${Date.now()}`);
-const CLI_PATH = join(process.cwd(), "bin", "index.ts");
+const CLI_PATH = join(__dirname, "..", "..", "bin", "index.ts");
 
 beforeAll(() => {
   // Create test directory
@@ -84,10 +84,17 @@ describe("frame-master CLI", () => {
     test("should create a minimal project", async () => {
       const projectName = "test-minimal-project";
       const projectPath = join(TEST_DIR, projectName);
-      const output =
-        await Bun.$`bun ${CLI_PATH} create ${projectName} --type minimal`
-          .cwd(TEST_DIR)
-          .text();
+
+      const proc = Bun.spawnSync(
+        ["bun", CLI_PATH, "create", projectName, "--type", "minimal"],
+        {
+          cwd: TEST_DIR,
+          stdout: "pipe",
+          stderr: "pipe",
+        }
+      );
+
+      const output = Bun.stripANSI(new TextDecoder().decode(proc.stdout));
 
       // Check if project was created
       expect(existsSync(projectPath)).toBe(true);
@@ -197,7 +204,12 @@ describe("frame-master CLI", () => {
       );
 
       // Create existing config file
-      const existingConfig = "// My custom config";
+      const existingConfig = `export default {
+      HTTPServer: {
+        port: 0,
+      },
+      plugins: [],
+      };`;
       writeFileSync(
         join(projectPath, "frame-master.config.ts"),
         existingConfig
@@ -211,8 +223,9 @@ describe("frame-master CLI", () => {
         stderr: "pipe",
       });
 
-      const stdout = await new Response(proc.stdout).text();
-      const stderr = await new Response(proc.stderr).text();
+      const stdout = Bun.stripANSI(await new Response(proc.stdout).text());
+      const stderr = Bun.stripANSI(await new Response(proc.stderr).text());
+
       await proc.exited;
 
       // Check that existing file wasn't overwritten
@@ -590,6 +603,44 @@ export default {
     // testing with timeouts and process management.
   });
 
+  describe("extended CLI command from plugin", () => {
+    test("should add custom command from plugin", async () => {
+      const projectName = "test-plugin-list";
+      const projectPath = join(TEST_DIR, projectName);
+      mkdirSync(projectPath, { recursive: true });
+
+      // Create a config file with plugins
+      const configContent = `
+import type { FrameMasterConfig } from "frame-master/server/type";
+
+export default {
+  HTTPServer: {
+    port: 3000,
+  },
+  plugins: [
+    {
+      name: "test-plugin",
+      version: "1.0.0",
+      cli: (cmd) => cmd.command("list").description("list available plugins extended CLI").action(() => {
+        console.log("Listing extended CLI plugins...");
+      }),
+    },
+  ],
+} satisfies FrameMasterConfig;
+`;
+      writeFileSync(join(projectPath, "frame-master.config.ts"), configContent);
+
+      const proc = Bun.spawnSync(["bun", CLI_PATH, "extended-cli", "list"], {
+        cwd: projectPath,
+      });
+
+      const out = new TextDecoder().decode(proc.stdout);
+
+      expect(out).toContain("Listing extended CLI plugins...");
+      expect(proc.exitCode).toBe(0);
+    });
+  });
+
   describe("error handling", () => {
     test("should handle invalid command", async () => {
       const proc = Bun.spawn(["bun", CLI_PATH, "invalid-command"], {
@@ -612,7 +663,7 @@ export default {
         stderr: "pipe",
       });
 
-      const stderr = await new Response(proc.stderr).text();
+      const stderr = Bun.stripANSI(await new Response(proc.stderr).text());
       await proc.exited;
 
       expect(stderr).toContain("missing required argument");

@@ -119,7 +119,7 @@ export default async () => {
 
       const reqManager = new masterRequest({ request, server });
       const result = reqManager.handleRequest();
-      if (!reqManager.isLogPrevented) logRequest(request);
+      result.then(() => !reqManager.isLogPrevented && logRequest(request));
       return result;
     },
     routes: { ...masterRoutes, ...pluginsRoutes, ...pluginServerConfig.routes },

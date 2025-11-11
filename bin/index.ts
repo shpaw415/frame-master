@@ -8,13 +8,7 @@ import { testCommand } from "./testing";
 import { buildCommand } from "./build";
 import chalk from "chalk";
 import { ensureNodeEnv } from "./share";
-
-type CommandOptions = {
-  install?: string;
-  uninstall?: string;
-  list?: boolean;
-  search?: string;
-};
+import ExtendCli from "./extend-cli";
 
 function LogServerInfo() {
   const config = getConfig();
@@ -103,5 +97,6 @@ program
 program.addCommand(pluginCommand);
 program.addCommand(testCommand);
 program.addCommand(buildCommand);
+program.addCommand(ExtendCli);
 
 program.parse();
