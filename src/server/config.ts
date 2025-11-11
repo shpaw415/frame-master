@@ -11,7 +11,7 @@ export const DEFAULT_CONFIG = {
 
 export class ConfigFileNotFound extends Error {
   constructor(errorOptions?: ErrorOptions) {
-    super("frame-master.config.ts file not founded.", errorOptions);
+    super("frame-master.config.ts file not found.", errorOptions);
     this.name = "ConfigFileNotFound";
   }
 }
