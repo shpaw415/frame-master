@@ -9,6 +9,13 @@ export const DEFAULT_CONFIG = {
   plugins: [],
 } satisfies FrameMasterConfig;
 
+export class ConfigFileNotFound extends Error {
+  constructor(errorOptions?: ErrorOptions) {
+    super("frame-master.config.ts file not founded.", errorOptions);
+    this.name = "ConfigFileNotFound";
+  }
+}
+
 /**
  * ConfigManager handles Frame-Master configuration loading and access.
  *
@@ -39,7 +46,10 @@ class ConfigManager {
    */
   async initConfig(withSuffix?: string): Promise<FrameMasterConfig> {
     if (this.mergedConfig != null) return this.mergedConfig;
-    const filePath = join(process.cwd(), Paths.configFile) + (withSuffix ?? "");
+    const realFilePath = join(process.cwd(), Paths.configFile);
+    const filePath = realFilePath + (withSuffix ?? "");
+    if (!(await Bun.file(realFilePath).exists()))
+      throw new ConfigFileNotFound();
     try {
       const configModule = await import(filePath);
       const config = configModule?.default as FrameMasterConfig | undefined;
@@ -50,7 +60,7 @@ class ConfigManager {
       this.mergedConfig = config;
       return this.mergedConfig;
     } catch (error) {
-      throw new Error(`Failed to load config file at ${filePath}`, {
+      throw new Error("Error when loading Config file frame-master.config.ts", {
         cause: error,
       });
     }

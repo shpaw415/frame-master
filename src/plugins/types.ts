@@ -1,6 +1,7 @@
 import type { ClientIPCManager } from "./utils";
 import { masterRequest } from "../server/request-manager";
 import type { Builder } from "../build";
+import type { Command } from "commander";
 
 export type WatchEventType = "change" | "rename";
 
@@ -750,4 +751,80 @@ export type FrameMasterPlugin<
      * ```
      */
     build: BuildOptionsPlugin;
+    /**
+     * Extend the Frame-Master CLI with custom commands using Commander.js.
+     *
+     * Plugin commands are automatically registered under the `frame-master extended-cli` namespace,
+     * making them accessible as: `frame-master extended-cli <your-command>`
+     *
+     * The provided Command instance is scoped to your plugin's namespace, allowing you to
+     * define subcommands, options, arguments, and actions without conflicting with other plugins.
+     *
+     * @param command - A Commander.js Command instance for defining your plugin's CLI interface
+     * @returns The modified Command instance with your custom commands, options, and handlers
+     *
+     * @see {@link https://www.npmjs.com/package/commander Commander.js Documentation}
+     *
+     * @example
+     * Basic command with options:
+     * ```typescript
+     * cli: (command) => {
+     *   return command
+     *     .command("deploy")
+     *     .description("Deploy your application")
+     *     .option("-e, --environment <env>", "Deployment environment", "production")
+     *     .action(async (options) => {
+     *       console.log(`Deploying to ${options.environment}...`);
+     *       // Your deployment logic here
+     *     });
+     * }
+     * ```
+     *
+     * @example
+     * Multiple commands with arguments:
+     * ```typescript
+     * cli: (command) => {
+     *   command
+     *     .command("init <project-name>")
+     *     .description("Initialize a new project")
+     *     .option("-t, --template <name>", "Project template")
+     *     .action(async (projectName, options) => {
+     *       console.log(`Creating ${projectName} from template ${options.template}`);
+     *     });
+     *
+     *   command
+     *     .command("status")
+     *     .description("Check deployment status")
+     *     .action(async () => {
+     *       console.log("Checking status...");
+     *     });
+     *
+     *   return command;
+     * }
+     * ```
+     *
+     * @example
+     * Advanced usage with validation:
+     * ```typescript
+     * cli: (command) => {
+     *   return command
+     *     .command("publish")
+     *     .description("Publish your package")
+     *     .option("-v, --version <version>", "Version number")
+     *     .option("--dry-run", "Run without actually publishing")
+     *     .action(async (options) => {
+     *       if (options.version && !/^\d+\.\d+\.\d+$/.test(options.version)) {
+     *         throw new Error("Version must be in format x.y.z");
+     *       }
+     *
+     *       if (options.dryRun) {
+     *         console.log("Dry run mode - no changes will be made");
+     *       }
+     *
+     *       // Your publish logic here
+     *     });
+     * }
+     * ```
+     */
+    cli: (command: Command) => Command;
   }>;

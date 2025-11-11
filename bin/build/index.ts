@@ -6,6 +6,7 @@ import { InitAll } from "frame-master/server/init";
 export const buildCommand = new Command("build")
   .description("Build the Frame Master project")
   .action(async () => {
+    process.env.BUILD_MODE = "true";
     ensureNodeEnv();
     await InitAll();
 

@@ -7,7 +7,6 @@ import {
 } from "@shpaw415/webtoken";
 import { formatHTML } from "./utils/html-formating";
 import { directiveToolSingleton } from "../plugins/utils";
-import { resolve } from "path";
 import { pluginLoader } from "../plugins/plugin-loader";
 import type { BodyInit } from "bun";
 import { FrameMasterError } from "./error";
@@ -34,7 +33,6 @@ export type DeleteCookieOptions = {
 
 const HTML_DOCTYPE = "<!DOCTYPE html>";
 
-class CookieError extends FrameMasterError {}
 export class ResponseAlreadySetError extends FrameMasterError {}
 export class ResponseNotSetError extends FrameMasterError {}
 export class NoServerSideMatchError extends FrameMasterError {}
@@ -237,10 +235,16 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
     this.responseSetBy = this.currentPluginName;
     this._response_body = body;
     this._response_init = {
-      ...this._response_init,
+      ...(this._response_init || {}),
+      ...init,
       headers: {
-        ...this._response_init?.headers,
-        ...init?.headers,
+        ...(this._response_init?.headers || {}),
+        ...(init?.headers instanceof Headers
+          ? Object.assign(
+              {},
+              ...init.headers.entries().map(([k, v]) => ({ [k]: v }))
+            )
+          : init?.headers || {}),
       },
     };
     this._response_setted = true;
@@ -314,13 +318,17 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
 
   setHeader(name: string, value: string) {
     if (this.currentState == "after_request") {
-      this._response?.headers.set(name, value);
+      if (!this._response)
+        throw new ResponseNotSetError(
+          "Response is not set when trying to set header in after_request"
+        );
+      this._response.headers.set(name, value);
       return this;
     }
-    this._response_init.headers = {
-      ...this._response_init.headers,
-      [name]: value,
-    };
+    if (!this._response_init.headers) {
+      this._response_init.headers = {};
+    }
+    (this._response_init.headers as Record<string, string>)[name] = value;
     return this;
   }
 

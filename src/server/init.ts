@@ -26,6 +26,12 @@ export async function InitAll() {
   inited = true;
 }
 
+export async function InitCLIPlugins() {
+  await InitConfig();
+  InitPluginLoader();
+  await InitBuilder();
+}
+
 async function runOnStartMainPlugins() {
   if (!cluster.isPrimary) return;
   if (!pluginLoader) throw new Error("Plugin loader not initialized");
