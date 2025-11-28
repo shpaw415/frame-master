@@ -9,6 +9,7 @@ import { buildCommand } from "./build";
 import chalk from "chalk";
 import { ensureNodeEnv } from "./share";
 import ExtendCli from "./extend-cli";
+import type { CreateProjectProps } from "./create";
 
 function LogServerInfo() {
   const config = getConfig();
@@ -94,22 +95,20 @@ program
 program
   .command("create [name]")
   .description("Create a new frame-master project")
-  .option("-t, --type <type>", "Type of project to create", "minimal")
+  .option("-t, --type <type>", "Type of project to create")
   .option("--template <template>", "Template to use (e.g. name@version)")
   .addHelpText("after", `\n  avalable type: [ minimal ]`)
-  .action(
-    async (
-      name: string | undefined,
-      options: { type: "minimal"; template?: string }
-    ) => {
-      const createProject = (await import("./create")).default;
-      await createProject({ name, ...options });
-    }
-  );
+  .action(async (name: string | undefined, options: CreateProjectProps) => {
+    const createProject = (await import("./create")).default;
+    await createProject({ name, ...options });
+  });
 
 program.addCommand(pluginCommand);
 program.addCommand(testCommand);
 program.addCommand(buildCommand);
 program.addCommand(ExtendCli);
 
-program.parse();
+await program.parseAsync().catch((err) => {
+  console.error("Error executing command:", err);
+  process.exit(1);
+});

@@ -7,7 +7,7 @@ import prompts from "prompts";
 
 export type CreateProjectProps = {
   name?: string;
-  type: "minimal";
+  type?: "minimal" | "template";
   template?: string;
 };
 
@@ -82,30 +82,34 @@ export default async function CreateProject(props: CreateProjectProps) {
     process.exit(1);
   }
 
-  if (!template) {
-    const response = await prompts({
-      type: "select",
-      name: "type",
-      message: "Select a project type",
-      choices: [
-        { title: "Minimal (Empty Project)", value: "minimal" },
-        { title: "Template (From Community)", value: "template" },
-      ],
-    });
+  if (template) type = "template";
 
-    if (response.type === "template") {
-      const templateResponse = await prompts({
-        type: "text",
-        name: "template",
-        message: "Enter template name (e.g. cloudflare-react-tailwind)",
-        validate: (value: string) =>
-          value.length > 0 ? true : "Template name is required",
-      });
-      template = templateResponse.template;
-    }
+  type =
+    type ??
+    ((
+      await prompts({
+        type: "select",
+        name: "type",
+        message: "Select a project type",
+        choices: [
+          { title: "Minimal (Empty Project)", value: "minimal" },
+          { title: "Template (From Community)", value: "template" },
+        ],
+      })
+    ).type as CreateProjectProps["type"]);
+
+  if (type === "template") {
+    const templateResponse = await prompts({
+      type: "text",
+      name: "template",
+      message: "Enter template name (e.g. cloudflare-react-tailwind)",
+      validate: (value: string) =>
+        value.length > 0 ? true : "Template name is required",
+    });
+    template = templateResponse.template;
   }
 
-  if (template) {
+  if (template && type === "template") {
     return await createFromTemplate({ name, type, template });
   }
 
