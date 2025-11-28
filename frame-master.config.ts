@@ -13,7 +13,7 @@ export default {
           .command("deploy")
           .description("Deploy to cloudFlare Pages")
           .action(() => {
-            console.log("Dwploying to CloudFlare Pages...");
+            console.log("Deploying to CloudFlare Pages...");
           }),
     },
   ],

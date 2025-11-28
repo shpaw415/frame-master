@@ -1,10 +1,12 @@
-import { mkdirSync, existsSync } from "fs";
+import { mkdirSync, existsSync, rmdirSync } from "fs";
 import { join } from "path";
 import { x } from "tar";
 import { Readable } from "stream";
+import { onVerbose } from "../share";
+import prompts from "prompts";
 
 export type CreateProjectProps = {
-  name: string;
+  name?: string;
   type: "minimal";
   template?: string;
 };
@@ -53,23 +55,72 @@ type GithubReleaseType = {
 
 const FrameMasterBaseUrl = "https://templates.frame-master-docs.pages.dev";
 
+const gitHubReleaseAPI = (usernameAndRepo: string) =>
+  `https://api.github.com/repos/${usernameAndRepo}/releases`;
+
+function fetchReleases(usernameAndRepo: string) {
+  const url = gitHubReleaseAPI(usernameAndRepo);
+  return fetch(url).then((res) => res.json()) as Promise<GithubReleaseType[]>;
+}
+
 export default async function CreateProject(props: CreateProjectProps) {
-  if (props.template) {
-    return await createFromTemplate(props);
+  let { name, type, template } = props;
+
+  if (!name) {
+    const response = await prompts({
+      type: "text",
+      name: "name",
+      message: "What is the name of your project?",
+      validate: (value: string) =>
+        value.length > 0 ? true : "Project name is required",
+    });
+    name = response.name;
   }
 
-  const cwd = join(process.cwd(), props.name);
+  if (!name) {
+    console.error("Project name is required");
+    process.exit(1);
+  }
+
+  if (!template) {
+    const response = await prompts({
+      type: "select",
+      name: "type",
+      message: "Select a project type",
+      choices: [
+        { title: "Minimal (Empty Project)", value: "minimal" },
+        { title: "Template (From Community)", value: "template" },
+      ],
+    });
+
+    if (response.type === "template") {
+      const templateResponse = await prompts({
+        type: "text",
+        name: "template",
+        message: "Enter template name (e.g. cloudflare-react-tailwind)",
+        validate: (value: string) =>
+          value.length > 0 ? true : "Template name is required",
+      });
+      template = templateResponse.template;
+    }
+  }
+
+  if (template) {
+    return await createFromTemplate({ name, type, template });
+  }
+
+  const cwd = join(process.cwd(), name);
   mkdirSync(cwd, {
     recursive: true,
   });
   await Bun.$`bun init --yes`.cwd(cwd);
   await Bun.$`bun add frame-master`.cwd(cwd);
   await Bun.$`bun frame-master init`.cwd(cwd);
-  if (props.type == "minimal")
+  if (type == "minimal")
     return console.log(
       [
-        `\x1b[32m✅ Successfully created minimal Frame Master project: ${props.name}\x1b[0m`,
-        "cd " + props.name,
+        `\x1b[32m✅ Successfully created minimal Frame Master project: ${name}\x1b[0m`,
+        "cd " + name,
         "Add your plugins in frame-master.config.ts",
         "Run development server with:",
         "\x1b[36mbun frame-master dev\x1b[0m",
@@ -77,7 +128,7 @@ export default async function CreateProject(props: CreateProjectProps) {
     );
 }
 
-async function createFromTemplate(props: CreateProjectProps) {
+async function createFromTemplate(props: Required<CreateProjectProps>) {
   const { name, template } = props;
   if (!template) return;
 
@@ -97,33 +148,73 @@ async function createFromTemplate(props: CreateProjectProps) {
     process.exit(1);
   }
 
-  console.log(`Creating project ${name} from template ${templateName}...`);
+  onVerbose(() =>
+    console.log(`Creating project ${name} from template ${templateName}...`)
+  );
 
   let url = "";
   try {
     if (templateName.startsWith("http")) {
-      url = templateName;
+      if (
+        templateName.includes("github.com") &&
+        !templateName.endsWith(".tar.gz") &&
+        !templateName.endsWith(".zip")
+      ) {
+        const urlObj = new URL(templateName);
+        const pathSegments = urlObj.pathname.split("/").filter(Boolean);
+        if (pathSegments.length >= 2) {
+          const owner = pathSegments[0];
+          let repo = pathSegments[1]!;
+          if (repo.endsWith(".git")) repo = repo.slice(0, -4);
+          url = `https://github.com/${owner}/${repo}/archive/refs/${
+            version ? "tags/" + version : "heads/main"
+          }.tar.gz`;
+        } else {
+          url = templateName;
+        }
+      } else {
+        url = templateName;
+      }
     } else if (templateName) {
       const fmrequestURL = `${FrameMasterBaseUrl}/api/templates/${templateName}`;
+      onVerbose(() =>
+        console.log(`Fetching template info from ${fmrequestURL}`)
+      );
       const response = await fetch(fmrequestURL);
-      if (response.ok) {
-        const repoUrl = (
-          (await response.json().then((data) => data.githubRepoUrl)) as string
-        ).trim();
-
-        const releases = (await (
-          await fetch(
-            `https://api.github.com/repos/${
-              repoUrl.split("github.com/")[1]
-            }/releases`
-          )
-        ).json()) as GithubReleaseType[];
-
-        url = `${
-          repoUrl.endsWith("/") ? repoUrl : repoUrl + "/"
-        }archive/refs/tags/${version || "main"}.tar.gz`;
-        console.log(`Resolved template URL: ${url}`);
+      onVerbose(() =>
+        console.log(`Template info response status:`, response.statusText)
+      );
+      if (!response.ok) {
+        if (response.status === 404)
+          throw new Error(
+            `Template '${templateName}' not found from API Frame Master templates.`
+          );
+        else
+          throw new Error(
+            `Failed to fetch template info: ${response.statusText}`
+          );
       }
+      const repoUrl = (
+        (await response.json().then((data) => data.githubRepoUrl)) as string
+      ).trim();
+
+      const releases = await fetchReleases(
+        repoUrl.split("github.com/").at(1) as string
+      );
+      const releaseExists = version
+        ? releases.find((release) => release.tag_name == version)?.tarball_url
+        : releases.at(0)?.tarball_url;
+
+      if (!releaseExists) {
+        console.table([
+          ...releases.map((r) => ({
+            "release-tags": r.tag_name,
+            "release-url": r.url,
+          })),
+        ]);
+        throw new Error("Specified version not found");
+      }
+      url = releaseExists;
     } else {
       // Fallback for testing or other templates
       console.warn(
@@ -144,11 +235,13 @@ async function createFromTemplate(props: CreateProjectProps) {
     console.error(`Failed to resolve template: ${e.message}`);
     process.exit(1);
   }
-
+  if (!url) {
+    throw new Error("Template URL could not be determined");
+  }
   mkdirSync(cwd, { recursive: true });
 
   try {
-    console.log(`Downloading template from ${url}...`);
+    onVerbose(() => console.log(`Downloading template from ${url}...`));
     const response = await fetch(url);
     if (!response.ok || !response.body) {
       throw new Error(
@@ -156,8 +249,7 @@ async function createFromTemplate(props: CreateProjectProps) {
       );
     }
 
-    // @ts-ignore
-    const nodeStream = Readable.fromWeb(response.body);
+    const nodeStream = Readable.fromWeb(response.body as any);
 
     await new Promise((resolve, reject) => {
       nodeStream
@@ -171,10 +263,10 @@ async function createFromTemplate(props: CreateProjectProps) {
         .on("error", reject);
     });
 
-    console.log("Installing dependencies...");
+    onVerbose(() => console.log("Installing dependencies..."));
     await Bun.$`bun install`.cwd(cwd);
 
-    console.log("Initializing Frame Master...");
+    onVerbose(() => console.log("Initializing Frame Master..."));
     await Bun.$`bun frame-master init`.cwd(cwd);
 
     console.log(
@@ -182,11 +274,18 @@ async function createFromTemplate(props: CreateProjectProps) {
         `\x1b[32m✅ Successfully created project from template: ${name}\x1b[0m`,
         `cd ${name}`,
         "Run development server with:",
-        "\x1b[36mbun frame-master dev\x1b[0m",
+        "\x1b[36mbun dev\x1b[0m",
       ].join("\n")
     );
   } catch (error) {
     console.error("Failed to create project from template:", error);
+    if (existsSync(cwd)) {
+      try {
+        rmdirSync(cwd);
+      } catch {
+        // ignore
+      }
+    }
     process.exit(1);
   }
 }

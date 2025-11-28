@@ -4,6 +4,7 @@ import chalk from "chalk";
 import { join } from "path";
 import _packageJson_ from "../../package.json";
 import { getConfig, InitConfig } from "../../src/server/config";
+import { onVerbose } from "../share";
 
 const pluginCommand = new Command("plugin");
 
@@ -388,6 +389,7 @@ pluginCommand
       console.log(chalk.bold.blue(`\n📦 Creating plugin "${name}"...\n`));
 
       // Create plugin template
+      onVerbose(() => console.log(chalk.gray("Reading plugin template...")));
       const template = await Bun.file(
         join(import.meta.dir, "plugin-template.ts")
       )
@@ -395,6 +397,7 @@ pluginCommand
         .then((content) => formatTemplateFile(content, name));
 
       // Write plugin file
+      onVerbose(() => console.log(chalk.gray(`Writing ${pluginFileName}...`)));
       await Bun.write(pluginFileName, template);
 
       // Create package.json
@@ -408,16 +411,23 @@ pluginCommand
         },
       };
 
+      onVerbose(() =>
+        console.log(chalk.gray(`Writing ${join(pluginDir, "package.json")}...`))
+      );
       await Bun.write(
         join(pluginDir, "package.json"),
         JSON.stringify(packageJson, null, 2)
       );
 
       // Create README
+      onVerbose(() => console.log(chalk.gray("Reading README template...")));
       const readme = await Bun.file(join(import.meta.dir, "README.template.md"))
         .text()
         .then((content) => formatTemplateFile(content, name));
 
+      onVerbose(() =>
+        console.log(chalk.gray(`Writing ${join(pluginDir, "README.md")}...`))
+      );
       await Bun.write(join(pluginDir, "README.md"), readme);
 
       console.log(chalk.green("✓ Plugin created successfully!\n"));

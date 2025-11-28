@@ -82,3 +82,12 @@ export const ensureNodeEnv = () => {
     process.exit(1);
   }
 };
+
+export function onVerbose(callback: (() => void | Promise<void>) | string) {
+  if (process.env.FRAME_MASTER_VERBOSE !== "true") return;
+  if (typeof callback === "string") {
+    console.log(callback);
+    return;
+  }
+  return callback();
+}

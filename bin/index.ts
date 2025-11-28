@@ -46,7 +46,14 @@ const importServerStart = () =>
 program
   .name("frame-master")
   .description("CLI tool to manage frame-master plugins and server")
-  .version(version);
+  .version(version)
+  .option("-v, --verbose", "Enable verbose logging")
+  .hook("preAction", (thisCommand) => {
+    const opts = thisCommand.opts();
+    if (opts.verbose) {
+      process.env.FRAME_MASTER_VERBOSE = "true";
+    }
+  });
 
 /*
 program
@@ -85,13 +92,16 @@ program
   });
 
 program
-  .command("create <name>")
+  .command("create [name]")
   .description("Create a new frame-master project")
   .option("-t, --type <type>", "Type of project to create", "minimal")
   .option("--template <template>", "Template to use (e.g. name@version)")
   .addHelpText("after", `\n  avalable type: [ minimal ]`)
   .action(
-    async (name: string, options: { type: "minimal"; template?: string }) => {
+    async (
+      name: string | undefined,
+      options: { type: "minimal"; template?: string }
+    ) => {
       const createProject = (await import("./create")).default;
       await createProject({ name, ...options });
     }
