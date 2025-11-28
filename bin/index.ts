@@ -88,11 +88,14 @@ program
   .command("create <name>")
   .description("Create a new frame-master project")
   .option("-t, --type <type>", "Type of project to create", "minimal")
+  .option("--template <template>", "Template to use (e.g. name@version)")
   .addHelpText("after", `\n  avalable type: [ minimal ]`)
-  .action(async (name: string, { type }: { type: "minimal" }) => {
-    const createProject = (await import("./create")).default;
-    await createProject({ name, type });
-  });
+  .action(
+    async (name: string, options: { type: "minimal"; template?: string }) => {
+      const createProject = (await import("./create")).default;
+      await createProject({ name, ...options });
+    }
+  );
 
 program.addCommand(pluginCommand);
 program.addCommand(testCommand);
