@@ -237,21 +237,6 @@ async function createFromTemplate(props: Required<CreateProjectProps>) {
         throw new Error("Specified version not found");
       }
       url = releaseExists;
-    } else {
-      // Fallback for testing or other templates
-      console.warn(
-        "Template API not connected. Trying to construct GitHub URL..."
-      );
-      // Assuming the template name is owner/repo if not found in mock
-      if (templateName.includes("/")) {
-        url = `https://github.com/${templateName}/archive/refs/${
-          version ? `tags/${version}` : "heads/main"
-        }.tar.gz`;
-      } else {
-        throw new Error(
-          `Template '${templateName}' not found. Please use 'owner/repo' format or a valid URL.`
-        );
-      }
     }
   } catch (e: any) {
     console.error(`Failed to resolve template: ${e.message}`);
