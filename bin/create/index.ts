@@ -134,7 +134,6 @@ export default async function CreateProject(props: CreateProjectProps) {
 
 async function createFromTemplate(props: Required<CreateProjectProps>) {
   const { name, template } = props;
-  if (!template) return;
 
   const parts = template.split("@");
   const templateName = parts[0];
@@ -202,9 +201,12 @@ async function createFromTemplate(props: Required<CreateProjectProps>) {
         (await response.json().then((data) => data.githubRepoUrl)) as string
       ).trim();
 
-      const releases = await fetchReleases(
-        repoUrl.split("github.com/").at(1) as string
-      );
+      const repoPath = repoUrl.split("github.com/").at(1);
+      if (!repoPath) {
+        throw new Error(`Invalid GitHub repository URL: ${repoUrl}`);
+      }
+
+      const releases = await fetchReleases(repoPath);
       const releaseExists = version
         ? releases.find((release) => release.tag_name == version)?.tarball_url
         : releases.at(0)?.tarball_url;

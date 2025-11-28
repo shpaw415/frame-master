@@ -15,7 +15,8 @@ import { existsSync, mkdirSync, rmSync } from "fs";
 mock.module("tar", () => ({
   x: () => {
     const pass = new (require("stream").PassThrough)();
-    pass.on("finish", () => {});
+    // Trigger finish on next tick to resolve the extraction promise
+    process.nextTick(() => pass.end());
     return pass;
   },
 }));
