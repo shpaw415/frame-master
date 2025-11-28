@@ -98,7 +98,7 @@ export default async function CreateProject(props: CreateProjectProps) {
       })
     ).type as CreateProjectProps["type"]);
 
-  if (type === "template") {
+  if (type === "template" && !template) {
     const templateResponse = await prompts({
       type: "text",
       name: "template",

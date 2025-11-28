@@ -25,8 +25,10 @@ Examples:
 pluginCommand
   .command("list")
   .description("List all installed plugins")
-  .option("-v, --verbose", "Show detailed plugin information")
-  .action(async (options: { verbose?: boolean }) => {
+  .action(async () => {
+    const options = {
+      verbose: process.env.FRAME_MASTER_VERBOSE === "true",
+    };
     try {
       await InitConfig();
       const config = getConfig();
