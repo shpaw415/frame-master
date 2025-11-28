@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { ensureNodeEnv } from "../share";
+import { ensureNodeEnv, onVerbose } from "../share";
 import chalk from "chalk";
 import { InitAll } from "frame-master/server/init";
 
@@ -8,6 +8,7 @@ export const buildCommand = new Command("build")
   .action(async () => {
     process.env.BUILD_MODE = "true";
     ensureNodeEnv();
+    onVerbose(() => console.log(chalk.gray("Initializing server...")));
     await InitAll();
 
     console.log(
@@ -24,6 +25,7 @@ export const buildCommand = new Command("build")
 
     try {
       // Import and initialize the builder
+      onVerbose(() => console.log(chalk.gray("Importing builder...")));
       const { builder } = await import("../../src/build");
 
       if (!builder) {
@@ -141,7 +143,8 @@ export const buildCommand = new Command("build")
       console.error(
         chalk.bold.red("└─────────────────────────────────────────┘") + "\n"
       );
-      console.error(chalk.red((error as Error).message));
-      process.exit(1);
+      throw new Error("Build process failed", {
+        cause: error as Error,
+      });
     }
   });

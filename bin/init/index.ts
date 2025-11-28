@@ -2,6 +2,7 @@ import { join } from "path";
 import Paths from "../../src/paths";
 import { cpSync, existsSync } from "fs";
 import { webToken } from "@shpaw415/webtoken";
+import { onVerbose } from "../share";
 
 export const PATH_TO_DEFAULT_CONFIG_FILE = join(
   import.meta.dir,
@@ -9,6 +10,7 @@ export const PATH_TO_DEFAULT_CONFIG_FILE = join(
 ) as `<frame-master-path>/bin/init/config.default.ts`;
 
 async function init() {
+  onVerbose(() => console.log("Starting initialization..."));
   await Promise.all([
     copyConfigFileToProject(),
     copyBunfigToProject(),
@@ -21,6 +23,7 @@ async function init() {
 }
 
 async function copyConfigFileToProject() {
+  onVerbose(() => console.log("Copying config file..."));
   const defaultConfigFile = Bun.file(PATH_TO_DEFAULT_CONFIG_FILE);
   const targetPath = join(process.cwd(), Paths.configFile);
   const targetFile = Bun.file(targetPath);
@@ -32,6 +35,7 @@ async function copyConfigFileToProject() {
 }
 
 function copyDotFrameMasterDirToProject() {
+  onVerbose(() => console.log("Copying .frame-master directory..."));
   const targetDirPath = join(process.cwd(), ".frame-master");
   if (existsSync(targetDirPath)) {
     console.warn(`.frame-master directory already exists. Skipping copy.`);
@@ -43,6 +47,7 @@ function copyDotFrameMasterDirToProject() {
 }
 
 async function copyBunfigToProject() {
+  onVerbose(() => console.log("Copying bunfig.toml..."));
   const bunfigFile = Bun.file(join(import.meta.dir, "bunfig.default"));
 
   const targetPath = join(process.cwd(), "bunfig.toml");
@@ -55,6 +60,7 @@ async function copyBunfigToProject() {
 }
 
 async function addScriptsToPackageJson() {
+  onVerbose(() => console.log("Adding scripts to package.json..."));
   const packageJsonPath = join(process.cwd(), "package.json");
   const packageJsonFile = Bun.file(packageJsonPath);
   const packageJson = (await import(packageJsonPath)).default;
@@ -115,6 +121,7 @@ const TS_CONFIG_WITH_CUSTOM_TYPE = {
 };
 
 async function InitTsConfig() {
+  onVerbose(() => console.log("Initializing tsconfig.json..."));
   const pathToTsConfig = join(process.cwd(), "tsconfig.json");
   const projectTsConfigFile = Bun.file(pathToTsConfig);
 
@@ -143,6 +150,7 @@ async function InitTsConfig() {
 }
 
 async function setEnvFile() {
+  onVerbose(() => console.log("Setting up .env file..."));
   const envFile = Bun.file(join("./.env"));
   const envFileText = (await envFile.exists()) ? await envFile.text() : "";
 

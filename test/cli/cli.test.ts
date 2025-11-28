@@ -109,23 +109,6 @@ describe("frame-master CLI", () => {
       expect(output).toContain("Successfully created");
       expect(output).toContain(projectName);
     }, 30000); // Longer timeout for project creation
-
-    test("should create project with default type when not specified", async () => {
-      const projectName = "test-default-project";
-      const projectPath = join(TEST_DIR, projectName);
-
-      const proc = Bun.spawn(["bun", CLI_PATH, "create", projectName], {
-        cwd: TEST_DIR,
-        stdout: "pipe",
-        stderr: "pipe",
-      });
-
-      await proc.exited;
-
-      expect(existsSync(projectPath)).toBe(true);
-      expect(existsSync(join(projectPath, "package.json"))).toBe(true);
-      expect(proc.exitCode).toBe(0);
-    }, 30000);
   });
 
   describe("init command", () => {
@@ -324,7 +307,7 @@ export default {
         stderr: "pipe",
       });
 
-      const output = await new Response(proc.stdout).text();
+      const output = Bun.stripANSI(await new Response(proc.stdout).text());
       await proc.exited;
 
       expect(output).toContain("test-plugin");
@@ -653,20 +636,6 @@ export default {
       await proc.exited;
 
       expect(stderr).toContain("unknown command");
-      expect(proc.exitCode).not.toBe(0);
-    });
-
-    test("should handle missing required arguments", async () => {
-      const proc = Bun.spawn(["bun", CLI_PATH, "create"], {
-        cwd: TEST_DIR,
-        stdout: "pipe",
-        stderr: "pipe",
-      });
-
-      const stderr = Bun.stripANSI(await new Response(proc.stderr).text());
-      await proc.exited;
-
-      expect(stderr).toContain("missing required argument");
       expect(proc.exitCode).not.toBe(0);
     });
   });

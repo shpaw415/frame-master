@@ -9,6 +9,7 @@ import { buildCommand } from "./build";
 import chalk from "chalk";
 import { ensureNodeEnv } from "./share";
 import ExtendCli from "./extend-cli";
+import type { CreateProjectProps } from "./create";
 
 function LogServerInfo() {
   const config = getConfig();
@@ -46,7 +47,14 @@ const importServerStart = () =>
 program
   .name("frame-master")
   .description("CLI tool to manage frame-master plugins and server")
-  .version(version);
+  .version(version)
+  .option("-v, --verbose", "Enable verbose logging")
+  .hook("preAction", (thisCommand) => {
+    const opts = thisCommand.opts();
+    if (opts.verbose) {
+      process.env.FRAME_MASTER_VERBOSE = "true";
+    }
+  });
 
 /*
 program
@@ -85,13 +93,14 @@ program
   });
 
 program
-  .command("create <name>")
+  .command("create [name]")
   .description("Create a new frame-master project")
-  .option("-t, --type <type>", "Type of project to create", "minimal")
+  .option("-t, --type <type>", "Type of project to create")
+  .option("--template <template>", "Template to use (e.g. name@version)")
   .addHelpText("after", `\n  avalable type: [ minimal ]`)
-  .action(async (name: string, { type }: { type: "minimal" }) => {
+  .action(async (name: string | undefined, options: CreateProjectProps) => {
     const createProject = (await import("./create")).default;
-    await createProject({ name, type });
+    await createProject({ name, ...options });
   });
 
 program.addCommand(pluginCommand);
@@ -99,4 +108,7 @@ program.addCommand(testCommand);
 program.addCommand(buildCommand);
 program.addCommand(ExtendCli);
 
-program.parse();
+await program.parseAsync().catch((err) => {
+  console.error("Error executing command:", err);
+  process.exit(1);
+});
