@@ -53,14 +53,25 @@ type GithubReleaseType = {
   zipball_url: string;
 };
 
-const FrameMasterBaseUrl = "https://templates.frame-master-docs.pages.dev";
+const FrameMasterBaseUrl = "https://frame-master.com";
 
 const gitHubReleaseAPI = (usernameAndRepo: string) =>
   `https://api.github.com/repos/${usernameAndRepo}/releases`;
 
 function fetchReleases(usernameAndRepo: string) {
   const url = gitHubReleaseAPI(usernameAndRepo);
-  return fetch(url).then((res) => res.json()) as Promise<GithubReleaseType[]>;
+  return fetch(url)
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error(
+          `GitHub API responded with status ${res.status}: ${res.statusText}`
+        );
+      }
+      return res.json();
+    })
+    .catch((e) => {
+      throw new Error(`Failed to fetch releases from GitHub: ${e.message}`);
+    }) as Promise<GithubReleaseType[]>;
 }
 
 export default async function CreateProject(props: CreateProjectProps) {
@@ -197,11 +208,16 @@ async function createFromTemplate(props: Required<CreateProjectProps>) {
             `Failed to fetch template info: ${response.statusText}`
           );
       }
-      const repoUrl = (
-        (await response.json().then((data) => data.githubRepoUrl)) as string
-      ).trim();
+      const repoUrl = (await response
+        .json()
+        .then((data) => data.githubRepoUrl)) as string;
+      if (!repoUrl) {
+        throw new Error(
+          `Template '${templateName}' does not have a valid GitHub repository URL.`
+        );
+      }
 
-      const repoPath = repoUrl.split("github.com/").at(1);
+      const repoPath = repoUrl.trim().split("github.com/").at(1);
       if (!repoPath) {
         throw new Error(`Invalid GitHub repository URL: ${repoUrl}`);
       }
@@ -221,21 +237,6 @@ async function createFromTemplate(props: Required<CreateProjectProps>) {
         throw new Error("Specified version not found");
       }
       url = releaseExists;
-    } else {
-      // Fallback for testing or other templates
-      console.warn(
-        "Template API not connected. Trying to construct GitHub URL..."
-      );
-      // Assuming the template name is owner/repo if not found in mock
-      if (templateName.includes("/")) {
-        url = `https://github.com/${templateName}/archive/refs/tags/${
-          version || "main"
-        }.tar.gz`;
-      } else {
-        throw new Error(
-          `Template '${templateName}' not found. Please use 'owner/repo' format or a valid URL.`
-        );
-      }
     }
   } catch (e: any) {
     console.error(`Failed to resolve template: ${e.message}`);
