@@ -159,8 +159,6 @@ async function setEnvFile() {
       .split("\n")
       .map((line) => line.trim())
       .filter((line) => line.length > 0),
-    !envFileText.includes("WEB_TOKEN_IV=") &&
-      `WEB_TOKEN_IV=${webToken.generateSecureIV()}`,
     !envFileText.includes("WEB_TOKEN_SECRET=") &&
       `WEB_TOKEN_SECRET=${webToken.generateSecureSecret()}`,
   ]

@@ -5,12 +5,12 @@
     "": {
       "name": "frame-master",
       "dependencies": {
-        "@shpaw415/webtoken": "^1.0.0",
+        "@shpaw415/webtoken": "^2.0.0",
         "chalk": "^5.6.2",
         "commander": "^14.0.2",
         "prompts": "^2.4.2",
-        "react": "19.2.0",
-        "react-dom": "19.2.0",
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0",
         "tar": "^7.5.2",
       },
       "devDependencies": {
@@ -26,7 +26,7 @@
   "packages": {
     "@isaacs/fs-minipass": ["@isaacs/fs-minipass@4.0.1", "", { "dependencies": { "minipass": "^7.0.4" } }, "sha512-wgm9Ehl2jpeqP3zw/7mo3kRHFp5MEDhqAdwy1fTGkHAwnkGOVsgpvQhL8B5n1qlb01jV3n/bI0ZfZp5lWA1k4w=="],
 
-    "@shpaw415/webtoken": ["@shpaw415/webtoken@1.0.0", "", { "peerDependencies": { "typescript": "^5" } }, "sha512-X4Mr7kUcPIwfbms/4RM/W3SP/+labCoMluNzqQeA1TXQZbpmbTirzrX8LTQeHKo/x4mbf1WbQIY2bZwGYQeEIA=="],
+    "@shpaw415/webtoken": ["@shpaw415/webtoken@2.0.0", "", { "peerDependencies": { "typescript": "^5.9.2" } }, "sha512-VFvsL64dGs5T6QeKLIJQq6Ty1X6dvnY1IZMgDeLuJUv/5dUpfWdCv9ybp/sRnUbdY/tQ/6WkJbvkB3FNauPtJg=="],
 
     "@types/bun": ["@types/bun@1.3.2", "", { "dependencies": { "bun-types": "1.3.2" } }, "sha512-t15P7k5UIgHKkxwnMNkJbWlh/617rkDGEdSsDbu+qNHTaz9SKf7aC8fiIlUdD5RPpH6GEkP0cK7WlvmrEBRtWg=="],
 

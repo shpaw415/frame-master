@@ -7,7 +7,6 @@ import serve from "../src/server";
 let master: masterRequest;
 let server: Bun.Server<undefined>;
 process.env.WEB_TOKEN_SECRET = webToken.generateSecureSecret();
-process.env.WEB_TOKEN_IV = webToken.generateSecureIV();
 
 // Track execution order and state for tests
 let executionOrder: string[] = [];
@@ -18,7 +17,7 @@ let counterValue = 0;
 beforeAll(async () => {
   setMockConfig({
     HTTPServer: {
-      port: 3000,
+      port: 3005,
     },
     plugins: [
       // Lifecycle test plugins

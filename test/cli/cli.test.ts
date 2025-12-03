@@ -148,14 +148,18 @@ describe("frame-master CLI", () => {
       await Bun.$`bun add frame-master`.cwd(projectPath).quiet();
 
       // Run init
-      const proc = Bun.spawn(["bun", CLI_PATH, "init"], {
-        cwd: projectPath,
-        stdout: "pipe",
-        stderr: "pipe",
-      });
+      const proc = await Bun.$`bun ${CLI_PATH} init`
+        .cwd(projectPath)
+        .catch((e) => {
+          console.error(Bun.stripANSI(e.message));
+        })
+        .then((p) => p);
 
-      const output = await new Response(proc.stdout).text();
-      await proc.exited;
+      if (!proc) throw new Error("Failed to run init command");
+
+      const output = proc.text();
+
+      console.log("out:", output);
 
       // Check if files were created
       expect(existsSync(join(projectPath, "frame-master.config.ts"))).toBe(
