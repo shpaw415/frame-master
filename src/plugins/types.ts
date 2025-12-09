@@ -600,13 +600,11 @@ export type FrameMasterPlugin<
      * they are **automatically chained** in priority order. Each handler receives
      * the previous handler's output via `args.pooled`.
      *
-     * **Type augmentation is automatic** - `args.pooled` and `preventChaining` are
-     * available on Bun's native types without any imports!
+     * **`args.pooled` is automatically typed** - no imports needed for reading chained data!
      *
      * ### Using Chained Handlers
      *
      * ```typescript
-     * // No type imports needed - args.pooled is automatically available!
      * runtimePlugins: [{
      *   name: "my-transform",
      *   setup(build) {
@@ -626,8 +624,6 @@ export type FrameMasterPlugin<
      *       return {
      *         contents: transform(contents),
      *         loader: "tsx",
-     *         // preventChaining is also automatically typed!
-     *         // preventChaining: true,
      *       };
      *     });
      *   }
@@ -636,16 +632,22 @@ export type FrameMasterPlugin<
      *
      * ### Preventing Chain Participation
      *
-     * To stop the chain and prevent subsequent handlers from running:
+     * To stop the chain, use `PooledOnLoadResult` type (Bun's `OnLoadResult` is a union
+     * type and cannot be augmented):
      *
      * ```typescript
-     * return {
-     *   contents: finalOutput,
-     *   loader: "tsx",
-     *   preventChaining: true, // Chain stops here - automatically typed!
-     * };
+     * import type { PooledOnLoadResult } from "frame-master/plugin/types";
+     *
+     * build.onLoad({ filter: /\.tsx$/ }, async (args): Promise<PooledOnLoadResult> => {
+     *   return {
+     *     contents: finalOutput,
+     *     loader: "tsx",
+     *     preventChaining: true, // Chain stops here
+     *   };
+     * });
      * ```
      *
+     * @see {@link PooledOnLoadResult} - Return type with `preventChaining` support
      * @see {@link getPooledContents} - Helper to get chained or disk contents
      */
     runtimePlugins: Array<Bun.BunPlugin>;

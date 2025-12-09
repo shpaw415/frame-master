@@ -25,7 +25,7 @@ export type OnLoadOptions = Parameters<PluginBuilder["onLoad"]>[0];
  */
 export interface PooledData {
   /** Contents returned by the previous handler */
-  contents: string;
+  contents?: string;
   /** Loader returned by the previous handler */
   loader?: string;
 }
@@ -55,8 +55,13 @@ export interface PooledOnLoadArgs extends OnLoadArgs {
 /**
  * Extended OnLoadResult that supports preventing further chaining.
  *
+ * Use this type for your onLoad handler return type when you want to use `preventChaining`.
+ * Since Bun's OnLoadResult is a union type (not an interface), it cannot be augmented.
+ *
  * @example
- * build.onLoad({ filter: /\.tsx$/ }, async (args) => {
+ * import type { PooledOnLoadResult } from "frame-master/plugin/types";
+ *
+ * build.onLoad({ filter: /\.tsx$/ }, async (args): Promise<PooledOnLoadResult> => {
  *   const contents = await Bun.file(args.path).text();
  *   return {
  *     contents: transform(contents),
@@ -65,20 +70,23 @@ export interface PooledOnLoadArgs extends OnLoadArgs {
  *   };
  * });
  */
-export interface PooledOnLoadResult extends OnLoadResult {
+export type PooledOnLoadResult = {
   /**
    * If true, stops the chain and returns this result immediately.
    * No subsequent handlers will be executed.
    * @default false
    */
   preventChaining?: boolean;
-}
+} & OnLoadResult;
 
 // ============================================================================
 // Type Augmentation for Bun's PluginBuilder
 // ============================================================================
 // This extends Bun's onLoad callback args to include `pooled` property
 // automatically when used within Frame-Master plugins.
+//
+// NOTE: OnLoadResult cannot be augmented because it's a type alias (union),
+// not an interface. Use PooledOnLoadResult type for preventChaining support.
 
 declare module "bun" {
   interface OnLoadArgs {
@@ -96,23 +104,6 @@ declare module "bun" {
      * });
      */
     pooled?: PooledData;
-  }
-
-  interface OnLoadResult {
-    /**
-     * If true, stops the Frame-Master file pool chain and returns this result immediately.
-     * No subsequent handlers will be executed.
-     *
-     * @default false
-     *
-     * @example
-     * return {
-     *   contents: "final output",
-     *   loader: "tsx",
-     *   preventChaining: true, // Chain stops here
-     * };
-     */
-    preventChaining?: boolean;
   }
 }
 
@@ -327,7 +318,7 @@ export class FilePool {
     initialArgs: OnLoadArgs
   ): Promise<OnLoadResult> {
     let currentArgs: PooledOnLoadArgs = initialArgs;
-    let previousResult: { contents: string; loader?: string } | undefined;
+    let previousResult: PooledData | undefined;
 
     for (const { handler, pluginName } of handlers) {
       try {
@@ -366,9 +357,15 @@ export class FilePool {
       }
     }
 
+    if (previousResult && previousResult.contents === undefined) {
+      throw new Error(
+        `FilePool: Handler chain resulted in undefined contents. Each handler must return contents.`
+      );
+    }
+
     return previousResult
       ? {
-          contents: previousResult.contents,
+          contents: previousResult.contents!,
           loader: previousResult.loader as Bun.Loader,
         }
       : { contents: "", loader: "ts" };
@@ -530,7 +527,7 @@ export function wrapPluginForPool(
  */
 export async function getPooledContents(
   args: PooledOnLoadArgs
-): Promise<{ contents: string; loader?: string }> {
+): Promise<PooledData> {
   if (args.pooled) {
     return {
       contents: args.pooled.contents,
