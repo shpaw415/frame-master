@@ -36,5 +36,5 @@
       "frame-master/server/request": ["./src/server/request-manager.ts"]
     }
   },
-  "include": ["src", "bin", "config"]
+  "include": ["src", "bin", "config", "test"]
 }
