@@ -183,9 +183,14 @@ export class FileSystemWatcher {
       if (stats.isDirectory()) {
         await this.watchDirectory(this.options.path);
       } else if (stats.isFile()) {
-        // Watch single file
-        const watcher = watch(this.options.path, (eventType, filename) => {
-          this.handleEvent(eventType, filename, this.options.path);
+        // Watch single file - use dirname as watchPath since handleEvent joins path + filename
+        const { dirname, basename } = await import("path");
+        const dirPath = dirname(this.options.path);
+        const fileName = basename(this.options.path);
+
+        const watcher = watch(this.options.path, (eventType, _filename) => {
+          // For single file watching, use the known filename
+          this.handleEvent(eventType, fileName, dirPath);
         });
         this.watchers.set(this.options.path, watcher);
       }

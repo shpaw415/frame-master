@@ -75,7 +75,9 @@ class ConfigManager {
    */
   async reloadConfig(): Promise<FrameMasterConfig> {
     this.mergedConfig = null;
-    return this.initConfig(`?t=${Date.now()}`);
+    // Use high-resolution timestamp + random to ensure unique cache bust
+    const cacheBust = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    return this.initConfig(`?t=${cacheBust}`);
   }
 
   /**
@@ -173,4 +175,21 @@ export function getConfig(): FrameMasterConfig | null {
 /** Override Config for testing perpose or something else */
 export function setMockConfig(mockConfig: FrameMasterConfig) {
   configManager.setMockConfig(mockConfig);
+}
+
+/**
+ * Gets the absolute path to the frame-master.config.ts file.
+ *
+ * @returns The absolute path to the config file
+ *
+ * @example
+ * ```typescript
+ * import { configPath } from "frame-master/server/config";
+ *
+ * console.log("Config file:", configPath());
+ * // Output: /path/to/project/frame-master.config.ts
+ * ```
+ */
+export function configPath(): string {
+  return join(process.cwd(), Paths.configFile);
 }

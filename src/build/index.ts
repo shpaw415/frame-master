@@ -4,6 +4,12 @@ import { pluginLoader } from "../plugins";
 import { pluginRegex } from "../utils";
 import chalk from "chalk";
 import { join } from "path";
+import {
+  FilePool,
+  wrapPluginForPool,
+  getPooledContents,
+} from "../plugins/file-pool";
+import type { BunPlugin } from "bun";
 
 type RequiredBuilOptions = Required<BuildOptionsPlugin>;
 
@@ -673,6 +679,43 @@ export class Builder {
     return report;
   }
 
+  /**
+   * Creates a file pool from an array of Bun plugins.
+   *
+   * This method collects all onLoad handlers from the provided plugins,
+   * groups them by filter pattern, and creates a unified plugin that
+   * chains handlers for the same filter in the order plugins were provided.
+   *
+   * @param plugins - Array of BunPlugin objects to pool
+   * @returns A single BunPlugin with chained onLoad handlers
+   */
+  private createPooledPlugin(plugins: BunPlugin[]): BunPlugin {
+    const pool = new FilePool();
+
+    // Register all plugins to the pool with index as priority
+    // This maintains the original plugin order
+    for (let i = 0; i < plugins.length; i++) {
+      const plugin = plugins[i];
+      if (plugin) {
+        wrapPluginForPool(pool, plugin.name, i, plugin);
+      }
+    }
+
+    // If we have pooled handlers, return the unified plugin
+    if (pool.size > 0) {
+      this.log(
+        `📦 File pool created with ${pool.size} handlers in ${pool.groupCount} filter groups`
+      );
+      return pool.createUnifiedPlugin("frame-master-build-pool");
+    }
+
+    // No handlers to pool, return empty plugin
+    return {
+      name: "frame-master-build-pool-empty",
+      setup() {},
+    };
+  }
+
   private getBuildConfig(): Promise<Bun.BuildConfig> {
     return Promise.all(
       this.buildConfigFactory.map((factory) => (factory as Function)(this))
@@ -701,6 +744,15 @@ export class Builder {
           mergedConfig as Bun.BuildConfig,
           this.staticBuildConfig
         );
+
+        // Pool all plugins with onLoad handlers for chained processing
+        if (mergedConfig.plugins && mergedConfig.plugins.length > 0) {
+          const pooledPlugin = this.createPooledPlugin(
+            mergedConfig.plugins as BunPlugin[]
+          );
+          mergedConfig.plugins = [pooledPlugin];
+        }
+
         this.currentBuildConfig = mergedConfig as Bun.BuildConfig;
         return mergedConfig;
       }) as Promise<Bun.BuildConfig>;
@@ -939,10 +991,38 @@ export default Builder;
 
 export async function InitBuilder() {
   if (builder) return;
+  await createBuilderFromPlugins();
+}
+
+/**
+ * Reload the builder with updated plugin configurations.
+ *
+ * This function recreates the singleton builder instance by re-reading
+ * all build configurations from currently loaded plugins. Use this after
+ * reloading plugins to ensure the builder reflects the new configuration.
+ *
+ * @internal - Use `reloadPlugins()` from `frame-master/utils` instead
+ */
+export async function reloadBuilder(): Promise<void> {
+  builder = null;
+  await createBuilderFromPlugins();
+}
+
+async function createBuilderFromPlugins() {
   if (!pluginLoader) {
     throw new Error("Plugin loader not initialized. Cannot create builder.");
   }
   const plugin = pluginLoader.getPluginByName("build");
+  if (plugin.length === 0) {
+    // No build plugins, create empty builder
+    builder = await Builder.createBuilder({
+      pluginBuildConfig: [],
+      beforeBuilds: [],
+      afterBuilds: [],
+      enableLogging: false,
+    });
+    return;
+  }
   const configFactories = plugin
     .map((plugin) => plugin.pluginParent.buildConfig)
     .filter((p) => p != undefined);
@@ -970,6 +1050,14 @@ export async function InitBuilder() {
 
 export function getBuilder() {
   return builder;
+}
+
+/**
+ * Reset the builder state for testing purposes.
+ * @internal - Only use in tests
+ */
+export function resetBuilderState() {
+  builder = null;
 }
 
 /**

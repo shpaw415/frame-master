@@ -167,6 +167,11 @@ class PluginLoader {
 }
 
 export let pluginLoader: PluginLoader | null = null;
+
+export function getPluginLoader(): PluginLoader | null {
+  return pluginLoader;
+}
+
 export function InitPluginLoader() {
   if (!pluginLoader) {
     pluginLoader = new PluginLoader();
@@ -175,4 +180,12 @@ export function InitPluginLoader() {
 
 export function reloadPluginLoader() {
   pluginLoader = new PluginLoader();
+}
+
+/**
+ * Reset the plugin loader state for testing purposes.
+ * @internal - Only use in tests
+ */
+export function resetPluginLoaderState() {
+  pluginLoader = null;
 }
