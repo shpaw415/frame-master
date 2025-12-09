@@ -1,0 +1,10 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "your-project-name",
+  "pages_build_output_dir": ".frame-master/build",
+  "compatibility_date": "2025-11-09",
+  "vars": {
+    "BUN_VERSION": "1.3.3",
+    "SKIP_DEPENDENCY_INSTALL": "true"
+  }
+}
