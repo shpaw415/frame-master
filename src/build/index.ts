@@ -4,11 +4,7 @@ import { pluginLoader } from "../plugins";
 import { pluginRegex } from "../utils";
 import chalk from "chalk";
 import { join } from "path";
-import {
-  FilePool,
-  wrapPluginForPool,
-  getPooledContents,
-} from "../plugins/file-pool";
+import { FilePool, wrapPluginForPool } from "../plugins/file-pool";
 import type { BunPlugin } from "bun";
 
 type RequiredBuilOptions = Required<BuildOptionsPlugin>;

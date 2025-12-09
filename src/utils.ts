@@ -127,7 +127,7 @@ export function onVerbose(callback: (() => void | Promise<void>) | string) {
  * }
  * ```
  */
-export async function reloadPlugins(): Promise<void> {
+export async function reloadPlugins(skipServerReload = false): Promise<void> {
   // Capture old config before reload to detect critical changes
   const oldConfig = getConfig();
   const oldPort = oldConfig?.HTTPServer?.port;
@@ -160,7 +160,7 @@ export async function reloadPlugins(): Promise<void> {
   }
 
   // 5. Reload server routes if server is running
-  const server = getServerInstance();
+  const server = skipServerReload ? null : getServerInstance();
   if (server) {
     const newServerConfig = buildServerConfig();
     if (newServerConfig) {

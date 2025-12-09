@@ -3,6 +3,22 @@ import { masterRequest } from "../server/request-manager";
 import type { Builder } from "../build";
 import type { Command } from "commander";
 
+// Re-export file pool types for plugin authors
+// Note: Bun's OnLoadArgs and OnLoadResult are automatically augmented
+// with `pooled` and `preventChaining` properties when using Frame-Master
+export type {
+  PooledOnLoadArgs,
+  PooledOnLoadResult,
+  PooledData,
+  OnLoadArgs,
+  OnLoadHandler,
+  OnLoadOptions,
+} from "./file-pool";
+export { getPooledContents } from "./file-pool";
+
+// Import file-pool to ensure type augmentation is applied
+import "./file-pool";
+
 export type WatchEventType = "change" | "rename";
 
 export type FileChangeCallback = (
@@ -155,8 +171,14 @@ export type PluginOptions = {
  * Frame-Master merges configs with smart strategies:
  * - **Arrays**: Deduplicated and concatenated (e.g., `external`, `entrypoints`)
  * - **Objects**: Deep merged (e.g., `define`, `loader`)
- * - **Plugins**: Concatenated to preserve order
+ * - **Plugins**: Concatenated and **chained** (onLoad handlers from all plugins)
  * - **Primitives**: Last plugin wins with warning
+ *
+ * ## Plugin Chaining (v3.0.0+)
+ *
+ * Build plugins with `onLoad` handlers are automatically chained when they match
+ * the same file. Use `PooledOnLoadArgs` and `PooledOnLoadResult` for type-safe
+ * chained handler development. See `runtimePlugins` documentation for details.
  *
  * Provides control over the build process at different stages,
  * allowing plugins to customize build configuration and perform
@@ -571,6 +593,60 @@ export type FrameMasterPlugin<
     requirement: Requirement;
     /**
      * Specify additional Bun plugins to be used at runtime to be included in the bunfig.toml.
+     *
+     * ## Plugin Chaining (v3.0.0+)
+     *
+     * When multiple plugins register `onLoad` handlers that match the same file,
+     * they are **automatically chained** in priority order. Each handler receives
+     * the previous handler's output via `args.pooled`.
+     *
+     * **Type augmentation is automatic** - `args.pooled` and `preventChaining` are
+     * available on Bun's native types without any imports!
+     *
+     * ### Using Chained Handlers
+     *
+     * ```typescript
+     * // No type imports needed - args.pooled is automatically available!
+     * runtimePlugins: [{
+     *   name: "my-transform",
+     *   setup(build) {
+     *     build.onLoad({ filter: /\.tsx$/ }, async (args) => {
+     *       // args.pooled is automatically typed!
+     *       if (args.pooled) {
+     *         console.log("Previous contents:", args.pooled.contents);
+     *         console.log("Previous loader:", args.pooled.loader);
+     *       }
+     *
+     *       // Or use the helper for convenience:
+     *       // import { getPooledContents } from "frame-master/plugin/types";
+     *       // const { contents, loader } = await getPooledContents(args);
+     *
+     *       const contents = args.pooled?.contents ?? await Bun.file(args.path).text();
+     *
+     *       return {
+     *         contents: transform(contents),
+     *         loader: "tsx",
+     *         // preventChaining is also automatically typed!
+     *         // preventChaining: true,
+     *       };
+     *     });
+     *   }
+     * }]
+     * ```
+     *
+     * ### Preventing Chain Participation
+     *
+     * To stop the chain and prevent subsequent handlers from running:
+     *
+     * ```typescript
+     * return {
+     *   contents: finalOutput,
+     *   loader: "tsx",
+     *   preventChaining: true, // Chain stops here - automatically typed!
+     * };
+     * ```
+     *
+     * @see {@link getPooledContents} - Helper to get chained or disk contents
      */
     runtimePlugins: Array<Bun.BunPlugin>;
     /**

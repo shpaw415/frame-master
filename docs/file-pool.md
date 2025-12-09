@@ -99,18 +99,18 @@ export default function myPlugin(): FrameMasterPlugin {
 }
 ```
 
-## Using `getPooledContents()` or `args.pooled`
+## Using `args.pooled` (Automatic Type Safety)
 
-When your handler might be part of a chain, you have two options to access previous handler's output:
+Frame-Master extends Bun's native `OnLoadArgs` and `OnLoadResult` types automatically.
+**No imports needed** - `args.pooled` and `preventChaining` are available out of the box!
 
 ### Option 1: Direct `args.pooled` Access
 
-Each handler receives an extended args object with a `pooled` property containing the previous handler's result:
+Each handler receives `args.pooled` containing the previous handler's result:
 
 ```typescript
-import type { PooledOnLoadArgs } from "frame-master/plugin";
-
-build.onLoad({ filter: /\.tsx$/ }, async (args: PooledOnLoadArgs) => {
+// No type imports needed - args.pooled is automatically typed!
+build.onLoad({ filter: /\.tsx$/ }, async (args) => {
   if (args.pooled) {
     // This handler is chained - use previous result
     console.log("Previous loader:", args.pooled.loader);
@@ -128,13 +128,13 @@ build.onLoad({ filter: /\.tsx$/ }, async (args: PooledOnLoadArgs) => {
 Use `getPooledContents()` for a simpler API that handles both cases:
 
 ```typescript
-import { getPooledContents, type PooledOnLoadArgs } from "frame-master/plugin";
+import { getPooledContents } from "frame-master/plugin";
 import type { BunPlugin } from "bun";
 
 const myPlugin: BunPlugin = {
   name: "my-transform-plugin",
   setup(build) {
-    build.onLoad({ filter: /\.tsx$/ }, async (args: PooledOnLoadArgs) => {
+    build.onLoad({ filter: /\.tsx$/ }, async (args) => {
       // Automatically handles both cases:
       // - First in chain: reads from disk
       // - Not first: gets previous handler's output

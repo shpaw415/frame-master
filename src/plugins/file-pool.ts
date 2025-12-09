@@ -21,11 +21,21 @@ export type OnLoadArgs = Parameters<OnLoadHandler>[0];
 export type OnLoadOptions = Parameters<PluginBuilder["onLoad"]>[0];
 
 /**
+ * Pooled data from previous handler in the chain.
+ */
+export interface PooledData {
+  /** Contents returned by the previous handler */
+  contents: string;
+  /** Loader returned by the previous handler */
+  loader?: string;
+}
+
+/**
  * Extended args passed to chained handlers with previous handler's result.
  *
  * @example
- * // In your onLoad handler:
- * build.onLoad({ filter: /\.tsx$/ }, async (args: PooledOnLoadArgs) => {
+ * // In your onLoad handler - args.pooled is automatically available:
+ * build.onLoad({ filter: /\.tsx$/ }, async (args) => {
  *   if (args.pooled) {
  *     // This handler is in a chain - use previous result
  *     console.log("Previous loader:", args.pooled.loader);
@@ -39,19 +49,14 @@ export interface PooledOnLoadArgs extends OnLoadArgs {
    * Contains the previous handler's result when chained.
    * Undefined if this is the first handler in the chain.
    */
-  pooled?: {
-    /** Contents returned by the previous handler */
-    contents: string;
-    /** Loader returned by the previous handler */
-    loader?: string;
-  };
+  pooled?: PooledData;
 }
 
 /**
  * Extended OnLoadResult that supports preventing further chaining.
  *
  * @example
- * build.onLoad({ filter: /\.tsx$/ }, async (args): Promise<PooledOnLoadResult> => {
+ * build.onLoad({ filter: /\.tsx$/ }, async (args) => {
  *   const contents = await Bun.file(args.path).text();
  *   return {
  *     contents: transform(contents),
@@ -67,6 +72,48 @@ export interface PooledOnLoadResult extends OnLoadResult {
    * @default false
    */
   preventChaining?: boolean;
+}
+
+// ============================================================================
+// Type Augmentation for Bun's PluginBuilder
+// ============================================================================
+// This extends Bun's onLoad callback args to include `pooled` property
+// automatically when used within Frame-Master plugins.
+
+declare module "bun" {
+  interface OnLoadArgs {
+    /**
+     * Contains the previous handler's result when chained in Frame-Master's file pool.
+     * Undefined if this is the first handler in the chain or not using Frame-Master.
+     *
+     * @example
+     * build.onLoad({ filter: /\.tsx$/ }, async (args) => {
+     *   if (args.pooled) {
+     *     // Use previous handler's output
+     *     const contents = args.pooled.contents;
+     *     const loader = args.pooled.loader;
+     *   }
+     * });
+     */
+    pooled?: PooledData;
+  }
+
+  interface OnLoadResult {
+    /**
+     * If true, stops the Frame-Master file pool chain and returns this result immediately.
+     * No subsequent handlers will be executed.
+     *
+     * @default false
+     *
+     * @example
+     * return {
+     *   contents: "final output",
+     *   loader: "tsx",
+     *   preventChaining: true, // Chain stops here
+     * };
+     */
+    preventChaining?: boolean;
+  }
 }
 
 interface PooledHandler {
