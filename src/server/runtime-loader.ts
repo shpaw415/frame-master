@@ -1,5 +1,5 @@
 import { InitPluginLoader, pluginLoader } from "../plugins/plugin-loader";
-import { plugin, type BunPlugin } from "bun";
+import { argv, plugin, type BunPlugin } from "bun";
 import { getConfig, InitConfig } from "./config";
 import { chainPlugins } from "../plugins/plugin-chaining";
 
@@ -13,11 +13,13 @@ import { chainPlugins } from "../plugins/plugin-chaining";
  * with each handler receiving the accumulated transformed content from previous handlers.
  */
 export async function load() {
+  setVerboseMode();
   await InitConfig();
   InitPluginLoader();
   if (!pluginLoader) throw new Error("Plugin loader not initialized");
 
   const config = getConfig();
+
   const disableChaining =
     config?.pluginsOptions?.disableOnLoadChaining ?? false;
 
@@ -47,13 +49,21 @@ export async function load() {
       }
     } else {
       // Chain all plugins together for onLoad handler chaining
-      const chainedPlugin = chainPlugins(allRuntimePlugins);
+      const chainedPlugin = chainPlugins(allRuntimePlugins, {
+        suffix: "runtime",
+      });
       try {
         await Bun.plugin(chainedPlugin);
       } catch (e) {
         throw new Error(`Failed to load chained runtime plugins`, { cause: e });
       }
     }
+  }
+}
+
+function setVerboseMode() {
+  if (argv.includes("--verbose")) {
+    process.env.FRAME_MASTER_VERBOSE = "true";
   }
 }
 

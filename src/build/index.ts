@@ -757,7 +757,9 @@ export class Builder {
         if (this.disableOnLoadChaining) {
           (target as any)[key] = allPlugins;
         } else {
-          (target as any)[key] = [chainPlugins(allPlugins)];
+          (target as any)[key] = [
+            chainPlugins(allPlugins, { suffix: "build" }),
+          ];
         }
       } else if (
         key === "external" &&

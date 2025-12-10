@@ -5,6 +5,7 @@ import { logRequest } from "./log";
 import { pluginLoader } from "../plugins";
 import { type FileSystemWatcher } from "./watch";
 import { InitAll } from "./init";
+import { verboseLog } from "frame-master/utils";
 
 declare global {
   var __FILESYSTEM_WATCHER__: FileSystemWatcher[];
@@ -178,7 +179,7 @@ export function reloadServer(): Bun.Server<unknown> {
 
 export default async () => {
   await InitAll();
-  console.log("[Server] Initialization complete");
+  verboseLog("[Server] Initialization complete");
   const config = getConfig();
   if (!config) {
     console.error("Configuration not loaded after InitAll");

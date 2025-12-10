@@ -1,5 +1,5 @@
 import type { BunPlugin, PluginBuilder, OnLoadCallback } from "bun";
-import { verboseLog } from "../utils";
+import { isVerbose, verboseLog } from "../utils";
 import chalk from "chalk";
 
 type OnLoadArgs = Parameters<OnLoadCallback>[0];
@@ -60,6 +60,13 @@ interface NonOnLoadPlugin {
 export class PluginProxy {
   private onLoadHandlers: RegisteredOnLoad[] = [];
   private nonOnLoadSetups: NonOnLoadPlugin[] = [];
+  private suffix: string;
+  private formatedSuffix: string;
+
+  constructor(opt: { suffix?: string } = {}) {
+    this.suffix = opt.suffix ?? "";
+    this.formatedSuffix = this.suffix ? `:${this.suffix}` : "";
+  }
 
   /**
    * Add a BunPlugin to the proxy. Its onLoad handlers will be collected
@@ -67,7 +74,7 @@ export class PluginProxy {
    */
   addPlugin(plugin: BunPlugin): void {
     verboseLog(
-      chalk.cyan("[PluginChaining]"),
+      chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
       chalk.white("Adding plugin:"),
       chalk.green(plugin.name)
     );
@@ -79,7 +86,7 @@ export class PluginProxy {
 
     if (onLoadCallbacks.length > 0) {
       verboseLog(
-        chalk.cyan("[PluginChaining]"),
+        chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
         chalk.gray("  └─"),
         chalk.white(
           `Found ${chalk.yellow(onLoadCallbacks.length)} onLoad handler(s):`
@@ -92,7 +99,7 @@ export class PluginProxy {
 
     if (otherSetup) {
       verboseLog(
-        chalk.cyan("[PluginChaining]"),
+        chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
         chalk.gray("  └─"),
         chalk.white("Found other handlers"),
         chalk.gray("(onResolve, onStart, etc.)")
@@ -120,30 +127,29 @@ export class PluginProxy {
     const self = this;
     const stats = this.getStats();
 
+    const Name = `[PluginChaining${this.formatedSuffix}]`;
+
+    verboseLog(chalk.cyan(Name), chalk.white("Creating chained plugin:"));
     verboseLog(
-      chalk.cyan("[PluginChaining]"),
-      chalk.white("Creating chained plugin:")
-    );
-    verboseLog(
-      chalk.cyan("[PluginChaining]"),
+      chalk.cyan(Name),
       chalk.gray("  └─"),
       chalk.white("Total onLoad handlers:"),
       chalk.yellow(stats.totalOnLoadHandlers)
     );
     verboseLog(
-      chalk.cyan("[PluginChaining]"),
+      chalk.cyan(Name),
       chalk.gray("  └─"),
       chalk.white("Unique patterns:"),
       chalk.yellow(stats.uniquePatterns)
     );
     verboseLog(
-      chalk.cyan("[PluginChaining]"),
+      chalk.cyan(Name),
       chalk.gray("  └─"),
       chalk.white("Namespaces:"),
       chalk.yellow(stats.uniqueNamespaces)
     );
     verboseLog(
-      chalk.cyan("[PluginChaining]"),
+      chalk.cyan(Name),
       chalk.gray("  └─"),
       chalk.white("Plugins:"),
       stats.pluginNames.map((n) => chalk.green(n)).join(chalk.gray(", "))
@@ -347,12 +353,12 @@ export class PluginProxy {
 
     if (handlers.length > 1) {
       verboseLog(
-        chalk.cyan("[PluginChaining]"),
+        chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
         chalk.white(`Chaining ${chalk.yellow(handlers.length)} handlers for:`),
         chalk.blue(originalArgs.path)
       );
       verboseLog(
-        chalk.cyan("[PluginChaining]"),
+        chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
         chalk.gray("  └─"),
         chalk.white("Handler order:"),
         handlers.map((h) => chalk.green(h.pluginName)).join(chalk.gray(" → "))
@@ -394,7 +400,7 @@ export class PluginProxy {
 
             if (handlers.length > 1) {
               verboseLog(
-                chalk.cyan("[PluginChaining]"),
+                chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
                 chalk.gray("  └─"),
                 chalk.gray(`[${i + 1}/${handlers.length}]`),
                 chalk.green(handler.pluginName) + chalk.white(":"),
@@ -535,8 +541,11 @@ export function createPluginProxy(): PluginProxy {
  * const chainedPlugin = chainPlugins([pluginA, pluginB]);
  * ```
  */
-export function chainPlugins(plugins: BunPlugin[]): BunPlugin {
-  const proxy = new PluginProxy();
+export function chainPlugins(
+  plugins: BunPlugin[],
+  opt?: { suffix?: string }
+): BunPlugin {
+  const proxy = new PluginProxy(opt);
   proxy.addPlugins(plugins);
   return proxy.createChainedPlugin();
 }

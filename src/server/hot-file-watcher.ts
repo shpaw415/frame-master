@@ -165,7 +165,7 @@ export class HotFileWatcher {
       });
 
       this.isWatching = true;
-      console.log(`[${this.options.name}] Watching file:`, this.absolutePath);
+      this.log(`[${this.options.name}] Watching file:`, this.absolutePath);
     } catch (error) {
       console.error(`[${this.options.name}] Failed to start watching:`, error);
       throw error;

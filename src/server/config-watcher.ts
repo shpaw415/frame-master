@@ -6,6 +6,7 @@ import { HotFileWatcher } from "./hot-file-watcher";
 import { reloadServer } from "./index";
 import { reinitAll } from "./init";
 import type { FrameMasterConfig } from "./type";
+import { isVerbose, verboseLog } from "frame-master/utils";
 
 export type ConfigReloadCallback = (
   newConfig: FrameMasterConfig
@@ -55,7 +56,7 @@ class ConfigWatcher {
    */
   async start(): Promise<void> {
     if (this.fileWatcher?.isActive()) {
-      console.log("[ConfigWatcher] Already watching config file");
+      verboseLog("[ConfigWatcher] Already watching config file");
       return;
     }
 
@@ -64,7 +65,7 @@ class ConfigWatcher {
       onReload: () => this.reload(),
       debounceDelay: 100,
       name: "ConfigWatcher",
-      verbose: false,
+      verbose: isVerbose(),
     });
 
     await this.fileWatcher.start();
@@ -74,7 +75,7 @@ class ConfigWatcher {
    * Reload the configuration and reinitialize dependent systems.
    */
   async reload(): Promise<void> {
-    console.log("[ConfigWatcher] Reloading configuration...");
+    verboseLog("[ConfigWatcher] Reloading configuration...");
 
     try {
       // 1. Reinitialize everything (config, plugins, builder, hooks, watchers)
@@ -98,7 +99,7 @@ class ConfigWatcher {
         }
       }
 
-      console.log("[ConfigWatcher] Configuration reloaded successfully");
+      verboseLog("[ConfigWatcher] Configuration reloaded successfully");
     } catch (error) {
       console.error("[ConfigWatcher] Failed to reload configuration:", error);
     }
@@ -133,7 +134,7 @@ class ConfigWatcher {
   stop(): void {
     this.fileWatcher?.stop();
     this.fileWatcher = null;
-    console.log("[ConfigWatcher] Stopped watching config file");
+    verboseLog("[ConfigWatcher] Stopped watching config file");
   }
 
   /**
