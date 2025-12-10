@@ -3,4 +3,4 @@
 ~~ Hot reload plugin. ~~
 ~~ isVerbose method helper ~~
 ~~ isBuildMode method helper ~~
-plugin file pool ( if multiple plugin interact with the same file with onLoad, it will be parsed one to the other before final output. )
+~~ plugin file pool ( if multiple plugin interact with the same file with onLoad, it will be parsed one to the other before final output. ) ~~
