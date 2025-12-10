@@ -178,7 +178,7 @@ export function reloadServer(): Bun.Server<unknown> {
 
 export default async () => {
   await InitAll();
-
+  console.log("[Server] Initialization complete");
   const config = getConfig();
   if (!config) {
     console.error("Configuration not loaded after InitAll");

@@ -39,10 +39,12 @@ export async function InitBuild() {
 }
 
 export async function InitCLIPlugins() {
+  if (inited) return;
   await InitConfig();
   InitPluginLoader();
   await InitBuilder();
   await runCreateContextHooks();
+  inited = true;
 }
 
 /**

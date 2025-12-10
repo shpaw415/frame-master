@@ -16,7 +16,10 @@ const command = new Command("extended-cli")
     }
   });
 
-await LoadCustomCLI(command);
+// Only load custom CLI plugins if the extended-cli command is being invoked
+if (process.argv.includes("extended-cli")) {
+  await LoadCustomCLI(command);
+}
 
 async function LoadCustomCLI(command: Command) {
   try {
