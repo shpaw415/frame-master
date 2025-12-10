@@ -973,6 +973,19 @@ export function getBuilder() {
 }
 
 /**
+ * Reinitialize the builder with updated plugin configurations.
+ *
+ * Used for hot-reloading when plugins or build configs change.
+ * Clears the current builder and creates a new one with fresh plugin configs.
+ *
+ * @returns Promise resolving when builder is reinitialized
+ */
+export async function reloadBuilder(): Promise<void> {
+  builder = null;
+  await InitBuilder();
+}
+
+/**
  * Type-safe helper for defining build configurations in Frame-Master plugins.
  *
  * **Public API** - Use this to get full TypeScript autocomplete and validation

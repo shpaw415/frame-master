@@ -124,3 +124,161 @@ export function pluginRegex({ path, ext }: { path: string[]; ext: string[] }) {
 function escapeRegExp(string: string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+
+/**
+ * Check if Frame-Master is running in verbose mode.
+ *
+ * Verbose mode is enabled by setting the `FRAME_MASTER_VERBOSE` environment variable to `"true"`.
+ *
+ * **Public API** - Use this helper in your plugins for conditional logging.
+ *
+ * @returns `true` if verbose mode is enabled, `false` otherwise
+ *
+ * @example
+ * ```typescript
+ * import { isVerbose } from "frame-master/utils";
+ *
+ * if (isVerbose()) {
+ *   console.log("[MyPlugin] Debug info:", debugData);
+ * }
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // In a plugin
+ * export function myPlugin(): FrameMasterPlugin {
+ *   return {
+ *     name: "my-plugin",
+ *     version: "1.0.0",
+ *     serverStart: {
+ *       main: () => {
+ *         if (isVerbose()) {
+ *           console.log("[MyPlugin] Initializing with verbose logging...");
+ *         }
+ *       }
+ *     }
+ *   };
+ * }
+ * ```
+ */
+export function isVerbose(): boolean {
+  return process.env.FRAME_MASTER_VERBOSE === "true";
+}
+
+/**
+ * Log a message only if verbose mode is enabled.
+ *
+ * Convenience function that combines `isVerbose()` check with logging.
+ *
+ * @param args - Arguments to pass to `console.log`
+ *
+ * @example
+ * ```typescript
+ * import { verboseLog } from "frame-master/utils";
+ *
+ * verboseLog("[MyPlugin] Processing file:", filePath);
+ * ```
+ */
+export function verboseLog(...args: unknown[]): void {
+  if (isVerbose()) {
+    console.log(...args);
+  }
+}
+
+/**
+ * Check if Frame-Master is currently in build mode.
+ *
+ * Build mode is active when `__DRY_RUN__` is `true` (before server starts serving requests).
+ * This is useful for plugins that need to behave differently during build vs runtime.
+ *
+ * **Public API** - Use this helper to conditionally execute code during build phase.
+ *
+ * @returns `true` if in build/initialization mode, `false` if server is running
+ *
+ * @example
+ * ```typescript
+ * import { isBuildMode } from "frame-master/utils";
+ *
+ * if (isBuildMode()) {
+ *   console.log("[MyPlugin] Running during build phase");
+ * } else {
+ *   console.log("[MyPlugin] Server is running");
+ * }
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Skip expensive operations during build
+ * export function myPlugin(): FrameMasterPlugin {
+ *   return {
+ *     name: "my-plugin",
+ *     version: "1.0.0",
+ *     router: {
+ *       before_request: (master) => {
+ *         if (isBuildMode()) return; // Skip during dry run
+ *         // Expensive runtime-only logic
+ *       }
+ *     }
+ *   };
+ * }
+ * ```
+ */
+export function isBuildMode(): boolean {
+  return globalThis.process.env.BUILD_MODE === "true";
+}
+
+/**
+ * Check if Frame-Master server is running (not in build mode).
+ *
+ * Inverse of `isBuildMode()`. Returns `true` when server is actively handling requests.
+ *
+ * @returns `true` if server is running, `false` if in build/initialization mode
+ *
+ * @example
+ * ```typescript
+ * import { isServerRunning } from "frame-master/utils";
+ *
+ * if (isServerRunning()) {
+ *   // Server is ready to handle requests
+ * }
+ * ```
+ */
+export function isServerRunning(): boolean {
+  return Boolean(globalThis.__SERVER_INSTANCE__);
+}
+
+/**
+ * Check if running in development mode.
+ *
+ * @returns `true` if `NODE_ENV` is not `"production"`
+ *
+ * @example
+ * ```typescript
+ * import { isDev } from "frame-master/utils";
+ *
+ * if (isDev()) {
+ *   console.log("[MyPlugin] Development mode enabled");
+ * }
+ * ```
+ */
+export function isDev(): boolean {
+  return process.env.NODE_ENV !== "production";
+}
+
+/**
+ * Check if running in production mode.
+ *
+ * @returns `true` if `NODE_ENV` is `"production"`
+ *
+ * @example
+ * ```typescript
+ * import { isProd } from "frame-master/utils";
+ *
+ * if (isProd()) {
+ *   // Production-only optimizations
+ * }
+ * ```
+ */
+export function isProd(): boolean {
+  return process.env.NODE_ENV === "production";
+}
