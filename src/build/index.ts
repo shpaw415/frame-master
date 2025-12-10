@@ -4,6 +4,8 @@ import { pluginLoader } from "../plugins";
 import { pluginRegex } from "../utils";
 import chalk from "chalk";
 import { join } from "path";
+import { chainPlugins } from "../plugins/plugin-chaining";
+import { getConfig } from "../server/config";
 
 type RequiredBuilOptions = Required<BuildOptionsPlugin>;
 
@@ -12,6 +14,12 @@ export type BuilderProps = {
   beforeBuilds?: Array<RequiredBuilOptions["beforeBuild"]>;
   afterBuilds?: Array<RequiredBuilOptions["afterBuild"]>;
   enableLogging?: boolean;
+  /**
+   * Disable onLoad handler chaining for build plugins.
+   * When true, plugins array will be concatenated instead of chained.
+   * @default false
+   */
+  disableOnLoadChaining?: boolean;
 };
 
 export class Builder {
@@ -29,6 +37,7 @@ export class Builder {
     outputCount: number;
     success: boolean;
   }> = [];
+  private disableOnLoadChaining: boolean;
 
   readonly isLogEnabled: boolean;
   public outputs: Bun.BuildArtifact[] | null = null;
@@ -38,6 +47,7 @@ export class Builder {
 
   constructor(props: BuilderProps) {
     this.isLogEnabled = props.enableLogging ?? true;
+    this.disableOnLoadChaining = props.disableOnLoadChaining ?? false;
 
     this.staticBuildConfig = props.pluginBuildConfig
       .filter((c) => typeof c != "function")
@@ -741,8 +751,16 @@ export class Builder {
         Array.isArray(targetValue) &&
         Array.isArray(sourceValue)
       ) {
-        // Plugins should be concatenated to preserve order and allow multiple instances
-        (target as any)[key] = [...targetValue, ...sourceValue];
+        // Plugins are chained using PluginProxy for onLoad handler chaining
+        // unless chaining is disabled via config
+        const allPlugins = [...targetValue, ...sourceValue];
+        if (this.disableOnLoadChaining) {
+          (target as any)[key] = allPlugins;
+        } else {
+          (target as any)[key] = [
+            chainPlugins(allPlugins, { suffix: "build" }),
+          ];
+        }
       } else if (
         key === "external" &&
         Array.isArray(targetValue) &&
@@ -942,6 +960,7 @@ export async function InitBuilder() {
   if (!pluginLoader) {
     throw new Error("Plugin loader not initialized. Cannot create builder.");
   }
+  const config = getConfig();
   const plugin = pluginLoader.getPluginByName("build");
   const configFactories = plugin
     .map((plugin) => plugin.pluginParent.buildConfig)
@@ -965,11 +984,25 @@ export async function InitBuilder() {
     beforeBuilds: beforeBuildHooks,
     afterBuilds: afterBuildHooks,
     enableLogging: logIsEnabled,
+    disableOnLoadChaining: config?.pluginsOptions?.disableOnLoadChaining,
   });
 }
 
 export function getBuilder() {
   return builder;
+}
+
+/**
+ * Reinitialize the builder with updated plugin configurations.
+ *
+ * Used for hot-reloading when plugins or build configs change.
+ * Clears the current builder and creates a new one with fresh plugin configs.
+ *
+ * @returns Promise resolving when builder is reinitialized
+ */
+export async function reloadBuilder(): Promise<void> {
+  builder = null;
+  await InitBuilder();
 }
 
 /**

@@ -2,6 +2,7 @@ import type { ClientIPCManager } from "./utils";
 import { masterRequest } from "../server/request-manager";
 import type { Builder } from "../build";
 import type { Command } from "commander";
+import type { FrameMasterConfig } from "../server/type";
 
 export type WatchEventType = "change" | "rename";
 
@@ -617,6 +618,65 @@ export type FrameMasterPlugin<
      * @param absolutePath - Absolute path to the changed file
      */
     onFileSystemChange?: FileChangeCallback;
+    /**
+     * Triggered when the frame-master.config.ts file is reloaded.
+     *
+     * This hook is called after the configuration has been reloaded and
+     * plugins have been reinitialized. Use it to perform cleanup or
+     * re-initialization tasks specific to your plugin.
+     *
+     * **Run on the main thread**
+     *
+     * **ONLY DEV MODE**
+     *
+     * @example
+     * ```typescript
+     * {
+     *   name: "my-plugin",
+     *   onConfigReload: async () => {
+     *     console.log("Config reloaded, reinitializing plugin state...");
+     *     await reinitializeMyPluginState();
+     *   }
+     * }
+     * ```
+     */
+    onConfigReload?: () => void | Promise<void>;
+    /**
+     * Initialize plugin context after plugins and builder are initialized.
+     *
+     * This hook is called during server initialization, after the plugin loader
+     * and builder have been set up. Use it to set up plugin-specific state,
+     * initialize connections, or perform any setup that depends on the configuration.
+     *
+     * **Run on the main thread**
+     *
+     * @param config - The loaded Frame-Master configuration
+     *
+     * @example
+     * ```typescript
+     * {
+     *   name: "my-plugin",
+     *   version: "1.0.0",
+     *   createContext: (config) => {
+     *     console.log("Plugin initializing with port:", config.HTTPServer.port);
+     *     myPluginState.init(config);
+     *   }
+     * }
+     * ```
+     *
+     * @example
+     * ```typescript
+     * // Async context creation
+     * {
+     *   name: "database-plugin",
+     *   version: "1.0.0",
+     *   createContext: async (config) => {
+     *     await connectToDatabase(config.HTTPServer);
+     *   }
+     * }
+     * ```
+     */
+    createContext?: (config: FrameMasterConfig) => void | Promise<void>;
     /**
      * WebSocket event handlers for real-time communication.
      *

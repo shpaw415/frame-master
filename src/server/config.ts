@@ -75,7 +75,7 @@ class ConfigManager {
    */
   async reloadConfig(): Promise<FrameMasterConfig> {
     this.mergedConfig = null;
-    return this.initConfig(`?t=${Date.now()}`);
+    return this.initConfig(`?t=${Bun.randomUUIDv7()}`);
   }
 
   /**

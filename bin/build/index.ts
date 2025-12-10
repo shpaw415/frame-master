@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { ensureNodeEnv, onVerbose } from "../share";
 import chalk from "chalk";
-import { InitAll } from "frame-master/server/init";
+import { InitBuild } from "frame-master/server/init";
 
 export const buildCommand = new Command("build")
   .description("Build the Frame Master project")
@@ -9,7 +9,7 @@ export const buildCommand = new Command("build")
     process.env.BUILD_MODE = "true";
     ensureNodeEnv();
     onVerbose(() => console.log(chalk.gray("Initializing server...")));
-    await InitAll();
+    await InitBuild();
 
     console.log(
       "\n" + chalk.bold.cyan("┌─────────────────────────────────────────┐")
