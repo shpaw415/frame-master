@@ -111,15 +111,26 @@ async function runCreateContextHooks(): Promise<void> {
 
   const createContextPlugins = pluginLoader.getPluginByName("createContext");
 
+  const errors: Array<{ name: string; error: any }> = [];
+
   await Promise.all(
     createContextPlugins.map(async (plugin) => {
       try {
         await plugin.pluginParent(config);
       } catch (error) {
         console.error(`Error in plugin ${plugin.name} createContext():`, error);
+        errors.push({ name: plugin.name, error });
       }
     })
   );
+
+  if (errors.length > 0) {
+    throw new AggregateError(
+      `Errors occurred in createContext hooks: ${errors
+        .map((e) => `${e.name}: ${e.error.message || e.error}`)
+        .join("; ")}`
+    );
+  }
 }
 
 async function runOnStartMainPlugins() {

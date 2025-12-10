@@ -196,7 +196,7 @@ export function verboseLog(...args: unknown[]): void {
 /**
  * Check if Frame-Master is currently in build mode.
  *
- * Build mode is active when `__DRY_RUN__` is `true` (before server starts serving requests).
+ * Build mode is active when `BUILD_MODE` is `true` (before server starts serving requests).
  * This is useful for plugins that need to behave differently during build vs runtime.
  *
  * **Public API** - Use this helper to conditionally execute code during build phase.

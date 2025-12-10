@@ -55,15 +55,21 @@ build.onLoad({ filter: /\.tsx$/ }, async (args) => {
 
 Both handlers will execute in order, with the output of Handler 1 feeding into Handler 2.
 
-### Accessing Chained Content
+### Accessing Chained Content and Loader
 
-Plugins can access the accumulated content from previous handlers via `args.__chainedContents`:
+Plugins can access the accumulated content and loader from previous handlers via special properties on `args`:
+
+- **`args.__chainedContents`** - The transformed content from previous handlers in the chain
+- **`args.__chainedLoader`** - The loader type returned by the previous handler (e.g., `"tsx"`, `"js"`, `"css"`)
 
 ```typescript
 build.onLoad({ filter: /\.tsx$/ }, async (args) => {
   // Get content from previous handlers in the chain (if any)
   // Falls back to reading from disk if this is the first handler
   const content = args.__chainedContents ?? (await Bun.file(args.path).text());
+
+  // Access the loader from the previous handler (useful for dynamic loader handling)
+  const previousLoader = args.__chainedLoader; // e.g., "tsx", "js", etc.
 
   // Transform the content
   const transformed = `import "my-lib";\n${content}`;
