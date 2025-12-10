@@ -139,8 +139,8 @@ export class PluginProxy {
     verboseLog(
       chalk.cyan("[PluginChaining]"),
       chalk.gray("  └─"),
-      chalk.white("Chained patterns (multiple handlers):"),
-      chalk.yellow(stats.chainedPatterns)
+      chalk.white("Namespaces:"),
+      chalk.yellow(stats.uniqueNamespaces)
     );
     verboseLog(
       chalk.cyan("[PluginChaining]"),
@@ -157,26 +157,66 @@ export class PluginProxy {
           plugin.setup(build);
         }
 
-        // Group onLoad handlers by files they can match
-        // We'll register handlers for each unique filter and chain matching handlers
-        const handlersByFilter = self.groupHandlersByFilter();
+        // Group handlers by namespace only - we'll check filter matches at runtime
+        const handlersByNamespace = self.groupHandlersByNamespace();
 
-        for (const [_filterKey, handlers] of handlersByFilter.entries()) {
-          const firstHandler = handlers[0];
-          if (!firstHandler) continue;
+        for (const [namespace, handlers] of handlersByNamespace.entries()) {
+          // Create a combined filter that matches if ANY handler's filter matches
+          const combinedFilter = self.createCombinedFilter(handlers);
 
           build.onLoad(
             {
-              filter: firstHandler.filter,
-              namespace: firstHandler.namespace,
+              filter: combinedFilter,
+              namespace: namespace === "file" ? undefined : namespace,
             },
             async (args) => {
-              return self.executeChainedOnLoad(args, handlers);
+              // Find all handlers whose filter matches this specific file
+              const matchingHandlers = handlers.filter((h) =>
+                h.filter.test(args.path)
+              );
+
+              if (matchingHandlers.length === 0) {
+                return undefined;
+              }
+
+              return self.executeChainedOnLoad(args, matchingHandlers);
             }
           );
         }
       },
     };
+  }
+
+  /**
+   * Groups handlers by namespace only.
+   * Actual file matching is done at runtime to support different filters matching same files.
+   */
+  private groupHandlersByNamespace(): Map<string, RegisteredOnLoad[]> {
+    const groups = new Map<string, RegisteredOnLoad[]>();
+
+    for (const handler of this.onLoadHandlers) {
+      const key = handler.namespace || "file";
+      const existing = groups.get(key) || [];
+      existing.push(handler);
+      groups.set(key, existing);
+    }
+
+    return groups;
+  }
+
+  /**
+   * Creates a combined regex that matches if ANY of the handler filters match.
+   * This ensures we intercept all files that could be handled by any plugin.
+   */
+  private createCombinedFilter(handlers: RegisteredOnLoad[]): RegExp {
+    if (handlers.length === 1) {
+      return handlers[0]!.filter;
+    }
+
+    // Combine all filter patterns with alternation
+    const patterns = handlers.map((h) => `(?:${h.filter.source})`);
+    const combined = new RegExp(patterns.join("|"));
+    return combined;
   }
 
   /**
@@ -323,15 +363,15 @@ export class PluginProxy {
       const handler = handlers[i];
       if (!handler) continue;
 
-      // Create a custom args object that provides access to the current content
-      const chainedArgs: OnLoadArgs & { __chainedContents?: string } = {
+      // Create a custom args object that provides access to the current content and loader
+      // Preserve binary data as Uint8Array, don't convert to string
+      const chainedArgs: OnLoadArgs & {
+        __chainedContents?: string | Uint8Array;
+        __chainedLoader?: Bun.Loader;
+      } = {
         ...originalArgs,
-        __chainedContents:
-          typeof accumulatedContents === "string"
-            ? accumulatedContents
-            : accumulatedContents
-            ? new TextDecoder().decode(accumulatedContents)
-            : undefined,
+        __chainedContents: accumulatedContents,
+        __chainedLoader: accumulatedLoader,
       };
 
       try {
@@ -416,13 +456,13 @@ export class PluginProxy {
   getStats(): {
     totalOnLoadHandlers: number;
     uniquePatterns: number;
-    chainedPatterns: number;
+    uniqueNamespaces: number;
     pluginNames: string[];
   } {
-    const groups = this.groupHandlersByFilter();
-    const chainedPatterns = Array.from(groups.values()).filter(
-      (handlers) => handlers.length > 1
-    ).length;
+    const namespaceGroups = this.groupHandlersByNamespace();
+    const uniquePatterns = new Set(
+      this.onLoadHandlers.map((h) => h.filter.source)
+    ).size;
 
     const pluginNames = [
       ...new Set(this.onLoadHandlers.map((h) => h.pluginName)),
@@ -430,8 +470,8 @@ export class PluginProxy {
 
     return {
       totalOnLoadHandlers: this.onLoadHandlers.length,
-      uniquePatterns: groups.size,
-      chainedPatterns,
+      uniquePatterns,
+      uniqueNamespaces: namespaceGroups.size,
       pluginNames,
     };
   }
@@ -508,14 +548,47 @@ export function chainPlugins(plugins: BunPlugin[]): BunPlugin {
 export type ChainedOnLoadArgs = OnLoadArgs & {
   /**
    * Content from previous handlers in the chain.
-   * Will be undefined if this is the first handler.
+   * Will be undefined if this is the first handler or if chaining is disabled.
+   * Can be string for text content or Uint8Array for binary content.
+   *
+   * @example
+   * ```typescript
+   * build.onLoad({ filter: /\.tsx$/ }, async (args: ChainedOnLoadArgs) => {
+   *   const content = args.__chainedContents ?? await Bun.file(args.path).text();
+   *   return { contents: transform(content), loader: "tsx" };
+   * });
+   * ```
    */
-  __chainedContents?: string;
+  __chainedContents?: string | Uint8Array;
+  /**
+   * Loader set by the previous handler in the chain.
+   */
+  __chainedLoader?: Bun.Loader;
 };
 
 /**
- * Helper to get content in a chainable plugin.
+ * Type-safe onLoad callback that includes chained content args.
+ * Use this when defining callbacks that participate in plugin chaining.
+ *
+ * @example
+ * ```typescript
+ * const myHandler: ChainedOnLoadCallback = async (args) => {
+ *   // args.__chainedContents is properly typed
+ *   const content = args.__chainedContents ?? await Bun.file(args.path).text();
+ *   return { contents: transform(content), loader: "tsx" };
+ * };
+ *
+ * build.onLoad({ filter: /\.tsx$/ }, myHandler);
+ * ```
+ */
+export type ChainedOnLoadCallback = (
+  args: ChainedOnLoadArgs
+) => OnLoadResult | Promise<OnLoadResult>;
+
+/**
+ * Helper to get text content in a chainable plugin.
  * Automatically uses chained content if available, otherwise reads from disk.
+ * If chained content is binary (Uint8Array), it will be decoded as UTF-8.
  *
  * @example
  * ```typescript
@@ -530,7 +603,105 @@ export async function getChainableContent(
 ): Promise<string> {
   const chainedArgs = args as ChainedOnLoadArgs;
   if (chainedArgs.__chainedContents !== undefined) {
-    return chainedArgs.__chainedContents;
+    if (typeof chainedArgs.__chainedContents === "string") {
+      return chainedArgs.__chainedContents;
+    }
+    // Convert Uint8Array to string
+    return new TextDecoder().decode(chainedArgs.__chainedContents);
   }
   return Bun.file(args.path).text();
+}
+
+/**
+ * Helper to get binary content in a chainable plugin.
+ * Automatically uses chained content if available, otherwise reads from disk.
+ * If chained content is text (string), it will be encoded as UTF-8.
+ *
+ * @example
+ * ```typescript
+ * build.onLoad({ filter: /\.png$/ }, async (args) => {
+ *   const content = await getChainableBinaryContent(args);
+ *   return { contents: processImage(content), loader: "file" };
+ * });
+ * ```
+ */
+export async function getChainableBinaryContent(
+  args: OnLoadArgs | ChainedOnLoadArgs
+): Promise<Uint8Array> {
+  const chainedArgs = args as ChainedOnLoadArgs;
+  if (chainedArgs.__chainedContents !== undefined) {
+    if (chainedArgs.__chainedContents instanceof Uint8Array) {
+      return chainedArgs.__chainedContents;
+    }
+    // Convert string to Uint8Array
+    return new TextEncoder().encode(chainedArgs.__chainedContents);
+  }
+  return new Uint8Array(await Bun.file(args.path).arrayBuffer());
+}
+
+/**
+ * Type guard to check if args have chained text content.
+ *
+ * @example
+ * ```typescript
+ * build.onLoad({ filter: /\.tsx$/ }, async (args) => {
+ *   if (hasChainedTextContent(args)) {
+ *     console.log("Using chained text:", args.__chainedContents.length, "chars");
+ *   }
+ *   const content = await getChainableContent(args);
+ *   return { contents: transform(content), loader: "tsx" };
+ * });
+ * ```
+ */
+export function hasChainedTextContent(
+  args: OnLoadArgs | ChainedOnLoadArgs
+): args is ChainedOnLoadArgs & { __chainedContents: string } {
+  return (
+    "__chainedContents" in args &&
+    typeof (args as ChainedOnLoadArgs).__chainedContents === "string"
+  );
+}
+
+/**
+ * Type guard to check if args have chained binary content.
+ *
+ * @example
+ * ```typescript
+ * build.onLoad({ filter: /\.png$/ }, async (args) => {
+ *   if (hasChainedBinaryContent(args)) {
+ *     console.log("Using chained binary:", args.__chainedContents.length, "bytes");
+ *   }
+ *   const content = await getChainableBinaryContent(args);
+ *   return { contents: content, loader: "file" };
+ * });
+ * ```
+ */
+export function hasChainedBinaryContent(
+  args: OnLoadArgs | ChainedOnLoadArgs
+): args is ChainedOnLoadArgs & { __chainedContents: Uint8Array } {
+  return (
+    "__chainedContents" in args &&
+    (args as ChainedOnLoadArgs).__chainedContents instanceof Uint8Array
+  );
+}
+
+/**
+ * Type guard to check if args have any chained content (text or binary).
+ *
+ * @example
+ * ```typescript
+ * build.onLoad({ filter: /\.*$/ }, async (args) => {
+ *   if (hasChainedContent(args)) {
+ *     console.log("Has chained content");
+ *   }
+ * });
+ * ```
+ */
+export function hasChainedContent(
+  args: OnLoadArgs | ChainedOnLoadArgs
+): args is ChainedOnLoadArgs & { __chainedContents: string | Uint8Array } {
+  return (
+    "__chainedContents" in args &&
+    (args as ChainedOnLoadArgs).__chainedContents !== undefined
+  );
 }
