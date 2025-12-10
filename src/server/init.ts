@@ -126,6 +126,7 @@ async function runCreateContextHooks(): Promise<void> {
 
   if (errors.length > 0) {
     throw new AggregateError(
+      errors.map((e) => e.error),
       `Errors occurred in createContext hooks: ${errors
         .map((e) => `${e.name}: ${e.error.message || e.error}`)
         .join("; ")}`
