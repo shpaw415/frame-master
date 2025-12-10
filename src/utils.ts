@@ -165,6 +165,14 @@ export function isVerbose(): boolean {
   return process.env.FRAME_MASTER_VERBOSE === "true";
 }
 
+export function onVerbose(
+  callback: () => void | Promise<void>
+): void | Promise<void> {
+  if (isVerbose()) {
+    return callback();
+  }
+}
+
 /**
  * Log a message only if verbose mode is enabled.
  *
