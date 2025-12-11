@@ -373,7 +373,7 @@ pluginCommand
 
 export const formatTemplateFile = (fileContent: string, pluginName: string) =>
   fileContent
-    .replaceAll(/\${NAME}/g, pluginName)
+    .replaceAll(/\${name}/g, pluginName)
     .replaceAll(/__CleanPluginName__/g, pluginName.replace(/-/g, ""))
     .replaceAll(/__PluginName__/g, pluginName);
 

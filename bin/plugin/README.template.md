@@ -1,4 +1,4 @@
-# ${NAME}
+# ${name}
 
 Frame-Master plugin
 

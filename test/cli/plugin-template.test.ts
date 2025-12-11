@@ -13,12 +13,12 @@ describe("Plugin Template Replacements", () => {
   const CLEAN_PLUGIN_NAME = "mycustomplugin"; // dashes removed
 
   describe("formatTemplateFile", () => {
-    test("should replace ${NAME} with plugin name", () => {
-      const template = "# ${NAME}\n\nPlugin: ${NAME}";
+    test("should replace ${name} with plugin name", () => {
+      const template = "# ${name}\n\nPlugin: ${name}";
       const result = formatTemplateFile(template, PLUGIN_NAME);
 
       expect(result).toBe(`# ${PLUGIN_NAME}\n\nPlugin: ${PLUGIN_NAME}`);
-      expect(result).not.toContain("${NAME}");
+      expect(result).not.toContain("${name}");
     });
 
     test("should replace __CleanPluginName__ with plugin name without dashes", () => {
@@ -43,7 +43,7 @@ describe("Plugin Template Replacements", () => {
     });
 
     test("should handle all replacements together", () => {
-      const template = `# \${NAME}
+      const template = `# \${name}
 
 bun add __PluginName__
 
@@ -62,7 +62,7 @@ import ${CLEAN_PLUGIN_NAME} from "${PLUGIN_NAME}";
 plugins: [${CLEAN_PLUGIN_NAME}()]`);
 
       // Ensure no template variables remain
-      expect(result).not.toContain("${NAME}");
+      expect(result).not.toContain("${name}");
       expect(result).not.toContain("__PluginName__");
       expect(result).not.toContain("__CleanPluginName__");
     });
@@ -80,7 +80,7 @@ plugins: [${CLEAN_PLUGIN_NAME}()]`);
       const multiDashName = "frame-master-plugin-react-ssr";
       const cleanName = "framemasterpluginreactssr";
       const template =
-        "Name: ${NAME}, Clean: __CleanPluginName__, Package: __PluginName__";
+        "Name: ${name}, Clean: __CleanPluginName__, Package: __PluginName__";
       const result = formatTemplateFile(template, multiDashName);
 
       expect(result).toBe(
@@ -117,7 +117,7 @@ plugins: [${CLEAN_PLUGIN_NAME}()]`);
       expect(result).toContain(`plugins: [${CLEAN_PLUGIN_NAME}()]`);
 
       // Ensure no template variables remain
-      expect(result).not.toContain("${NAME}");
+      expect(result).not.toContain("${name}");
       expect(result).not.toContain("__PluginName__");
       expect(result).not.toContain("__CleanPluginName__");
     });
@@ -137,7 +137,7 @@ plugins: [${CLEAN_PLUGIN_NAME}()]`);
       const result = formatTemplateFile(template, PLUGIN_NAME);
 
       // Ensure no template variables remain
-      expect(result).not.toContain("${NAME}");
+      expect(result).not.toContain("${name}");
       expect(result).not.toContain("__PluginName__");
       expect(result).not.toContain("__CleanPluginName__");
     });
