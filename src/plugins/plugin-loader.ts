@@ -3,6 +3,7 @@
 import type { FrameMasterPlugin } from "./types";
 import { getConfig } from "../server/config";
 import FrameMasterPackageJson from "../../package.json";
+import { directiveToolSingleton } from "./utils";
 
 class PluginLoader {
   protected Plugins: Array<FrameMasterPlugin> = [];
@@ -28,6 +29,7 @@ class PluginLoader {
       return (a?.priority ?? 1000) - (b?.priority ?? 1000);
     });
     this.ensurePluginRequirements();
+    this.registerPluginDirectives();
 
     // Clear caches when plugins are reinitialized
     this.clearCaches();
@@ -158,6 +160,25 @@ class PluginLoader {
           } else if (!Bun.semver.satisfies(pluginFounded.version, version)) {
             throw new Error(
               `Plugin "${plugin.name}" requires Frame Master plugin "${pluginName}" to be installed in version ${version}. currently installed version is ${pluginFounded.version}.`
+            );
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Register directives from all plugins to the directiveToolSingleton.
+   * This allows plugins to define custom directives that can be used in files.
+   */
+  private registerPluginDirectives() {
+    for (const plugin of this.Plugins) {
+      if (plugin.directives && Array.isArray(plugin.directives)) {
+        for (const directive of plugin.directives) {
+          if (directive.name && directive.regex) {
+            directiveToolSingleton.addDirective(
+              directive.name,
+              directive.regex
             );
           }
         }

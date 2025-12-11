@@ -371,10 +371,11 @@ pluginCommand
     }
   });
 
-const formatTemplateFile = (fileContent: string, pluginName: string) =>
+export const formatTemplateFile = (fileContent: string, pluginName: string) =>
   fileContent
-    .replaceAll(/__PluginName__/g, pluginName)
-    .replaceAll(/__CleanPluginName__/g, pluginName.replace(/-/g, ""));
+    .replaceAll(/\${name}/g, pluginName)
+    .replaceAll(/__CleanPluginName__/g, pluginName.replace(/-/g, ""))
+    .replaceAll(/__PluginName__/g, pluginName);
 
 /**
  * Create a new plugin template

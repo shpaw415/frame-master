@@ -486,14 +486,29 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
           )
         );
       }
+      // Get content type from response init headers
+      const initHeaders =
+        this._response_init.headers instanceof Headers
+          ? this._response_init.headers
+          : new Headers(this._response_init.headers || {});
+      const initContentType =
+        initHeaders.get("Content-Type") || initHeaders.get("content-type");
+      const isHtmlResponse = initContentType?.includes("text/html");
+
       // Handle string responses with potential HTML processing
       if (this._response_body instanceof ReadableStream) {
+        // Only apply modifiers for HTML responses
+        if (!isHtmlResponse) {
+          return this.setResponseThenReturn(
+            new Response(this._response_body, this._response_init)
+          );
+        }
         const self = this;
         const transformer = new TransformStream({
           async transform(chunk, controller) {
             let text = new TextDecoder().decode(chunk);
 
-            // Exemple : injection d’un script avant </body>
+            // Apply HTML rewrite and global value injection
             text = await self.applyModifiers(text);
 
             controller.enqueue(new TextEncoder().encode(text));
@@ -512,11 +527,16 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
 
       let formattedStringData: string;
 
-      try {
-        formattedStringData = await this.applyModifiers(this._response_body);
-      } catch (error) {
-        console.error("Failed to apply modifiers:", error);
-        formattedStringData = this._response_body; // Fallback to original
+      // Only apply modifiers (HTML_rewrite & GlobalValueInjection) for HTML responses
+      if (isHtmlResponse) {
+        try {
+          formattedStringData = await this.applyModifiers(this._response_body);
+        } catch (error) {
+          console.error("Failed to apply modifiers:", error);
+          formattedStringData = this._response_body; // Fallback to original
+        }
+      } else {
+        formattedStringData = this._response_body;
       }
 
       // Initialize response init if not set
