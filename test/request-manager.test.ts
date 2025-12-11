@@ -228,6 +228,50 @@ beforeAll(async () => {
           },
         },
       },
+      // Tests for HTML modifiers only applied to text/html content type
+      {
+        name: "html-modifier-test",
+        version: "1.0.0",
+        priority: 91,
+        router: {
+          request(req) {
+            // JSON response - modifiers should NOT be applied
+            if (req.request.url.includes("/json-response")) {
+              req.setGlobalValues({ __TEST_VAR__: "test-value" } as any);
+              req.setResponse('{"data": "test"}', {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              });
+            }
+            // Plain text response - modifiers should NOT be applied
+            if (req.request.url.includes("/text-response")) {
+              req.setGlobalValues({ __TEST_VAR__: "test-value" } as any);
+              req.setResponse("Plain text content", {
+                status: 200,
+                headers: { "Content-Type": "text/plain" },
+              });
+            }
+            // HTML response - modifiers SHOULD be applied
+            if (req.request.url.includes("/html-response")) {
+              req.setGlobalValues({ __TEST_VAR__: "test-value" } as any);
+              req.setResponse(
+                "<html><head></head><body>HTML content</body></html>",
+                {
+                  status: 200,
+                  headers: { "Content-Type": "text/html" },
+                }
+              );
+            }
+            // No content type - modifiers should NOT be applied
+            if (req.request.url.includes("/no-content-type")) {
+              req.setGlobalValues({ __TEST_VAR__: "test-value" } as any);
+              req.setResponse("No content type", {
+                status: 200,
+              });
+            }
+          },
+        },
+      },
       {
         name: "default-response-plugin",
         version: "1.0.0",
@@ -440,4 +484,65 @@ test("request: should parse JSON body", async () => {
 
   const parsedBody = await testMaster.request.json();
   expect(parsedBody).toEqual(body);
+});
+
+// HTML Modifier Tests - ensure modifiers only apply to text/html responses
+test("modifiers: should NOT apply global values to JSON responses", async () => {
+  const testMaster = new masterRequest({
+    request: new Request("http://localhost/json-response"),
+    server,
+  });
+
+  const res = await testMaster.handleRequest();
+  const text = await res.text();
+
+  // JSON should remain unchanged - no globalThis injection
+  expect(text).not.toContain("globalThis");
+  expect(text).not.toContain("__TEST_VAR__");
+  expect(text.trim()).toBe('{"data": "test"}');
+});
+
+test("modifiers: should NOT apply global values to plain text responses", async () => {
+  const testMaster = new masterRequest({
+    request: new Request("http://localhost/text-response"),
+    server,
+  });
+
+  const res = await testMaster.handleRequest();
+  const text = await res.text();
+
+  // Plain text should remain unchanged - no globalThis injection
+  expect(text).not.toContain("globalThis");
+  expect(text).not.toContain("__TEST_VAR__");
+  expect(text.trim()).toBe("Plain text content");
+});
+
+test("modifiers: should apply global values to HTML responses", async () => {
+  const testMaster = new masterRequest({
+    request: new Request("http://localhost/html-response"),
+    server,
+  });
+
+  const res = await testMaster.handleRequest();
+  const text = await res.text();
+
+  // HTML should have globalThis injection in <head>
+  expect(text).toContain("globalThis");
+  expect(text).toContain("__TEST_VAR__");
+  expect(text).toContain("<script>");
+});
+
+test("modifiers: should NOT apply global values when no content type is set", async () => {
+  const testMaster = new masterRequest({
+    request: new Request("http://localhost/no-content-type"),
+    server,
+  });
+
+  const res = await testMaster.handleRequest();
+  const text = await res.text();
+
+  // No content type means not HTML, so no modification
+  expect(text).not.toContain("globalThis");
+  expect(text).not.toContain("__TEST_VAR__");
+  expect(text.trim()).toBe("No content type");
 });
