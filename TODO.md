@@ -21,9 +21,7 @@ runtime.finally("html", ({ contents }: { contents: string | ArrayBuffer }) => ({
 
 ### Fixes
 
-#### Apply in 3.0.1
+#### Apply in 3.0.2
 
-- [x] CLI create plugin README.md name variable.
-- [x] Directive Tool not linked to the FrameMasterConfig.diretives config entry.
-- [x] (request-manager) Only Apply (applyModifiers) HTML_rewrite & GlobalValueInjection when contentType = text/html
-- [x] plugin chaining must be matching when no namespace is provided as a global maching patern.
+- [x] plugin chaining virtual module throw error when chained.
+- [x] directiveTool throws when the file does not exists.

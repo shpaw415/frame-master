@@ -171,7 +171,9 @@ export class DirectiveTool {
   }
 
   private async detectDirective(filePath: string): Promise<string> {
-    const fileContent = await Bun.file(filePath).text();
+    const file = Bun.file(filePath);
+    if (!(await file.exists())) return "use-server";
+    const fileContent = await file.text();
     // Trim leading whitespace to check if directive is at the very beginning
     const trimmedContent = fileContent.trimStart();
 

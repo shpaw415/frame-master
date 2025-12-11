@@ -388,24 +388,11 @@ export class PluginProxy {
     originalArgs: OnLoadArgs,
     handlers: RegisteredOnLoad[]
   ): Promise<OnLoadResult> {
+    // Don't pre-read from disk - let plugins use getChainableContent() helper
+    // which reads from disk only when needed
     let accumulatedContents: string | Uint8Array | undefined;
     let accumulatedLoader: Bun.Loader | undefined;
     let lastResult: OnLoadResult = undefined;
-
-    // Only read from disk for "file" namespace (default)
-    // Custom namespaces (from onResolve redirects) handle their own content
-    const isFileNamespace =
-      !originalArgs.namespace || originalArgs.namespace === "file";
-
-    if (isFileNamespace) {
-      try {
-        const originalContent = await Bun.file(originalArgs.path).text();
-        accumulatedContents = originalContent;
-      } catch (error) {
-        // File might not exist (virtual path), let handler deal with it
-        accumulatedContents = undefined;
-      }
-    }
 
     if (handlers.length > 1) {
       verboseLog(
@@ -655,6 +642,8 @@ export type ChainedOnLoadCallback = (
  * Automatically uses chained content if available, otherwise reads from disk.
  * If chained content is binary (Uint8Array), it will be decoded as UTF-8.
  *
+ * For virtual modules (non-file namespaces), returns empty string if no chained content.
+ *
  * @example
  * ```typescript
  * build.onLoad({ filter: /\.tsx$/ }, async (args) => {
@@ -674,13 +663,28 @@ export async function getChainableContent(
     // Convert Uint8Array to string
     return new TextDecoder().decode(chainedArgs.__chainedContents);
   }
-  return Bun.file(args.path).text();
+
+  // Only read from disk for "file" namespace (default)
+  // Virtual modules (custom namespaces) don't exist on disk
+  const isFileNamespace = !args.namespace || args.namespace === "file";
+  if (!isFileNamespace) {
+    return "";
+  }
+
+  try {
+    return await Bun.file(args.path).text();
+  } catch (error) {
+    // File might not exist (virtual path in file namespace), return empty string
+    return "";
+  }
 }
 
 /**
  * Helper to get binary content in a chainable plugin.
  * Automatically uses chained content if available, otherwise reads from disk.
  * If chained content is text (string), it will be encoded as UTF-8.
+ *
+ * For virtual modules (non-file namespaces), returns empty Uint8Array if no chained content.
  *
  * @example
  * ```typescript
@@ -701,7 +705,20 @@ export async function getChainableBinaryContent(
     // Convert string to Uint8Array
     return new TextEncoder().encode(chainedArgs.__chainedContents);
   }
-  return new Uint8Array(await Bun.file(args.path).arrayBuffer());
+
+  // Only read from disk for "file" namespace (default)
+  // Virtual modules (custom namespaces) don't exist on disk
+  const isFileNamespace = !args.namespace || args.namespace === "file";
+  if (!isFileNamespace) {
+    return new Uint8Array(0);
+  }
+
+  try {
+    return new Uint8Array(await Bun.file(args.path).arrayBuffer());
+  } catch (error) {
+    // File might not exist (virtual path in file namespace), return empty array
+    return new Uint8Array(0);
+  }
 }
 
 /**
