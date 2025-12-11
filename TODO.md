@@ -14,6 +14,6 @@
 
 #### Apply in 3.0.1
 
-- CLI create plugin README.md name variable.
+- [x] CLI create plugin README.md name variable.
 - Directive Tool not linked to the FrameMasterConfig.diretives config entry.
 - [x] (request-manager) Only Apply (applyModifiers) HTML_rewrite & GlobalValueInjection when contentType = text/html
