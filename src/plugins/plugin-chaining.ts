@@ -163,10 +163,18 @@ export class PluginProxy {
           plugin.setup(build);
         }
 
-        // Group handlers by namespace only - we'll check filter matches at runtime
-        const handlersByNamespace = self.groupHandlersByNamespace();
+        // Separate handlers into global (no namespace) and namespace-specific
+        const { globalHandlers, handlersByNamespace } =
+          self.groupHandlersWithGlobalSupport();
 
-        for (const [namespace, handlers] of handlersByNamespace.entries()) {
+        for (const [
+          namespace,
+          namespaceHandlers,
+        ] of handlersByNamespace.entries()) {
+          // Combine namespace-specific handlers with global handlers
+          // Global handlers (no namespace specified) should match all namespaces
+          const handlers = [...namespaceHandlers, ...globalHandlers];
+
           // Create a combined filter that matches if ANY handler's filter matches
           const combinedFilter = self.createCombinedFilter(handlers);
 
@@ -189,13 +197,61 @@ export class PluginProxy {
             }
           );
         }
+
+        // If there are global handlers but no namespace-specific handlers,
+        // we still need to register them for the default "file" namespace
+        if (globalHandlers.length > 0 && handlersByNamespace.size === 0) {
+          const combinedFilter = self.createCombinedFilter(globalHandlers);
+          build.onLoad({ filter: combinedFilter }, async (args) => {
+            const matchingHandlers = globalHandlers.filter((h) =>
+              h.filter.test(args.path)
+            );
+            if (matchingHandlers.length === 0) {
+              return undefined;
+            }
+            return self.executeChainedOnLoad(args, matchingHandlers);
+          });
+        }
       },
     };
   }
 
   /**
+   * Groups handlers by namespace, separating global handlers (no namespace).
+   * Global handlers will be included in all namespace groups at runtime.
+   */
+  private groupHandlersWithGlobalSupport(): {
+    globalHandlers: RegisteredOnLoad[];
+    handlersByNamespace: Map<string, RegisteredOnLoad[]>;
+  } {
+    const globalHandlers: RegisteredOnLoad[] = [];
+    const handlersByNamespace = new Map<string, RegisteredOnLoad[]>();
+
+    for (const handler of this.onLoadHandlers) {
+      if (!handler.namespace) {
+        // No namespace = global handler, matches all namespaces
+        globalHandlers.push(handler);
+      } else {
+        // Namespace-specific handler
+        const existing = handlersByNamespace.get(handler.namespace) || [];
+        existing.push(handler);
+        handlersByNamespace.set(handler.namespace, existing);
+      }
+    }
+
+    // Ensure "file" namespace exists if we have global handlers
+    // This is the default namespace for regular file loads
+    if (globalHandlers.length > 0 && !handlersByNamespace.has("file")) {
+      handlersByNamespace.set("file", []);
+    }
+
+    return { globalHandlers, handlersByNamespace };
+  }
+
+  /**
    * Groups handlers by namespace only.
    * Actual file matching is done at runtime to support different filters matching same files.
+   * @deprecated Use groupHandlersWithGlobalSupport instead
    */
   private groupHandlersByNamespace(): Map<string, RegisteredOnLoad[]> {
     const groups = new Map<string, RegisteredOnLoad[]>();

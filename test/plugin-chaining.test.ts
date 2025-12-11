@@ -551,6 +551,84 @@ describe("Plugin Chaining", () => {
       expect(stats.totalOnLoadHandlers).toBe(2);
       expect(stats.uniqueNamespaces).toBe(2);
     });
+
+    test("should include global handlers (no namespace) in all namespace groups", () => {
+      const proxy = new PluginProxy();
+
+      const plugin: BunPlugin = {
+        name: "global-namespace-plugin",
+        setup(build) {
+          // onResolve redirects to custom namespace
+          build.onResolve({ filter: /^custom:/ }, (args) => ({
+            path: args.path.replace("custom:", ""),
+            namespace: "custom-ns",
+          }));
+
+          // Handler for custom namespace only
+          build.onLoad(
+            { filter: /.*/, namespace: "custom-ns" },
+            async (args) => ({
+              contents: `// from custom-ns handler\n${
+                args.__chainedContents ?? ""
+              }`,
+              loader: "js",
+            })
+          );
+
+          // Global handler (no namespace) - should match ALL namespaces including custom-ns
+          build.onLoad({ filter: /.*/ }, async (args) => ({
+            contents: `// from global handler\n${args.__chainedContents ?? ""}`,
+            loader: "js",
+          }));
+        },
+      };
+
+      proxy.addPlugin(plugin);
+      const stats = proxy.getStats();
+
+      // 2 handlers total
+      expect(stats.totalOnLoadHandlers).toBe(2);
+      // 2 unique namespaces: "custom-ns" and "file" (default for global)
+      expect(stats.uniqueNamespaces).toBe(2);
+    });
+
+    test("global handler should be included when chaining with namespace-specific handlers", () => {
+      const proxy = new PluginProxy();
+      const executionOrder: string[] = [];
+
+      const plugin: BunPlugin = {
+        name: "chaining-test-plugin",
+        setup(build) {
+          // Namespace-specific handler
+          build.onLoad({ filter: /.*/, namespace: "test-ns" }, async (args) => {
+            executionOrder.push("namespace-specific");
+            return {
+              contents: `namespace: ${args.__chainedContents ?? "start"}`,
+              loader: "js",
+            };
+          });
+
+          // Global handler (no namespace) - should also run for "test-ns"
+          build.onLoad({ filter: /.*/ }, async (args) => {
+            executionOrder.push("global");
+            return {
+              contents: `global: ${args.__chainedContents ?? "start"}`,
+              loader: "js",
+            };
+          });
+        },
+      };
+
+      proxy.addPlugin(plugin);
+
+      // The chained plugin should register the global handler for the "test-ns" namespace too
+      const chained = proxy.createChainedPlugin();
+      expect(chained.name).toBe("frame-master-chained-loader");
+
+      // Stats should show both handlers
+      const stats = proxy.getStats();
+      expect(stats.totalOnLoadHandlers).toBe(2);
+    });
   });
 
   describe("Edge cases", () => {
