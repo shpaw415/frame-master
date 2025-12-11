@@ -331,6 +331,49 @@ describe("Plugin Chaining", () => {
       expect(content).toBe("binary text");
     });
 
+    test("getChainableContent should return empty string for virtual modules (custom namespace) without chained content", async () => {
+      const args = {
+        path: "virtual:my-module",
+        namespace: "virtual-ns",
+        loader: "js",
+        suffix: "",
+        pluginData: undefined,
+      } as unknown as ChainedOnLoadArgs;
+
+      // Should not throw, should return empty string for virtual modules
+      const content = await getChainableContent(args);
+      expect(content).toBe("");
+    });
+
+    test("getChainableContent should return chained content for virtual modules when available", async () => {
+      const args = {
+        path: "virtual:my-module",
+        namespace: "virtual-ns",
+        loader: "js",
+        suffix: "",
+        pluginData: undefined,
+        __chainedContents: "export default 'virtual content';",
+      } as unknown as ChainedOnLoadArgs;
+
+      const content = await getChainableContent(args);
+      expect(content).toBe("export default 'virtual content';");
+    });
+
+    test("getChainableBinaryContent should return empty array for virtual modules without chained content", async () => {
+      const args = {
+        path: "virtual:my-binary",
+        namespace: "virtual-ns",
+        loader: "file",
+        suffix: "",
+        pluginData: undefined,
+      } as unknown as ChainedOnLoadArgs;
+
+      // Should not throw, should return empty Uint8Array for virtual modules
+      const content = await getChainableBinaryContent(args);
+      expect(content).toBeInstanceOf(Uint8Array);
+      expect(content.length).toBe(0);
+    });
+
     test("getChainableBinaryContent should return chained binary content", async () => {
       const binaryContent = new Uint8Array([1, 2, 3, 4, 5]);
       const args = {
