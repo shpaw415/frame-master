@@ -12,5 +12,8 @@
 
 ### Fixes
 
+#### Apply in 3.0.1
+
 - CLI create plugin README.md name variable.
-- Directive Tool not linked to the configs diretive.
+- Directive Tool not linked to the FrameMasterConfig.diretives config entry.
+- (request-manager) Only Apply (applyModifiers) HTML_rewrite & GlobalValueInjection when contentType = text/html
