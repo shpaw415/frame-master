@@ -3,6 +3,7 @@ import { program } from "commander";
 import { version } from "../package.json";
 import { join } from "path";
 import pluginCommand from "./plugin";
+import searchCommand from "./search";
 import { getConfig, InitConfig } from "../src/server/config";
 import { testCommand } from "./testing";
 import { buildCommand } from "./build";
@@ -104,6 +105,7 @@ program
   });
 
 program.addCommand(pluginCommand);
+program.addCommand(searchCommand);
 program.addCommand(testCommand);
 program.addCommand(buildCommand);
 program.addCommand(ExtendCli);

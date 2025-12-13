@@ -91,3 +91,5 @@ export function onVerbose(callback: (() => void | Promise<void>) | string) {
   }
   return callback();
 }
+
+export const BASE_URL = "https://frame-master.com";
