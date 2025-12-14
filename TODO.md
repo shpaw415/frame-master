@@ -6,12 +6,13 @@
 - Stop onLoad Plugin chaining with return value `{ preventChaining: true }`
 - Add a props in `FrameMasterConfig.pluginsOptions` introducing `entrypoints` for a quick way to add entrypoints to the buildStep
 - Plugin creation helper method that require a callback function. passing plugins toolings `{directives, builder}` as a props to the callback.
--
 
 ### Features
 
 - Extend Bun.PluginBuilder to include finally. adding a final modification to a specific loader before sending it to the Bun.bundler final content. Exemple:
 - Extendable directive interface type to extend current "use-server", "use-client", etc...
+- [x] implement search plugin from cli
+- [x] implement search template from cli
 
 ```typescript
 runtime.finally("html", ({ contents }: { contents: string | ArrayBuffer }) => ({
