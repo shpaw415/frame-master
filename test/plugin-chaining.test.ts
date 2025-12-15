@@ -1355,4 +1355,329 @@ describe("Integration scenarios", () => {
       expect(typeof receivedContents).toBe("string");
     });
   });
+
+  describe("finally handlers with onLoad (comprehensive)", () => {
+    test("finally modifies content from onLoad handler", async () => {
+      let onLoadOutput = "";
+      let finallyOutput = "";
+
+      const plugin: BunPlugin = {
+        name: "test-plugin",
+        setup(build) {
+          build.onLoad({ filter: /\.txt$/ }, async (args) => {
+            const content =
+              args.__chainedContents ?? (await Bun.file(args.path).text());
+            onLoadOutput = content + " [ONLOAD]";
+            return { contents: onLoadOutput, loader: "text" };
+          });
+
+          build.finally("text", ({ contents }) => {
+            const str =
+              typeof contents === "string"
+                ? contents
+                : new TextDecoder().decode(contents);
+            finallyOutput = str + " [FINALLY]";
+            return { contents: finallyOutput };
+          });
+        },
+      };
+
+      const chained = chainPlugins([plugin]);
+
+      await Bun.build({
+        entrypoints: [TEST_FILE],
+        plugins: [chained],
+        outdir: join(TEST_DIR, "out-finally-with-onload-1"),
+      });
+
+      expect(onLoadOutput).toContain("[ONLOAD]");
+      expect(finallyOutput).toContain("[ONLOAD]");
+      expect(finallyOutput).toContain("[FINALLY]");
+    });
+
+    test("multiple onLoad handlers chain then finally runs", async () => {
+      const executionOrder: string[] = [];
+
+      const pluginA: BunPlugin = {
+        name: "plugin-a",
+        setup(build) {
+          build.onLoad({ filter: /\.txt$/ }, async (args) => {
+            executionOrder.push("onLoad-a");
+            const content =
+              args.__chainedContents ?? (await Bun.file(args.path).text());
+            return { contents: content + " [A]", loader: "text" };
+          });
+        },
+      };
+
+      const pluginB: BunPlugin = {
+        name: "plugin-b",
+        setup(build) {
+          build.onLoad({ filter: /\.txt$/ }, async (args) => {
+            executionOrder.push("onLoad-b");
+            const content =
+              args.__chainedContents ?? (await Bun.file(args.path).text());
+            return { contents: content + " [B]", loader: "text" };
+          });
+
+          build.finally("text", ({ contents }) => {
+            executionOrder.push("finally-b");
+            return { contents: `${contents} [FINAL]` };
+          });
+        },
+      };
+
+      const chained = chainPlugins([pluginA, pluginB]);
+
+      await Bun.build({
+        entrypoints: [TEST_FILE],
+        plugins: [chained],
+        outdir: join(TEST_DIR, "out-finally-with-onload-2"),
+      });
+
+      expect(executionOrder).toEqual(["onLoad-a", "onLoad-b", "finally-b"]);
+    });
+
+    test("finally receives accumulated content from chained handlers", async () => {
+      let finalContents = "";
+
+      const pluginA: BunPlugin = {
+        name: "plugin-a",
+        setup(build) {
+          build.onLoad({ filter: /\.txt$/ }, async (args) => {
+            const content =
+              args.__chainedContents ?? (await Bun.file(args.path).text());
+            return { contents: `[START]${content}`, loader: "text" };
+          });
+        },
+      };
+
+      const pluginB: BunPlugin = {
+        name: "plugin-b",
+        setup(build) {
+          build.onLoad({ filter: /\.txt$/ }, async (args) => {
+            const content =
+              args.__chainedContents ?? (await Bun.file(args.path).text());
+            return { contents: `${content}[MIDDLE]`, loader: "text" };
+          });
+
+          build.finally("text", ({ contents }) => {
+            const str =
+              typeof contents === "string"
+                ? contents
+                : new TextDecoder().decode(contents);
+            finalContents = `${str}[END]`;
+            return { contents: finalContents };
+          });
+        },
+      };
+
+      const chained = chainPlugins([pluginA, pluginB]);
+
+      await Bun.build({
+        entrypoints: [TEST_FILE],
+        plugins: [chained],
+        outdir: join(TEST_DIR, "out-finally-with-onload-3"),
+      });
+
+      expect(finalContents).toContain("[START]");
+      expect(finalContents).toContain("[MIDDLE]");
+      expect(finalContents).toContain("[END]");
+    });
+
+    test("preventChaining stops chain but finally still runs", async () => {
+      const executionOrder: string[] = [];
+
+      const plugin: BunPlugin = {
+        name: "test-plugin",
+        setup(build) {
+          build.onLoad({ filter: /\.txt$/ }, async (args) => {
+            executionOrder.push("onLoad-1");
+            const content =
+              args.__chainedContents ?? (await Bun.file(args.path).text());
+            return {
+              contents: content + " [STOPPED]",
+              loader: "text",
+              preventChaining: true,
+            };
+          });
+
+          build.onLoad({ filter: /\.txt$/ }, async (args) => {
+            executionOrder.push("onLoad-2-should-not-run");
+            return { contents: "should not see this", loader: "text" };
+          });
+
+          build.finally("text", ({ contents }) => {
+            executionOrder.push("finally");
+            return { contents: `${contents} [FINAL]` };
+          });
+        },
+      };
+
+      const chained = chainPlugins([plugin]);
+
+      await Bun.build({
+        entrypoints: [TEST_FILE],
+        plugins: [chained],
+        outdir: join(TEST_DIR, "out-finally-with-prevent"),
+      });
+
+      expect(executionOrder).toEqual(["onLoad-1", "finally"]);
+      expect(executionOrder).not.toContain("onLoad-2-should-not-run");
+    });
+  });
+
+  describe("finally handlers without onLoad (finally-only)", () => {
+    test("finally-only handler processes tsx files", async () => {
+      let processed = false;
+      let receivedPath = "";
+
+      const plugin: BunPlugin = {
+        name: "tsx-finally-only",
+        setup(build) {
+          build.finally("tsx", ({ contents, path }) => {
+            processed = true;
+            receivedPath = path;
+            return { contents: `// Processed\n${contents}` };
+          });
+        },
+      };
+
+      const chained = chainPlugins([plugin]);
+
+      await Bun.build({
+        entrypoints: [TEST_FILE_TSX],
+        plugins: [chained],
+        outdir: join(TEST_DIR, "out-tsx-finally-only"),
+      });
+
+      expect(processed).toBe(true);
+      expect(receivedPath).toBe(TEST_FILE_TSX);
+    });
+
+    test("multiple finally-only handlers chain correctly", async () => {
+      const executionOrder: string[] = [];
+      let finalOutput = "";
+
+      const pluginA: BunPlugin = {
+        name: "plugin-a",
+        setup(build) {
+          build.finally("text", ({ contents }) => {
+            executionOrder.push("finally-a");
+            return { contents: `[A]${contents}` };
+          });
+        },
+      };
+
+      const pluginB: BunPlugin = {
+        name: "plugin-b",
+        setup(build) {
+          build.finally("text", ({ contents }) => {
+            executionOrder.push("finally-b");
+            const str =
+              typeof contents === "string"
+                ? contents
+                : new TextDecoder().decode(contents);
+            finalOutput = `${str}[B]`;
+            return { contents: finalOutput };
+          });
+        },
+      };
+
+      const chained = chainPlugins([pluginA, pluginB]);
+
+      await Bun.build({
+        entrypoints: [TEST_FILE],
+        plugins: [chained],
+        outdir: join(TEST_DIR, "out-multi-finally-only"),
+      });
+
+      expect(executionOrder).toEqual(["finally-a", "finally-b"]);
+      expect(finalOutput).toContain("[A]");
+      expect(finalOutput).toContain("[B]");
+    });
+
+    test("finally-only does not run for non-matching loader", async () => {
+      let jsFinallyCalled = false;
+
+      const plugin: BunPlugin = {
+        name: "js-finally-only",
+        setup(build) {
+          // This should NOT run for .txt files
+          build.finally("js", ({ contents }) => {
+            jsFinallyCalled = true;
+            return { contents };
+          });
+        },
+      };
+
+      const chained = chainPlugins([plugin]);
+
+      await Bun.build({
+        entrypoints: [TEST_FILE], // .txt file
+        plugins: [chained],
+        outdir: join(TEST_DIR, "out-no-match-finally"),
+      });
+
+      expect(jsFinallyCalled).toBe(false);
+    });
+
+    test("finally-only receives original file content", async () => {
+      let receivedContent = "";
+
+      const plugin: BunPlugin = {
+        name: "content-check",
+        setup(build) {
+          build.finally("text", ({ contents }) => {
+            receivedContent =
+              typeof contents === "string"
+                ? contents
+                : new TextDecoder().decode(contents);
+            return { contents };
+          });
+        },
+      };
+
+      const chained = chainPlugins([plugin]);
+
+      await Bun.build({
+        entrypoints: [TEST_FILE],
+        plugins: [chained],
+        outdir: join(TEST_DIR, "out-content-check"),
+      });
+
+      // Should have the original file content
+      expect(receivedContent).toBe("original content");
+    });
+
+    test("finally-only with async callback", async () => {
+      let asyncResult = "";
+
+      const plugin: BunPlugin = {
+        name: "async-finally-only",
+        setup(build) {
+          build.finally("text", async ({ contents }) => {
+            await new Promise((resolve) => setTimeout(resolve, 5));
+            const str =
+              typeof contents === "string"
+                ? contents
+                : new TextDecoder().decode(contents);
+            asyncResult = `[ASYNC] ${str}`;
+            return { contents: asyncResult };
+          });
+        },
+      };
+
+      const chained = chainPlugins([plugin]);
+
+      await Bun.build({
+        entrypoints: [TEST_FILE],
+        plugins: [chained],
+        outdir: join(TEST_DIR, "out-async-finally-only"),
+      });
+
+      expect(asyncResult).toContain("[ASYNC]");
+      expect(asyncResult).toContain("original content");
+    });
+  });
 });
