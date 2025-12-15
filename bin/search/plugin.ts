@@ -308,10 +308,10 @@ function formatSearchResults(
 // CLI COMMAND
 // ============================================================================
 
-const pluginSerachCommand = new Command("plugins");
+const pluginSearchCommand = new Command("plugins");
 
-pluginSerachCommand
-  .command("plugins [query]")
+pluginSearchCommand
+  .argument("[query]", "Search query")
   .description("Search for plugins by keyword or advanced query")
   .option("-c, --category <category>", "Filter by category")
   .option("-n, --name <name>", "Filter by exact plugin name")
@@ -350,11 +350,27 @@ pluginSerachCommand
         if (options.category) builder.category(options.category);
         if (options.name) builder.name(options.name);
 
+        const validSortFields: SortField[] = [
+          "relevance",
+          "name",
+          "created",
+          "updated",
+        ];
+        const validOrders: SortOrder[] = ["asc", "desc"];
+
+        const sortField = validSortFields.includes(options.sort as SortField)
+          ? (options.sort as SortField)
+          : "relevance";
+
+        const sortOrder = validOrders.includes(options.order as SortOrder)
+          ? (options.order as SortOrder)
+          : "desc";
+
         builder
           .page(parseInt(options.page))
           .limit(parseInt(options.limit))
-          .sortBy(options.sort as SortField)
-          .order(options.order as SortOrder)
+          .sortBy(sortField)
+          .order(sortOrder)
           .fuzzy(options.fuzzy);
 
         if (options.include === "longDescription") {
@@ -383,4 +399,4 @@ pluginSerachCommand
       }
     }
   );
-export default pluginSerachCommand;
+export default pluginSearchCommand;

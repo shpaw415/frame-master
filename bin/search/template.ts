@@ -370,8 +370,8 @@ Advanced Query Syntax:
         if (options.name) builder.name(options.name);
 
         builder
-          .page(parseInt(options.page))
-          .limit(parseInt(options.limit))
+          .page(parseInt(options.page, 10) || 0)
+          .limit(parseInt(options.limit, 10) || 25)
           .sortBy(options.sort as SortField)
           .order(options.order as SortOrder)
           .fuzzy(options.fuzzy);
