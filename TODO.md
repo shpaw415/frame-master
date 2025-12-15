@@ -5,11 +5,10 @@
 - [x] CLI create plugin with linked packageJson name and version to the plugin name and version.
 - [x] Stop onLoad Plugin chaining with return value `{ preventChaining: true }`
 - [x] Add a props in `FrameMasterConfig.pluginsOptions` introducing `entrypoints` for a quick way to add entrypoints to the buildStep
-- Plugin creation helper method that require a callback function. passing plugins toolings `{directives, builder}` as a props to the callback.
 
 ### Features
 
-- Extendable directive interface type to extend current "use-server", "use-client", etc...
+- [x] Extendable directive interface type to extend current "use-server", "use-client", etc...
 - [x] implement search plugin from cli
 - [x] implement search template from cli
 - [x] Extend Bun.PluginBuilder to include finally. adding a final modification to a specific loader before sending it to the Bun.bundler final content.

@@ -38,6 +38,91 @@ export interface CustomDirectives {}
 // Combined type that includes both base and custom directives
 export type Directives = BaseDirectives | keyof CustomDirectives;
 
+/**
+ * Directive definition for use in FrameMasterPlugin.directives array.
+ * The name field is type-safe and includes both base and custom directives.
+ *
+ * @example
+ * ```typescript
+ * const myPlugin: FrameMasterPlugin = {
+ *   name: "my-plugin",
+ *   version: "1.0.0",
+ *   directives: [
+ *     {
+ *       name: "use-custom",
+ *       regex: /^['"]use[-\s]custom['"];?\s*$/m
+ *     }
+ *   ]
+ * };
+ * ```
+ */
+export interface DirectiveDefinition<T extends string = Directives> {
+  /**
+   * The directive name. Use BaseDirectives or extend CustomDirectives for type safety.
+   */
+  name: T;
+  /**
+   * Regex pattern to match the directive in files.
+   * Should match the directive at the beginning of the file.
+   */
+  regex: RegExp;
+}
+
+/**
+ * Helper function to create a type-safe directive definition.
+ * Useful when defining custom directives in plugins.
+ *
+ * @example
+ * ```typescript
+ * // First, extend CustomDirectives
+ * declare module "frame-master/plugin/utils" {
+ *   interface CustomDirectives {
+ *     "use-analytics": true;
+ *   }
+ * }
+ *
+ * // Then create the directive definition
+ * const analyticsDirective = createDirective(
+ *   "use-analytics",
+ *   /^['"]use[-\s]analytics['"];?\s*$/m
+ * );
+ *
+ * // Use in plugin
+ * const plugin: FrameMasterPlugin = {
+ *   name: "analytics-plugin",
+ *   version: "1.0.0",
+ *   directives: [analyticsDirective]
+ * };
+ * ```
+ */
+export function createDirective<T extends Directives>(
+  name: T,
+  regex: RegExp
+): DirectiveDefinition<T> {
+  return { name, regex };
+}
+
+/**
+ * Create a custom directive with an arbitrary name (not type-checked).
+ * Use this when you need to define a directive that isn't declared in CustomDirectives.
+ *
+ * For type-safe directives, extend CustomDirectives instead.
+ *
+ * @example
+ * ```typescript
+ * const customDirective = createCustomDirective(
+ *   "my-special-directive",
+ *   /^['"]my[-\s]special[-\s]directive['"];?\s*$/m
+ * );
+ * ```
+ */
+export function createCustomDirective(
+  name: string,
+  regex: RegExp
+): DirectiveDefinition<string> {
+  return { name, regex };
+}
+
 type DirectiveEntry = { path: string; route?: string };
 
 export class DirectiveTool {

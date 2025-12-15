@@ -6,11 +6,20 @@ import {
   afterAll,
   beforeEach,
 } from "bun:test";
-import { DirectiveTool, directiveToolSingleton } from "../src/plugins/utils";
+import {
+  DirectiveTool,
+  directiveToolSingleton,
+  createDirective,
+  createCustomDirective,
+  type DirectiveDefinition,
+  type Directives,
+  type BaseDirectives,
+} from "../src/plugins/utils";
 import { setMockConfig } from "../src/server/config";
 import { reloadPluginLoader, pluginLoader } from "../src/plugins/plugin-loader";
 import { join } from "path";
 import { mkdirSync, writeFileSync, rmSync } from "fs";
+import type { FrameMasterPlugin } from "../src/plugins/types";
 
 const TEST_DIR = join(import.meta.dir, ".test-directive-tmp");
 
@@ -229,5 +238,123 @@ describe("Plugin Directives Registration", () => {
 
     // Should not throw and should handle gracefully
     expect(() => reloadPluginLoader()).not.toThrow();
+  });
+});
+
+describe("Directive Helper Functions", () => {
+  describe("createDirective", () => {
+    test("should create a directive definition with type-safe name", () => {
+      const directive = createDirective(
+        "use-client",
+        /^['"]use[-\s]client['"];?\s*$/m
+      );
+
+      expect(directive.name).toBe("use-client");
+      expect(directive.regex).toBeInstanceOf(RegExp);
+    });
+
+    test("should work with all base directive types", () => {
+      const clientDir = createDirective(
+        "use-client",
+        /^['"]use[-\s]client['"];?\s*$/m
+      );
+      const serverDir = createDirective(
+        "use-server",
+        /^['"]use[-\s]server['"];?\s*$/m
+      );
+      const staticDir = createDirective(
+        "use-static",
+        /^['"]use[-\s]static['"];?\s*$/m
+      );
+      const serverOnlyDir = createDirective(
+        "server-only",
+        /^['"]server[-\s]only['"];?\s*$/m
+      );
+
+      expect(clientDir.name).toBe("use-client");
+      expect(serverDir.name).toBe("use-server");
+      expect(staticDir.name).toBe("use-static");
+      expect(serverOnlyDir.name).toBe("server-only");
+    });
+  });
+
+  describe("createCustomDirective", () => {
+    test("should create a directive definition with any name", () => {
+      const directive = createCustomDirective(
+        "my-custom-directive",
+        /^['"]my[-\s]custom[-\s]directive['"];?\s*$/m
+      );
+
+      expect(directive.name).toBe("my-custom-directive");
+      expect(directive.regex).toBeInstanceOf(RegExp);
+    });
+
+    test("should work with DirectiveTool", async () => {
+      const tool = new DirectiveTool();
+      const directive = createCustomDirective(
+        "test-custom",
+        /^(?:\s*(?:\/\/.*?\n|\s)*)?['"]test[-\s]custom['"];?\s*(?:\/\/.*)?(?:\r?\n|$)/m
+      );
+
+      tool.addDirective(directive.name, directive.regex);
+
+      const testFile = join(TEST_DIR, "custom-helper-test.ts");
+      writeFileSync(testFile, '"test-custom";\nexport const x = 1;');
+
+      const result = await tool.pathIs(directive.name as any, testFile);
+      expect(result).toBe(true);
+    });
+  });
+});
+
+describe("DirectiveDefinition Type", () => {
+  test("should be usable in FrameMasterPlugin.directives", () => {
+    const plugin: FrameMasterPlugin = {
+      name: "type-test-plugin",
+      version: "1.0.0",
+      directives: [
+        createDirective("use-client", /^['"]use[-\s]client['"];?\s*$/m),
+        createDirective("use-server", /^['"]use[-\s]server['"];?\s*$/m),
+      ],
+    } as const;
+
+    expect(plugin.directives).toHaveLength(2);
+    expect(plugin.directives![0]!.name).toBe("use-client");
+    expect(plugin.directives![1]!.name).toBe("use-server");
+  });
+
+  test("should allow string names for custom directives", () => {
+    const plugin: FrameMasterPlugin = {
+      name: "custom-type-test",
+      version: "1.0.0",
+      directives: [
+        {
+          name: "my-arbitrary-directive",
+          regex: /^['"]my[-\s]arbitrary[-\s]directive['"];?\s*$/m,
+        },
+      ],
+    };
+
+    expect(plugin.directives![0]!.name).toBe("my-arbitrary-directive");
+  });
+
+  test("should mix base and custom directives", () => {
+    const plugin: FrameMasterPlugin = {
+      name: "mixed-directives-plugin",
+      version: "1.0.0",
+      directives: [
+        createDirective("use-client", /^['"]use[-\s]client['"];?\s*$/m),
+        createCustomDirective(
+          "use-analytics",
+          /^['"]use[-\s]analytics['"];?\s*$/m
+        ),
+        { name: "use-tracking", regex: /^['"]use[-\s]tracking['"];?\s*$/m },
+      ],
+    };
+
+    expect(plugin.directives).toHaveLength(3);
+    expect(plugin.directives![0]!.name).toBe("use-client");
+    expect(plugin.directives![1]!.name).toBe("use-analytics");
+    expect(plugin.directives![2]!.name).toBe("use-tracking");
   });
 });

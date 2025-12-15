@@ -1,4 +1,8 @@
-import type { ClientIPCManager } from "./utils";
+import type {
+  ClientIPCManager,
+  DirectiveDefinition,
+  Directives,
+} from "./utils";
 import { masterRequest } from "../server/request-manager";
 import type { Builder } from "../build";
 import type { Command } from "commander";
@@ -579,23 +583,45 @@ export type FrameMasterPlugin<
      *
      * Directives are special comments that can be added to the top of your files to enable or disable certain plugin features.
      *
+     * You can extend the CustomDirectives interface to add type-safe custom directives:
+     *
      * @example
-     * {
-     *  name: "my-plugin",
-     *  directives: [
-     *    {
-     *      name: "use-client",
-     *      regex: /^(?:\s*(?:\/\/.*?\n|\s)*)?['"]use[-\s]client['"];?\s*(?:\/\/.*)?(?:\r?\n|$)/m
-     *    },
-     *    {
-     *      name: "use-some-directive",
-     *      regex: /^(?:\s*(?:\/\/.*?\n|\s)*)?['"]use[-\s]some-directive['"];?\s*(?:\/\/.*)?(?:\r?\n|$)/m
-     *    }
-     *  ]
+     * ```typescript
+     * // Extend the CustomDirectives interface in your plugin
+     * declare module "frame-master/plugin/utils" {
+     *   interface CustomDirectives {
+     *     "use-some-directive": true;
+     *   }
      * }
      *
+     * const plugin: FrameMasterPlugin = {
+     *   name: "my-plugin",
+     *   version: "1.0.0",
+     *   directives: [
+     *     {
+     *       name: "use-client", // Built-in directive
+     *       regex: /^(?:\s*(?:\/\/.*?\n|\s)*)?['"]use[-\s]client['"];?\s*(?:\/\/.*)?(?:\r?\n|$)/m
+     *     },
+     *     {
+     *       name: "use-some-directive", // Custom directive (type-safe after module augmentation)
+     *       regex: /^(?:\s*(?:\/\/.*?\n|\s)*)?['"]use[-\s]some-directive['"];?\s*(?:\/\/.*)?(?:\r?\n|$)/m
+     *     }
+     *   ]
+     * };
+     * ```
+     *
+     * You can also use the createDirective helper for type-safe directive creation:
+     * @example
+     * ```typescript
+     * import { createDirective } from "frame-master/plugin/utils";
+     *
+     * const myDirective = createDirective(
+     *   "use-client",
+     *   /^(?:\s*(?:\/\/.*?\n|\s)*)?['"]use[-\s]client['"];?\s*(?:\/\/.*)?(?:\r?\n|$)/m
+     * );
+     * ```
      */
-    directives: Array<{ name: string; regex: RegExp }>;
+    directives: Array<DirectiveDefinition<Directives | (string & {})>>;
     /**
      * ServerConfig
      */
