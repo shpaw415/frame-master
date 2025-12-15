@@ -20,6 +20,11 @@ export type BuilderProps = {
    * @default false
    */
   disableOnLoadChaining?: boolean;
+  /**
+   * Base entrypoints to include in every build.
+   * These are merged with plugin-provided and per-build entrypoints.
+   */
+  baseEntrypoints?: string[];
 };
 
 export class Builder {
@@ -38,6 +43,7 @@ export class Builder {
     success: boolean;
   }> = [];
   private disableOnLoadChaining: boolean;
+  private baseEntrypoints: string[];
 
   readonly isLogEnabled: boolean;
   public outputs: Bun.BuildArtifact[] | null = null;
@@ -48,6 +54,7 @@ export class Builder {
   constructor(props: BuilderProps) {
     this.isLogEnabled = props.enableLogging ?? true;
     this.disableOnLoadChaining = props.disableOnLoadChaining ?? false;
+    this.baseEntrypoints = props.baseEntrypoints ?? [];
 
     this.staticBuildConfig = props.pluginBuildConfig
       .filter((c) => typeof c != "function")
@@ -150,7 +157,11 @@ export class Builder {
     const startTime = performance.now();
     this.clearBuildDir();
     const buildConfig = await this.getBuildConfig();
-    buildConfig.entrypoints = [...buildConfig.entrypoints, ...entrypoints];
+    buildConfig.entrypoints = [
+      ...this.baseEntrypoints,
+      ...buildConfig.entrypoints,
+      ...entrypoints,
+    ];
     if (!buildConfig.outdir) buildConfig.outdir = ".frame-master/build";
 
     this.log("🔨 Building with merged configuration:", {
@@ -985,6 +996,7 @@ export async function InitBuilder() {
     afterBuilds: afterBuildHooks,
     enableLogging: logIsEnabled,
     disableOnLoadChaining: config?.pluginsOptions?.disableOnLoadChaining,
+    baseEntrypoints: config?.pluginsOptions?.entrypoints,
   });
 }
 

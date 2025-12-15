@@ -29,6 +29,24 @@ export type FrameMasterConfig = {
      * @default false
      */
     disableOnLoadChaining?: boolean;
+    /**
+     * Additional entrypoints to include in every build.
+     *
+     * These paths are merged with entrypoints provided by plugins and those
+     * passed directly to `builder.build()`. Useful for adding global client-side
+     * scripts or shared modules without modifying individual plugin configs.
+     *
+     * @example
+     * ```typescript
+     * pluginsOptions: {
+     *   entrypoints: [
+     *     "./src/global.ts",
+     *     "./src/analytics.ts"
+     *   ]
+     * }
+     * ```
+     */
+    entrypoints?: string[];
   }>;
 };
 

@@ -780,6 +780,44 @@ describe("disableOnLoadChaining option", () => {
   });
 });
 
+describe("pluginsOptions.entrypoints", () => {
+  test("should be configurable in FrameMasterConfig", () => {
+    const config = {
+      pluginsOptions: {
+        entrypoints: ["./src/global.ts", "./src/analytics.ts"],
+      },
+    };
+
+    expect(config.pluginsOptions.entrypoints).toEqual([
+      "./src/global.ts",
+      "./src/analytics.ts",
+    ]);
+  });
+
+  test("should accept empty array", () => {
+    const config = {
+      pluginsOptions: {
+        entrypoints: [],
+      },
+    };
+
+    expect(config.pluginsOptions.entrypoints).toEqual([]);
+  });
+
+  test("config with entrypoints should be valid alongside other options", () => {
+    const config = {
+      plugins: [],
+      pluginsOptions: {
+        disableOnLoadChaining: false,
+        entrypoints: ["./src/client.ts"],
+      },
+    };
+
+    expect(config.pluginsOptions.entrypoints).toEqual(["./src/client.ts"]);
+    expect(config.pluginsOptions.disableOnLoadChaining).toBe(false);
+  });
+});
+
 describe("Integration scenarios", () => {
   describe("Multi-plugin transformation pipeline", () => {
     test("should support import injection + code transformation chain", () => {
