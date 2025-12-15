@@ -3,7 +3,7 @@
 ### Enhancements
 
 - [x] CLI create plugin with linked packageJson name and version to the plugin name and version.
-- Stop onLoad Plugin chaining with return value `{ preventChaining: true }`
+- [x] Stop onLoad Plugin chaining with return value `{ preventChaining: true }`
 - Add a props in `FrameMasterConfig.pluginsOptions` introducing `entrypoints` for a quick way to add entrypoints to the buildStep
 - Plugin creation helper method that require a callback function. passing plugins toolings `{directives, builder}` as a props to the callback.
 

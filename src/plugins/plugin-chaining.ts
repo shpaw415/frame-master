@@ -463,6 +463,20 @@ export class PluginProxy {
             accumulatedLoader = result.loader as Bun.Loader;
           }
           lastResult = result;
+
+          // Check for preventChaining flag to stop the chain early
+          if ("preventChaining" in result && result.preventChaining === true) {
+            if (handlers.length > 1) {
+              verboseLog(
+                chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
+                chalk.gray("  └─"),
+                chalk.yellow("Chain stopped by"),
+                chalk.green(handler.pluginName),
+                chalk.gray(`(preventChaining: true)`)
+              );
+            }
+            break;
+          }
         }
       } catch (error) {
         console.error(

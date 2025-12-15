@@ -945,4 +945,163 @@ describe("Integration scenarios", () => {
       expect(stats.totalOnLoadHandlers).toBe(3);
     });
   });
+
+  describe("preventChaining", () => {
+    test("should stop chain when preventChaining is true", async () => {
+      const executionOrder: string[] = [];
+
+      const pluginA: BunPlugin = {
+        name: "plugin-a",
+        setup(build) {
+          build.onLoad({ filter: /\.txt$/ }, async (args) => {
+            executionOrder.push("plugin-a");
+            const content =
+              args.__chainedContents ?? (await Bun.file(args.path).text());
+            return {
+              contents: content + " [A]",
+              loader: "text",
+              preventChaining: true,
+            };
+          });
+        },
+      };
+
+      const pluginB: BunPlugin = {
+        name: "plugin-b",
+        setup(build) {
+          build.onLoad({ filter: /\.txt$/ }, async (args) => {
+            executionOrder.push("plugin-b");
+            const content =
+              args.__chainedContents ?? (await Bun.file(args.path).text());
+            return { contents: content + " [B]", loader: "text" };
+          });
+        },
+      };
+
+      const pluginC: BunPlugin = {
+        name: "plugin-c",
+        setup(build) {
+          build.onLoad({ filter: /\.txt$/ }, async (args) => {
+            executionOrder.push("plugin-c");
+            const content =
+              args.__chainedContents ?? (await Bun.file(args.path).text());
+            return { contents: content + " [C]", loader: "text" };
+          });
+        },
+      };
+
+      const chained = chainPlugins([pluginA, pluginB, pluginC]);
+
+      // Run build to test the chaining
+      const result = await Bun.build({
+        entrypoints: [TEST_FILE],
+        plugins: [chained],
+        outdir: join(TEST_DIR, "out-prevent"),
+      });
+
+      // Only plugin-a should have executed
+      expect(executionOrder).toEqual(["plugin-a"]);
+      expect(executionOrder).not.toContain("plugin-b");
+      expect(executionOrder).not.toContain("plugin-c");
+    });
+
+    test("should continue chain when preventChaining is false or undefined", async () => {
+      const executionOrder: string[] = [];
+
+      const pluginA: BunPlugin = {
+        name: "plugin-a",
+        setup(build) {
+          build.onLoad({ filter: /\.txt$/ }, async (args) => {
+            executionOrder.push("plugin-a");
+            const content =
+              args.__chainedContents ?? (await Bun.file(args.path).text());
+            return {
+              contents: content + " [A]",
+              loader: "text",
+              preventChaining: false,
+            };
+          });
+        },
+      };
+
+      const pluginB: BunPlugin = {
+        name: "plugin-b",
+        setup(build) {
+          build.onLoad({ filter: /\.txt$/ }, async (args) => {
+            executionOrder.push("plugin-b");
+            const content =
+              args.__chainedContents ?? (await Bun.file(args.path).text());
+            return { contents: content + " [B]", loader: "text" };
+          });
+        },
+      };
+
+      const chained = chainPlugins([pluginA, pluginB]);
+
+      await Bun.build({
+        entrypoints: [TEST_FILE],
+        plugins: [chained],
+        outdir: join(TEST_DIR, "out-continue"),
+      });
+
+      // Both plugins should execute
+      expect(executionOrder).toEqual(["plugin-a", "plugin-b"]);
+    });
+
+    test("should stop chain at middle plugin with preventChaining", async () => {
+      const executionOrder: string[] = [];
+
+      const pluginA: BunPlugin = {
+        name: "plugin-a",
+        setup(build) {
+          build.onLoad({ filter: /\.txt$/ }, async (args) => {
+            executionOrder.push("plugin-a");
+            const content =
+              args.__chainedContents ?? (await Bun.file(args.path).text());
+            return { contents: content + " [A]", loader: "text" };
+          });
+        },
+      };
+
+      const pluginB: BunPlugin = {
+        name: "plugin-b",
+        setup(build) {
+          build.onLoad({ filter: /\.txt$/ }, async (args) => {
+            executionOrder.push("plugin-b");
+            const content =
+              args.__chainedContents ?? (await Bun.file(args.path).text());
+            return {
+              contents: content + " [B]",
+              loader: "text",
+              preventChaining: true,
+            };
+          });
+        },
+      };
+
+      const pluginC: BunPlugin = {
+        name: "plugin-c",
+        setup(build) {
+          build.onLoad({ filter: /\.txt$/ }, async (args) => {
+            executionOrder.push("plugin-c");
+            const content =
+              args.__chainedContents ?? (await Bun.file(args.path).text());
+            return { contents: content + " [C]", loader: "text" };
+          });
+        },
+      };
+
+      const chained = chainPlugins([pluginA, pluginB, pluginC]);
+
+      await Bun.build({
+        entrypoints: [TEST_FILE],
+        plugins: [chained],
+        outdir: join(TEST_DIR, "out-middle"),
+      });
+
+      // plugin-a and plugin-b should execute, but not plugin-c
+      expect(executionOrder).toEqual(["plugin-a", "plugin-b"]);
+      expect(executionOrder).not.toContain("plugin-c");
+    });
+  });
 });

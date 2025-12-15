@@ -73,4 +73,31 @@ declare module "bun" {
      */
     __chainedLoader?: Loader;
   }
+
+  interface OnLoadResult {
+    /**
+     * When set to `true`, prevents subsequent plugin handlers in the chain from running.
+     *
+     * In Frame-Master's plugin chaining system, multiple `onLoad` handlers
+     * can match the same file. By default, all matching handlers execute sequentially.
+     * Set this to `true` to stop the chain and use this handler's result as final.
+     *
+     * @example
+     * ```typescript
+     * build.onLoad({ filter: /\.tsx$/ }, async (args) => {
+     *   const content = args.__chainedContents ?? await Bun.file(args.path).text();
+     *
+     *   // Stop further processing by other plugins
+     *   return {
+     *     contents: transform(content),
+     *     loader: "tsx",
+     *     preventChaining: true, // No more handlers will run after this
+     *   };
+     * });
+     * ```
+     *
+     * @default undefined (chaining continues)
+     */
+    preventChaining?: boolean;
+  }
 }
