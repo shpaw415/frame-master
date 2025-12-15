@@ -54,6 +54,8 @@
     "./config": "./src/server/config.ts",
     "./utils": "./src/utils.ts",
     "./paths": "./src/paths.ts",
-    "./build": "./src/build/index.ts"
+    "./build": "./src/build/index.ts",
+    "./search/plugin": "./bin/search/plugin.ts",
+    "./search/template": "./bin/search/template.ts"
   }
 }
