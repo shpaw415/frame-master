@@ -127,4 +127,59 @@ declare module "bun" {
      */
     preventChaining?: boolean;
   }
+
+  /**
+   * Callback for the `finally` method on PluginBuilder.
+   * Receives the final content after all chained handlers complete.
+   */
+  type FinallyCallback = (args: {
+    /** The final content after all plugin transformations */
+    contents: string | Uint8Array;
+    /** The file path that was processed */
+    path: string;
+    /** The loader that will be used */
+    loader: Loader;
+  }) =>
+    | { contents: string | Uint8Array }
+    | Promise<{ contents: string | Uint8Array }>;
+
+  interface PluginBuilder {
+    /**
+     * Register a final transformation that runs after all chained onLoad handlers complete.
+     *
+     * Frame-Master extension: This method allows plugins to apply a final transformation
+     * to content processed by a specific loader. The `finally` handler runs after all
+     * `onLoad` handlers in the chain have completed, giving you a chance to modify
+     * the final output before it's sent to the bundler.
+     *
+     * Multiple `finally` handlers for the same loader are chained in registration order.
+     *
+     * @param loader - The loader type to intercept (e.g., "html", "css", "js", "tsx")
+     * @param callback - Function that receives the final content and returns modified content
+     *
+     * @example
+     * ```typescript
+     * build.finally("html", ({ contents, path }) => ({
+     *   contents: `<!-- Generated from ${path} -->\n${contents}`,
+     * }));
+     * ```
+     *
+     * @example
+     * ```typescript
+     * // Minify CSS as a final step
+     * build.finally("css", async ({ contents }) => ({
+     *   contents: await minifyCSS(contents.toString()),
+     * }));
+     * ```
+     *
+     * @example
+     * ```typescript
+     * // Add source maps comment
+     * build.finally("js", ({ contents, path }) => ({
+     *   contents: `${contents}\n//# sourceURL=${path}`,
+     * }));
+     * ```
+     */
+    finally(loader: Loader, callback: FinallyCallback): PluginBuilder;
+  }
 }

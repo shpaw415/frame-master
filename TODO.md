@@ -9,16 +9,10 @@
 
 ### Features
 
-- Extend Bun.PluginBuilder to include finally. adding a final modification to a specific loader before sending it to the Bun.bundler final content. Exemple:
 - Extendable directive interface type to extend current "use-server", "use-client", etc...
 - [x] implement search plugin from cli
 - [x] implement search template from cli
-
-```typescript
-runtime.finally("html", ({ contents }: { contents: string | ArrayBuffer }) => ({
-  contents: `/** final transform */${contents}`,
-}));
-```
+- [x] Extend Bun.PluginBuilder to include finally. adding a final modification to a specific loader before sending it to the Bun.bundler final content.
 
 ### Fixes
 

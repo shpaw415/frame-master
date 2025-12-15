@@ -1142,4 +1142,217 @@ describe("Integration scenarios", () => {
       expect(executionOrder).not.toContain("plugin-c");
     });
   });
+
+  describe("finally handlers", () => {
+    test("should execute finally handler after all onLoad handlers", async () => {
+      const executionOrder: string[] = [];
+
+      const pluginA: BunPlugin = {
+        name: "plugin-a",
+        setup(build) {
+          build.onLoad({ filter: /\.txt$/ }, async (args) => {
+            executionOrder.push("onLoad-a");
+            const content =
+              args.__chainedContents ?? (await Bun.file(args.path).text());
+            return { contents: content + " [A]", loader: "text" };
+          });
+
+          build.finally("text", ({ contents }) => {
+            executionOrder.push("finally-a");
+            return { contents: `${contents} [FINAL]` };
+          });
+        },
+      };
+
+      const chained = chainPlugins([pluginA]);
+
+      await Bun.build({
+        entrypoints: [TEST_FILE],
+        plugins: [chained],
+        outdir: join(TEST_DIR, "out-finally-1"),
+      });
+
+      // finally should run after onLoad
+      expect(executionOrder).toEqual(["onLoad-a", "finally-a"]);
+    });
+
+    test("should chain multiple finally handlers for same loader", async () => {
+      const executionOrder: string[] = [];
+
+      const pluginA: BunPlugin = {
+        name: "plugin-a",
+        setup(build) {
+          build.onLoad({ filter: /\.txt$/ }, async (args) => {
+            executionOrder.push("onLoad-a");
+            const content =
+              args.__chainedContents ?? (await Bun.file(args.path).text());
+            return { contents: content + " [A]", loader: "text" };
+          });
+
+          build.finally("text", ({ contents }) => {
+            executionOrder.push("finally-a");
+            return { contents: `${contents} [F1]` };
+          });
+        },
+      };
+
+      const pluginB: BunPlugin = {
+        name: "plugin-b",
+        setup(build) {
+          build.finally("text", ({ contents }) => {
+            executionOrder.push("finally-b");
+            return { contents: `${contents} [F2]` };
+          });
+        },
+      };
+
+      const chained = chainPlugins([pluginA, pluginB]);
+
+      await Bun.build({
+        entrypoints: [TEST_FILE],
+        plugins: [chained],
+        outdir: join(TEST_DIR, "out-finally-2"),
+      });
+
+      // Both finally handlers should run in order
+      expect(executionOrder).toEqual(["onLoad-a", "finally-a", "finally-b"]);
+    });
+
+    test("should only run finally handlers matching the final loader", async () => {
+      const executionOrder: string[] = [];
+
+      const plugin: BunPlugin = {
+        name: "test-plugin",
+        setup(build) {
+          build.onLoad({ filter: /\.txt$/ }, async (args) => {
+            executionOrder.push("onLoad");
+            const content =
+              args.__chainedContents ?? (await Bun.file(args.path).text());
+            return { contents: content, loader: "text" };
+          });
+
+          // This should run
+          build.finally("text", ({ contents }) => {
+            executionOrder.push("finally-text");
+            return { contents: `${contents} [TEXT]` };
+          });
+
+          // This should NOT run (wrong loader)
+          build.finally("js", ({ contents }) => {
+            executionOrder.push("finally-js");
+            return { contents: `${contents} [JS]` };
+          });
+        },
+      };
+
+      const chained = chainPlugins([plugin]);
+
+      await Bun.build({
+        entrypoints: [TEST_FILE],
+        plugins: [chained],
+        outdir: join(TEST_DIR, "out-finally-3"),
+      });
+
+      // Only text finally handler should run
+      expect(executionOrder).toEqual(["onLoad", "finally-text"]);
+      expect(executionOrder).not.toContain("finally-js");
+    });
+
+    test("finally handler should receive correct path and loader", async () => {
+      let receivedArgs: { path: string; loader: string } | null = null;
+
+      const plugin: BunPlugin = {
+        name: "test-plugin",
+        setup(build) {
+          build.onLoad({ filter: /\.txt$/ }, async (args) => {
+            const content =
+              args.__chainedContents ?? (await Bun.file(args.path).text());
+            return { contents: content, loader: "text" };
+          });
+
+          build.finally("text", ({ contents, path, loader }) => {
+            receivedArgs = { path, loader };
+            return { contents };
+          });
+        },
+      };
+
+      const chained = chainPlugins([plugin]);
+
+      await Bun.build({
+        entrypoints: [TEST_FILE],
+        plugins: [chained],
+        outdir: join(TEST_DIR, "out-finally-4"),
+      });
+
+      expect(receivedArgs).not.toBeNull();
+      expect(receivedArgs!.path).toBe(TEST_FILE);
+      expect(receivedArgs!.loader).toBe("text");
+    });
+
+    test("async finally handlers should work correctly", async () => {
+      let finalContents: string = "";
+
+      const plugin: BunPlugin = {
+        name: "test-plugin",
+        setup(build) {
+          build.onLoad({ filter: /\.txt$/ }, async (args) => {
+            const content =
+              args.__chainedContents ?? (await Bun.file(args.path).text());
+            return { contents: content, loader: "text" };
+          });
+
+          build.finally("text", async ({ contents }) => {
+            // Simulate async operation
+            await new Promise((resolve) => setTimeout(resolve, 10));
+            const result =
+              typeof contents === "string"
+                ? contents
+                : new TextDecoder().decode(contents);
+            finalContents = result + " [ASYNC]";
+            return { contents: finalContents };
+          });
+        },
+      };
+
+      const chained = chainPlugins([plugin]);
+
+      await Bun.build({
+        entrypoints: [TEST_FILE],
+        plugins: [chained],
+        outdir: join(TEST_DIR, "out-finally-5"),
+      });
+
+      expect(finalContents).toContain("[ASYNC]");
+    });
+
+    test("finally handler should run even without matching onLoad handler", async () => {
+      let finallyRan = false;
+      let receivedContents: string | Uint8Array | null = null;
+
+      const plugin: BunPlugin = {
+        name: "finally-only-plugin",
+        setup(build) {
+          // Only register a finally handler, no onLoad
+          build.finally("text", ({ contents, path }) => {
+            finallyRan = true;
+            receivedContents = contents;
+            return { contents: `[FINALLY PROCESSED] ${contents}` };
+          });
+        },
+      };
+
+      const chained = chainPlugins([plugin]);
+
+      await Bun.build({
+        entrypoints: [TEST_FILE],
+        plugins: [chained],
+        outdir: join(TEST_DIR, "out-finally-only"),
+      });
+
+      expect(finallyRan).toBe(true);
+      expect(receivedContents).not.toBeNull();
+      expect(typeof receivedContents).toBe("string");
+    });
+  });
 });
