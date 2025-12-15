@@ -141,5 +141,25 @@ plugins: [${CLEAN_PLUGIN_NAME}()]`);
       expect(result).not.toContain("__PluginName__");
       expect(result).not.toContain("__CleanPluginName__");
     });
+
+    test("should import name and version from package.json", async () => {
+      const templatePath = join(
+        __dirname,
+        "..",
+        "..",
+        "bin",
+        "plugin",
+        "plugin-template.ts"
+      );
+      const template = await Bun.file(templatePath).text();
+
+      // Verify the import statement exists
+      expect(template).toContain(
+        'import { name, version } from "./package.json"'
+      );
+
+      // Verify the plugin uses the imported values (not hardcoded)
+      expect(template).toMatch(/name,\s*\n\s*version,/);
+    });
   });
 });

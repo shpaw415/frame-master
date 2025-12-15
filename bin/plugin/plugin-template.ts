@@ -1,4 +1,5 @@
 import type { FrameMasterPlugin } from "frame-master/plugin/types";
+import { name, version } from "./package.json";
 
 /**
  * __PluginName__ - Frame-Master Plugin
@@ -7,8 +8,8 @@ import type { FrameMasterPlugin } from "frame-master/plugin/types";
  */
 export default function __CleanPluginName__(): FrameMasterPlugin {
   return {
-    name: "__PluginName__",
-    version: "0.1.0",
+    name,
+    version,
     priority: 100, // Lower number = higher priority
 
     router: {
