@@ -1,7 +1,7 @@
 {
   "name": "frame-master",
   "type": "module",
-  "version": "3.1.x",
+  "version": "3.1.0",
   "baseUrl": ".",
   "license": "MIT",
   "devDependencies": {
