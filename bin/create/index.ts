@@ -3,7 +3,7 @@ import { join } from "path";
 import { x } from "tar";
 import { Readable } from "stream";
 import { onVerbose } from "../share";
-import prompts from "prompts";
+import { input, select } from "@inquirer/prompts";
 
 export type CreateProjectProps = {
   name?: string;
@@ -78,14 +78,13 @@ export default async function CreateProject(props: CreateProjectProps) {
   let { name, type, template } = props;
 
   if (!name) {
-    const response = await prompts({
-      type: "text",
-      name: "name",
+    const response = await input({
       message: "What is the name of your project?",
+      required: true,
       validate: (value: string) =>
         value.length > 0 ? true : "Project name is required",
     });
-    name = response.name;
+    name = response;
   }
 
   if (!name) {
@@ -97,33 +96,31 @@ export default async function CreateProject(props: CreateProjectProps) {
 
   type =
     type ??
-    ((
-      await prompts({
-        type: "select",
-        name: "type",
-        message: "Select a project type",
-        choices: [
-          { title: "Minimal (Empty Project)", value: "minimal" },
-          { title: "Template (From Community)", value: "template" },
-        ],
-      })
-    ).type as CreateProjectProps["type"]);
+    ((await select({
+      message: "Select a project type",
+      choices: [
+        { name: "Minimal", value: "minimal", description: "Empty Project" },
+        {
+          name: "Template",
+          value: "template",
+          description: "From Community Templates",
+        },
+      ],
+    })) as CreateProjectProps["type"]);
 
   if (type === "template" && !template) {
-    const templateResponse = await prompts({
-      type: "text",
-      name: "template",
+    const templateResponse = await input({
       message: "Enter template name (e.g. cloudflare-react-tailwind)",
+      required: true,
       validate: (value: string) =>
         value.length > 0 ? true : "Template name is required",
     });
-    template = templateResponse.template;
+    template = templateResponse;
   }
 
   if (template && type === "template") {
     return await createFromTemplate({ name, type, template });
   }
-
   const cwd = join(process.cwd(), name);
   mkdirSync(cwd, {
     recursive: true,

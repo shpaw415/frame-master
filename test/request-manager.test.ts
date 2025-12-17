@@ -14,10 +14,13 @@ let beforeRequestCalled = false;
 let contextTest = { testKey: "", requestKey: "" };
 let counterValue = 0;
 
+let port = 3005;
+
 beforeAll(async () => {
+  port += 1;
   setMockConfig({
     HTTPServer: {
-      port: 3005,
+      port,
     },
     plugins: [
       // Lifecycle test plugins

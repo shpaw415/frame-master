@@ -4,16 +4,19 @@ import { tmpdir } from "os";
 import { existsSync, mkdirSync, rmSync } from "fs";
 
 // Mock prompts
-mock.module("prompts", () => {
+mock.module("@inquirer/prompts", () => {
   return {
-    default: async (questions: any) => {
-      if (questions.name === "name") {
-        return { name: "interactive-project" };
-      }
-      if (questions.name === "type") {
-        return { type: "minimal" };
+    input: async (questions: any) => {
+      if (questions.message === "What is the name of your project?") {
+        return "interactive-project";
       }
       return {};
+    },
+    select: async (questions: any) => {
+      if (questions.message === "Select a project type") {
+        return "minimal";
+      }
+      return null;
     },
   };
 });
@@ -54,7 +57,6 @@ describe("Create Project Interactive", () => {
 
     try {
       // Call with empty name to trigger prompts
-      // @ts-ignore
       await CreateProject({ type: "minimal" });
     } finally {
       process.chdir(originalCwd);

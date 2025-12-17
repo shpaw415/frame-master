@@ -2,7 +2,7 @@ name: Bun – Multi-Platform CI
 
 on:
   push:
-    branches: [main, 3.1.x]
+    branches: [main, 3.1.x, 3.1.1]
   pull_request:
 
 jobs:
