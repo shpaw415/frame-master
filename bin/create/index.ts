@@ -3,7 +3,7 @@ import { join } from "path";
 import { x } from "tar";
 import { Readable } from "stream";
 import { onVerbose } from "../share";
-import { input, select } from "@inquirer/prompts";
+import { text, select } from "@clack/prompts";
 
 export type CreateProjectProps = {
   name?: string;
@@ -78,13 +78,13 @@ export default async function CreateProject(props: CreateProjectProps) {
   let { name, type, template } = props;
 
   if (!name) {
-    const response = await input({
+    const response = await text({
+      initialValue: "my-project",
       message: "What is the name of your project?",
-      required: true,
       validate: (value: string) =>
-        value.length > 0 ? true : "Project name is required",
+        value.length > 0 ? undefined : new Error("Project name is required"),
     });
-    name = response;
+    name = response.toString();
   }
 
   if (!name) {
@@ -98,24 +98,24 @@ export default async function CreateProject(props: CreateProjectProps) {
     type ??
     ((await select({
       message: "Select a project type",
-      choices: [
-        { name: "Minimal", value: "minimal", description: "Empty Project" },
+
+      options: [
+        { label: "Minimal", value: "minimal", hint: "Empty Project" },
         {
-          name: "Template",
+          label: "Template",
           value: "template",
-          description: "From Community Templates",
+          hint: "From Community Templates",
         },
       ],
     })) as CreateProjectProps["type"]);
 
   if (type === "template" && !template) {
-    const templateResponse = await input({
+    const templateResponse = await text({
       message: "Enter template name (e.g. cloudflare-react-tailwind)",
-      required: true,
       validate: (value: string) =>
-        value.length > 0 ? true : "Template name is required",
+        value.length > 0 ? undefined : new Error("Template name is required"),
     });
-    template = templateResponse;
+    template = templateResponse.toString();
   }
 
   if (template && type === "template") {
