@@ -38,7 +38,9 @@
   },
   "scripts": {
     "build:tool:test": "bun build bin/testing/src/frontend.tsx --outfile=bin/testing/src/frontend.js",
-    "frame-master": "bun run bin/index.ts"
+    "frame-master": "bun run bin/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
   },
   "exports": {
     "./runtime": "./src/server/runtime-loader.ts",
