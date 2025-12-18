@@ -1,4 +1,13 @@
 import chalk from "chalk";
+import {
+  text as _text,
+  select as _select,
+  type TextOptions,
+  type SelectOptions,
+} from "@clack/prompts";
+import { platform } from "node:os";
+
+export const BASE_URL = "https://frame-master.com";
 
 export const ensureNodeEnv = () => {
   if (process.env.NODE_ENV === undefined) {
@@ -92,4 +101,71 @@ export function onVerbose(callback: (() => void | Promise<void>) | string) {
   return callback();
 }
 
-export const BASE_URL = "https://frame-master.com";
+export function fallbackText(opt: TextOptions): string | symbol {
+  console.log(chalk.yellow(opt.message));
+  const res = prompt(
+    opt.placeholder ? `(${opt.placeholder}) ` : undefined,
+    opt.defaultValue
+  );
+  if (!res) {
+    return opt.defaultValue || "";
+  }
+  if (opt.validate) {
+    const validated = opt.validate(res);
+    if (typeof validated === "undefined") {
+      return res;
+    } else if (typeof validated === "string") {
+      console.log(chalk.red(validated));
+      return fallbackText(opt);
+    } else if (validated instanceof Error) {
+      throw validated;
+    }
+  }
+  return res;
+}
+
+export function fallbackSelect<Value>(
+  opt: SelectOptions<Value>
+): Promise<symbol | Value> {
+  console.log(chalk.yellow(opt.message));
+  console.log(
+    opt.options
+      .map(
+        (o, idx) =>
+          chalk.cyan.bold(`  ${idx + 1}. `) +
+          chalk.white(o.label) +
+          (o.hint ? chalk.gray(` (${o.hint})`) : "")
+      )
+      .join("\n")
+  );
+  console.log("Enter the number of your choice:");
+
+  const foundInitalOption = opt.initialValue
+    ? opt.options.find(({ value }) => value === opt.initialValue)
+    : null;
+
+  if (!foundInitalOption && opt.initialValue !== undefined) {
+    throw new Error("Initial value does not match any option values.");
+  }
+
+  const res = prompt(
+    "> ",
+    opt.initialValue
+      ? String(
+          opt.options.findIndex(({ value }) => value === opt.initialValue) + 1
+        )
+      : undefined
+  );
+  return Promise.resolve(
+    res === undefined
+      ? opt.initialValue ?? Symbol("no-selection")
+      : opt.options[Number(res) - 1]?.value ?? Symbol("no-selection")
+  );
+}
+
+export const { text, select } =
+  platform() === "win32"
+    ? // use fallback prompts on Windows platforms
+      { text: fallbackText, select: fallbackSelect }
+    : // default to @clack/prompts on non-Windows platforms
+      { text: _text, select: _select };

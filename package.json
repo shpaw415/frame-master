@@ -21,7 +21,6 @@
     "commander": "^14.0.2",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "safer-buffer": "^2.1.2",
     "tar": "^7.5.2"
   },
   "keywords": [

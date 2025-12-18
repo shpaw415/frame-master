@@ -2,8 +2,7 @@ import { mkdirSync, existsSync, rmdirSync } from "fs";
 import { join } from "path";
 import { x } from "tar";
 import { Readable } from "stream";
-import { onVerbose } from "../share";
-import { text, select } from "@clack/prompts";
+import { onVerbose, text, select } from "../share";
 
 export type CreateProjectProps = {
   name?: string;

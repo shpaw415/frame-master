@@ -4,9 +4,9 @@ import { tmpdir } from "os";
 import { existsSync, mkdirSync, rmSync } from "fs";
 
 // Mock prompts
-mock.module("@inquirer/prompts", () => {
+mock.module("@clack/prompts", () => {
   return {
-    input: async (questions: any) => {
+    text: async (questions: any) => {
       if (questions.message === "What is the name of your project?") {
         return "interactive-project";
       }
