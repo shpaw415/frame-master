@@ -1,11 +1,25 @@
-import { InitPluginLoader, pluginLoader, reloadPluginLoader } from "../plugins";
+import {
+  InitPluginLoader,
+  pluginLoader,
+  PluginLoader,
+  reloadPluginLoader,
+} from "../plugins";
 import { InitConfig, reloadConfig, getConfig } from "./config";
-import { InitBuilder, reloadBuilder } from "../build";
+import Builder, { InitBuilder, reloadBuilder } from "../build";
 import cluster from "node:cluster";
 import { createWatcher } from "./watch";
 import { startConfigWatcher } from "./config-watcher";
+import type { FrameMasterConfig } from "./type";
 
 let inited = false;
+
+type InitProps = Partial<{
+  loders: Partial<{
+    config: FrameMasterConfig;
+    builder: Builder;
+    pluginLoader: PluginLoader;
+  }>;
+}>;
 
 /**
  * Loads and initializes all core components of the server.
@@ -17,14 +31,14 @@ let inited = false;
  * necessary systems are in place before handling requests. And orderly called
  *
  */
-export async function InitAll() {
+export async function InitAll(bypass?: InitProps) {
   if (inited) return;
-  await InitConfig();
-  InitPluginLoader();
-  await InitBuilder();
-  await runCreateContextHooks();
-  await runOnStartMainPlugins();
-  await runFileSystemWatcherPlugin();
+  await InitConfig(bypass?.loders?.config);
+  InitPluginLoader(bypass?.loders?.pluginLoader);
+  await InitBuilder(bypass?.loders as unknown as { builder: Builder });
+  await runCreateContextHooks(bypass?.loders);
+  await runOnStartMainPlugins(bypass?.loders);
+  await runFileSystemWatcherPlugin(undefined, bypass?.loders);
   await startConfigWatcher();
   inited = true;
 }
@@ -63,6 +77,8 @@ export async function InitCLIPlugins() {
  * @example
  * ```typescript
  * import { reinitAll } from "frame-master/server/init";
+import { builder } from '../build/index';
+import { pluginLoader } from '../plugins/plugin-loader';
  *
  * // After config changes
  * await reinitAll();
@@ -104,19 +120,23 @@ function cleanupFileSystemWatchers(): void {
  * Run createContext hooks for all plugins that define them.
  * Called after plugin loader and builder are initialized.
  */
-async function runCreateContextHooks(): Promise<void> {
-  if (!pluginLoader) throw new Error("Plugin loader not initialized");
-  const config = getConfig();
-  if (!config) throw new Error("Config not initialized");
+async function runCreateContextHooks(params?: {
+  config?: FrameMasterConfig;
+  pluginLoader?: PluginLoader;
+}): Promise<void> {
+  const _pluginLoader = params?.pluginLoader ?? pluginLoader;
+  const _config = params?.config ?? getConfig();
+  if (!_pluginLoader) throw new Error("Plugin loader not initialized");
+  if (!_config) throw new Error("Config not initialized");
 
-  const createContextPlugins = pluginLoader.getPluginByName("createContext");
+  const createContextPlugins = _pluginLoader.getPluginByName("createContext");
 
   const errors: Array<{ name: string; error: any }> = [];
 
   await Promise.all(
     createContextPlugins.map(async (plugin) => {
       try {
-        await plugin.pluginParent(config);
+        await plugin.pluginParent(_config);
       } catch (error) {
         console.error(`Error in plugin ${plugin.name} createContext():`, error);
         errors.push({ name: plugin.name, error });
@@ -134,11 +154,18 @@ async function runCreateContextHooks(): Promise<void> {
   }
 }
 
-async function runOnStartMainPlugins() {
+async function runOnStartMainPlugins(params?: {
+  config?: FrameMasterConfig;
+  pluginLoader?: PluginLoader;
+}) {
+  const _pluginLoader = params?.pluginLoader ?? pluginLoader;
+  const _config = params?.config ?? getConfig();
+  if (!_pluginLoader) throw new Error("Plugin loader not initialized");
+  if (!_config) throw new Error("Config not initialized");
   if (!cluster.isPrimary) return;
-  if (!pluginLoader) throw new Error("Plugin loader not initialized");
+  if (!_pluginLoader) throw new Error("Plugin loader not initialized");
   await Promise.all(
-    pluginLoader.getPluginByName("serverStart").map(async (plugin) => {
+    _pluginLoader.getPluginByName("serverStart").map(async (plugin) => {
       try {
         await plugin.pluginParent.main?.();
       } catch (error) {
@@ -155,28 +182,38 @@ async function runOnStartMainPlugins() {
   );
 }
 
-async function runFileSystemWatcherPlugin(forceRun = false) {
+async function runFileSystemWatcherPlugin(
+  forceRun = false,
+  params?: {
+    config?: FrameMasterConfig;
+    pluginLoader?: PluginLoader;
+  }
+) {
+  const _pluginLoader = params?.pluginLoader ?? pluginLoader;
+  const _config = params?.config ?? getConfig();
+  if (!_pluginLoader) throw new Error("Plugin loader not initialized");
+  if (!_config) throw new Error("Config not initialized");
   // Skip if not in dev mode, unless forced (for hot-reload)
   if (
     (!globalThis.__DRY_RUN__ && !forceRun) ||
     process.env.NODE_ENV == "production"
   )
     return;
-  if (!pluginLoader) throw new Error("Plugin loader not initialized");
+  if (!_pluginLoader) throw new Error("Plugin loader not initialized");
 
   // Stop existing watchers before creating new ones
   cleanupFileSystemWatchers();
 
   const DirToWatch = [
     ...new Set(
-      pluginLoader
+      _pluginLoader
         .getPluginByName("fileSystemWatchDir")
         .map((p) => p.pluginParent)
         .reduce((curr, prev) => [...curr, ...prev], [])
     ),
   ];
 
-  const OnFileSystemChangeCallbacks = pluginLoader
+  const OnFileSystemChangeCallbacks = _pluginLoader
     .getPluginByName("onFileSystemChange")
     .map((p) => p.pluginParent);
 

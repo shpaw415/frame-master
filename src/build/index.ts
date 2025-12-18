@@ -1,11 +1,12 @@
 import { mkdirSync, rmSync } from "fs";
 import type { BuildOptionsPlugin } from "../plugins/types";
-import { pluginLoader } from "../plugins";
+import { PluginLoader, pluginLoader } from "../plugins";
 import { pluginRegex } from "../utils";
 import chalk from "chalk";
 import { join } from "path";
 import { chainPlugins } from "../plugins/plugin-chaining";
 import { getConfig } from "../server/config";
+import type { FrameMasterConfig } from "frame-master/server/type";
 
 type RequiredBuilOptions = Required<BuildOptionsPlugin>;
 
@@ -966,13 +967,11 @@ export class Builder {
 export let builder: Builder | null = null;
 export default Builder;
 
-export async function InitBuilder() {
-  if (builder) return;
-  if (!pluginLoader) {
-    throw new Error("Plugin loader not initialized. Cannot create builder.");
-  }
-  const config = getConfig();
-  const plugin = pluginLoader.getPluginByName("build");
+export async function createBuilder(
+  _config: FrameMasterConfig,
+  _pluginLoader: PluginLoader
+) {
+  const plugin = _pluginLoader.getPluginByName("build");
   const configFactories = plugin
     .map((plugin) => plugin.pluginParent.buildConfig)
     .filter((p) => p != undefined);
@@ -990,14 +989,45 @@ export async function InitBuilder() {
   >;
   const logIsEnabled = plugin.some((p) => p.pluginParent.enableLoging === true);
 
-  builder = await Builder.createBuilder({
+  return await Builder.createBuilder({
     pluginBuildConfig: configFactories,
     beforeBuilds: beforeBuildHooks,
     afterBuilds: afterBuildHooks,
     enableLogging: logIsEnabled,
-    disableOnLoadChaining: config?.pluginsOptions?.disableOnLoadChaining,
-    baseEntrypoints: config?.pluginsOptions?.entrypoints,
+    disableOnLoadChaining: _config?.pluginsOptions?.disableOnLoadChaining,
+    baseEntrypoints: _config?.pluginsOptions?.entrypoints,
   });
+}
+
+export async function InitBuilder(
+  loaders?:
+    | {
+        config: FrameMasterConfig;
+        pluginLoader: PluginLoader;
+        builder?: undefined;
+      }
+    | { builder: Builder; config?: undefined; pluginLoader?: undefined }
+) {
+  if (loaders?.builder) {
+    builder = loaders.builder;
+    return;
+  } else if (builder) return;
+
+  const config = loaders?.config ?? getConfig();
+
+  if (!config) {
+    throw new Error(
+      "Frame-Master configuration not initialized. cannot create builder."
+    );
+  }
+
+  const _pluginLoader = loaders?.pluginLoader ?? pluginLoader;
+
+  if (!_pluginLoader) {
+    throw new Error("Plugin loader not initialized. Cannot create builder.");
+  }
+
+  builder = await createBuilder(config, _pluginLoader);
 }
 
 export function getBuilder() {

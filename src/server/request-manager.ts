@@ -7,7 +7,6 @@ import {
 } from "@shpaw415/webtoken";
 import { formatHTML } from "./utils/html-formating";
 import { directiveToolSingleton } from "../plugins/utils";
-import { pluginLoader } from "../plugins/plugin-loader";
 import type { BodyInit } from "bun";
 import { FrameMasterError } from "./error";
 import { renderToReadableStream, renderToString } from "react-dom/server";
@@ -16,6 +15,7 @@ import { errorToJSXPage } from "./utils/error-to-jsx";
 import NotFound from "./fallback/not-found";
 import { getConfig } from "./config";
 import { fixReactJSXDEV } from "./react-fix";
+import { PluginLoader } from "frame-master/plugins";
 
 fixReactJSXDEV();
 
@@ -117,13 +117,22 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
   /**
    * Server configuration
    */
-  public serverConfig: FrameMasterConfig = getConfig()!;
+  public serverConfig: FrameMasterConfig;
+  public pluginLoader: PluginLoader;
   public serverInstance: Bun.Server<undefined>;
   public isLogPrevented: boolean = false;
 
-  constructor(props: { request: Request; server: Bun.Server<undefined> }) {
+  constructor(props: {
+    request: Request;
+    server: Bun.Server<undefined>;
+    config?: FrameMasterConfig;
+    pluginLoader?: PluginLoader;
+  }) {
     this.request = props.request;
     this.serverInstance = props.server;
+    this.serverConfig = props.config ?? getConfig()!;
+    this.pluginLoader =
+      props.pluginLoader ?? new PluginLoader(this.serverConfig);
 
     this.URL = new URL(this.request.url);
 
@@ -133,7 +142,7 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
   }
 
   async handleRequest(): Promise<Response> {
-    const routerPlugins = pluginLoader!.getPluginByName("router");
+    const routerPlugins = this.pluginLoader.getPluginByName("router");
 
     this.currentState = "before_request";
 
@@ -637,7 +646,7 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
   private async applyRewritePlugins(html: string): Promise<string> {
     if (this._prevent_rewrite) return html;
     const rewriter = new HTMLRewriter();
-    const plugins = pluginLoader!.getSubPluginsByParentName(
+    const plugins = this.pluginLoader.getSubPluginsByParentName(
       "router",
       "html_rewrite"
     );

@@ -3,6 +3,9 @@ import { masterRequest } from "../src/server/request-manager";
 import { webToken } from "@shpaw415/webtoken";
 import { setMockConfig } from "../src/server/config";
 import serve from "../src/server";
+import type { FrameMasterConfig } from "frame-master/server/type";
+import { PluginLoader } from "frame-master/plugins";
+import Builder, { createBuilder } from "frame-master/build";
 
 let server: Bun.Server<undefined>;
 process.env.WEB_TOKEN_SECRET = webToken.generateSecureSecret();
@@ -11,262 +14,271 @@ process.env.WEB_TOKEN_SECRET = webToken.generateSecureSecret();
 let executionOrder: string[] = [];
 let beforeRequestCalled = false;
 let contextTest = { testKey: "", requestKey: "" };
+const config: FrameMasterConfig = {
+  HTTPServer: {
+    port: 3005,
+  },
+  plugins: [
+    // Lifecycle test plugins
+    {
+      name: "before-test",
+      version: "1.0.0",
+      priority: 100,
+      router: {
+        before_request(req) {
+          beforeRequestCalled = true;
+          if (req.request.url.includes("/before-test")) {
+            expect(req.currentState).toBe("before_request");
+          }
+        },
+      },
+    },
+    {
+      name: "order-test",
+      version: "1.0.0",
+      priority: 99,
+      router: {
+        before_request(req) {
+          if (req.request.url.includes("/order-test")) {
+            executionOrder.push("before_request");
+          }
+        },
+        request(req) {
+          if (req.request.url.includes("/order-test")) {
+            executionOrder.push("request");
+          }
+        },
+      },
+    },
+    {
+      name: "after-test",
+      version: "1.0.0",
+      priority: 98,
+      router: {
+        before_request(req) {
+          if (req.request.url.includes("/after-test")) {
+            executionOrder.push("before");
+          }
+        },
+        request(req) {
+          if (req.request.url.includes("/after-test")) {
+            executionOrder.push("request");
+          }
+        },
+        after_request(req) {
+          if (req.request.url.includes("/after-test")) {
+            executionOrder.push("after");
+            expect(req.currentState).toBe("after_request");
+          }
+        },
+      },
+    },
+    {
+      name: "early-response",
+      version: "1.0.0",
+      priority: 97,
+      router: {
+        before_request(req) {
+          if (req.request.url.includes("/early-response")) {
+            req.setResponse("Early response", { status: 403 });
+          }
+        },
+        request(req) {
+          if (req.request.url.includes("/early-response")) {
+            req.setResponse("Should not appear", { status: 200 });
+          }
+        },
+      },
+    },
+    {
+      name: "context-test",
+      version: "1.0.0",
+      priority: 96,
+      router: {
+        before_request(req) {
+          if (req.request.url.includes("/context-test")) {
+            req.setContext({ testKey: "testValue" } as any);
+          }
+        },
+        request(req) {
+          if (req.request.url.includes("/context-test")) {
+            const context = req.getContext() as any;
+            contextTest.testKey = context.testKey;
+            req.setContext({ requestKey: "requestValue" } as any);
+          }
+        },
+        after_request(req) {
+          if (req.request.url.includes("/context-test")) {
+            const context = req.getContext() as any;
+            contextTest.requestKey = context.requestKey;
+          }
+        },
+      },
+    },
+    {
+      name: "response-check",
+      version: "1.0.0",
+      priority: 94,
+      router: {
+        before_request(req) {
+          if (req.request.url.includes("/response-check")) {
+            expect(req.isResponseSetted()).toBe(false);
+          }
+        },
+        request(req) {
+          if (req.request.url.includes("/response-check")) {
+            req.setResponse("Test", { status: 200 });
+            expect(req.isResponseSetted()).toBe(true);
+          }
+        },
+        after_request(req) {
+          if (req.request.url.includes("/response-check")) {
+            expect(req.isResponseSetted()).toBe(true);
+          }
+        },
+      },
+    },
+    {
+      name: "error-test",
+      version: "1.0.0",
+      priority: 93,
+      router: {
+        request(req) {
+          if (req.request.url.includes("/error-test")) {
+            throw new Error("Test error");
+          }
+        },
+      },
+    },
+    {
+      name: "plugin-low-priority",
+      version: "1.0.0",
+      priority: 1,
+      router: {
+        request(req) {
+          if (req.request.url.includes("/priority-test")) {
+            executionOrder.push("low");
+          }
+        },
+      },
+    },
+    {
+      name: "plugin-high-priority",
+      version: "1.0.0",
+      priority: 10,
+      router: {
+        request(req) {
+          if (req.request.url.includes("/priority-test")) {
+            executionOrder.push("high");
+          }
+        },
+      },
+    },
+    {
+      name: "plugin-medium-priority",
+      version: "1.0.0",
+      priority: 5,
+      router: {
+        request(req) {
+          if (req.request.url.includes("/priority-test")) {
+            executionOrder.push("medium");
+          }
+        },
+      },
+    },
+    {
+      name: "header-test",
+      version: "1.0.0",
+      priority: 92,
+      router: {
+        request(req) {
+          if (req.request.url.includes("/header-test")) {
+            req.setResponse("header-test", {
+              status: 200,
+              headers: {
+                "X-Custom-Header": "custom-value",
+                "Content-Type": "application/json",
+              },
+            });
+          }
+        },
+      },
+    },
+    // Tests for HTML modifiers only applied to text/html content type
+    {
+      name: "html-modifier-test",
+      version: "1.0.0",
+      priority: 91,
+      router: {
+        request(req) {
+          // JSON response - modifiers should NOT be applied
+          if (req.request.url.includes("/json-response")) {
+            req.setGlobalValues({ __TEST_VAR__: "test-value" } as any);
+            req.setResponse('{"data": "test"}', {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+          // Plain text response - modifiers should NOT be applied
+          if (req.request.url.includes("/text-response")) {
+            req.setGlobalValues({ __TEST_VAR__: "test-value" } as any);
+            req.setResponse("Plain text content", {
+              status: 200,
+              headers: { "Content-Type": "text/plain" },
+            });
+          }
+          // HTML response - modifiers SHOULD be applied
+          if (req.request.url.includes("/html-response")) {
+            req.setGlobalValues({ __TEST_VAR__: "test-value" } as any);
+            req.setResponse(
+              "<html><head></head><body>HTML content</body></html>",
+              {
+                status: 200,
+                headers: { "Content-Type": "text/html" },
+              }
+            );
+          }
+          // No content type - modifiers should NOT be applied
+          if (req.request.url.includes("/no-content-type")) {
+            req.setGlobalValues({ __TEST_VAR__: "test-value" } as any);
+            req.setResponse("No content type", {
+              status: 200,
+            });
+          }
+        },
+      },
+    },
+    {
+      name: "default-response-plugin",
+      version: "1.0.0",
+      priority: undefined,
+      router: {
+        request(req) {
+          if (!req.isResponseSetted())
+            req.setResponse("Default Response", { status: 200 });
+        },
+      },
+    },
+  ],
+};
+const pluginLoader = new PluginLoader(config);
+let builder: Builder;
 
 const createMaster = () =>
   new masterRequest({
     request: new Request("http://localhost/login", { method: "POST" }),
     server,
+    config,
+    pluginLoader,
   });
 
 beforeAll(async () => {
-  setMockConfig({
-    HTTPServer: {
-      port: 3005,
-    },
-    plugins: [
-      // Lifecycle test plugins
-      {
-        name: "before-test",
-        version: "1.0.0",
-        priority: 100,
-        router: {
-          before_request(req) {
-            beforeRequestCalled = true;
-            if (req.request.url.includes("/before-test")) {
-              expect(req.currentState).toBe("before_request");
-            }
-          },
-        },
-      },
-      {
-        name: "order-test",
-        version: "1.0.0",
-        priority: 99,
-        router: {
-          before_request(req) {
-            if (req.request.url.includes("/order-test")) {
-              executionOrder.push("before_request");
-            }
-          },
-          request(req) {
-            if (req.request.url.includes("/order-test")) {
-              executionOrder.push("request");
-            }
-          },
-        },
-      },
-      {
-        name: "after-test",
-        version: "1.0.0",
-        priority: 98,
-        router: {
-          before_request(req) {
-            if (req.request.url.includes("/after-test")) {
-              executionOrder.push("before");
-            }
-          },
-          request(req) {
-            if (req.request.url.includes("/after-test")) {
-              executionOrder.push("request");
-            }
-          },
-          after_request(req) {
-            if (req.request.url.includes("/after-test")) {
-              executionOrder.push("after");
-              expect(req.currentState).toBe("after_request");
-            }
-          },
-        },
-      },
-      {
-        name: "early-response",
-        version: "1.0.0",
-        priority: 97,
-        router: {
-          before_request(req) {
-            if (req.request.url.includes("/early-response")) {
-              req.setResponse("Early response", { status: 403 });
-            }
-          },
-          request(req) {
-            if (req.request.url.includes("/early-response")) {
-              req.setResponse("Should not appear", { status: 200 });
-            }
-          },
-        },
-      },
-      {
-        name: "context-test",
-        version: "1.0.0",
-        priority: 96,
-        router: {
-          before_request(req) {
-            if (req.request.url.includes("/context-test")) {
-              req.setContext({ testKey: "testValue" } as any);
-            }
-          },
-          request(req) {
-            if (req.request.url.includes("/context-test")) {
-              const context = req.getContext() as any;
-              contextTest.testKey = context.testKey;
-              req.setContext({ requestKey: "requestValue" } as any);
-            }
-          },
-          after_request(req) {
-            if (req.request.url.includes("/context-test")) {
-              const context = req.getContext() as any;
-              contextTest.requestKey = context.requestKey;
-            }
-          },
-        },
-      },
-      {
-        name: "response-check",
-        version: "1.0.0",
-        priority: 94,
-        router: {
-          before_request(req) {
-            if (req.request.url.includes("/response-check")) {
-              expect(req.isResponseSetted()).toBe(false);
-            }
-          },
-          request(req) {
-            if (req.request.url.includes("/response-check")) {
-              req.setResponse("Test", { status: 200 });
-              expect(req.isResponseSetted()).toBe(true);
-            }
-          },
-          after_request(req) {
-            if (req.request.url.includes("/response-check")) {
-              expect(req.isResponseSetted()).toBe(true);
-            }
-          },
-        },
-      },
-      {
-        name: "error-test",
-        version: "1.0.0",
-        priority: 93,
-        router: {
-          request(req) {
-            if (req.request.url.includes("/error-test")) {
-              throw new Error("Test error");
-            }
-          },
-        },
-      },
-      {
-        name: "plugin-low-priority",
-        version: "1.0.0",
-        priority: 1,
-        router: {
-          request(req) {
-            if (req.request.url.includes("/priority-test")) {
-              executionOrder.push("low");
-            }
-          },
-        },
-      },
-      {
-        name: "plugin-high-priority",
-        version: "1.0.0",
-        priority: 10,
-        router: {
-          request(req) {
-            if (req.request.url.includes("/priority-test")) {
-              executionOrder.push("high");
-            }
-          },
-        },
-      },
-      {
-        name: "plugin-medium-priority",
-        version: "1.0.0",
-        priority: 5,
-        router: {
-          request(req) {
-            if (req.request.url.includes("/priority-test")) {
-              executionOrder.push("medium");
-            }
-          },
-        },
-      },
-      {
-        name: "header-test",
-        version: "1.0.0",
-        priority: 92,
-        router: {
-          request(req) {
-            if (req.request.url.includes("/header-test")) {
-              req.setResponse("header-test", {
-                status: 200,
-                headers: {
-                  "X-Custom-Header": "custom-value",
-                  "Content-Type": "application/json",
-                },
-              });
-            }
-          },
-        },
-      },
-      // Tests for HTML modifiers only applied to text/html content type
-      {
-        name: "html-modifier-test",
-        version: "1.0.0",
-        priority: 91,
-        router: {
-          request(req) {
-            // JSON response - modifiers should NOT be applied
-            if (req.request.url.includes("/json-response")) {
-              req.setGlobalValues({ __TEST_VAR__: "test-value" } as any);
-              req.setResponse('{"data": "test"}', {
-                status: 200,
-                headers: { "Content-Type": "application/json" },
-              });
-            }
-            // Plain text response - modifiers should NOT be applied
-            if (req.request.url.includes("/text-response")) {
-              req.setGlobalValues({ __TEST_VAR__: "test-value" } as any);
-              req.setResponse("Plain text content", {
-                status: 200,
-                headers: { "Content-Type": "text/plain" },
-              });
-            }
-            // HTML response - modifiers SHOULD be applied
-            if (req.request.url.includes("/html-response")) {
-              req.setGlobalValues({ __TEST_VAR__: "test-value" } as any);
-              req.setResponse(
-                "<html><head></head><body>HTML content</body></html>",
-                {
-                  status: 200,
-                  headers: { "Content-Type": "text/html" },
-                }
-              );
-            }
-            // No content type - modifiers should NOT be applied
-            if (req.request.url.includes("/no-content-type")) {
-              req.setGlobalValues({ __TEST_VAR__: "test-value" } as any);
-              req.setResponse("No content type", {
-                status: 200,
-              });
-            }
-          },
-        },
-      },
-      {
-        name: "default-response-plugin",
-        version: "1.0.0",
-        priority: undefined,
-        router: {
-          request(req) {
-            if (!req.isResponseSetted())
-              req.setResponse("Default Response", { status: 200 });
-          },
-        },
-      },
-    ],
+  builder = await createBuilder(config, pluginLoader);
+  server = await serve({
+    config,
+    pluginLoader,
+    builder,
   });
-  server = await serve();
 });
 
 beforeEach(() => {

@@ -2,10 +2,12 @@ import { getConfig } from "./config";
 import { masterRequest } from "./request-manager";
 import masterRoutes from "./frame-master-routes";
 import { logRequest } from "./log";
-import { pluginLoader } from "../plugins";
+import { PluginLoader, pluginLoader } from "../plugins";
 import { type FileSystemWatcher } from "./watch";
 import { InitAll } from "./init";
 import { verboseLog } from "frame-master/utils";
+import type { FrameMasterConfig } from "./type";
+import type Builder from "frame-master/build";
 
 declare global {
   var __FILESYSTEM_WATCHER__: FileSystemWatcher[];
@@ -82,19 +84,23 @@ function isPlainObject(value: any): boolean {
  *
  * @internal Used by server initialization and hot-reload
  */
-export function createServer(): Bun.Server<unknown> {
-  const config = getConfig();
+export function createServer(params?: {
+  config?: FrameMasterConfig;
+  pluginLoader?: PluginLoader;
+}): Bun.Server<unknown> {
+  const effectiveConfig = params?.config ?? getConfig();
+  const _pluginLoader = params?.pluginLoader ?? pluginLoader;
 
-  if (!config) {
+  if (!effectiveConfig) {
     throw new Error("Configuration not loaded");
-  } else if (!pluginLoader) {
+  } else if (!_pluginLoader) {
     throw new Error("Plugin loader not initialized");
   }
 
-  const serverConfigPlugins = pluginLoader.getPluginByName("serverConfig");
-  const websocketPlugins = pluginLoader.getPluginByName("websocket");
+  const serverConfigPlugins = _pluginLoader.getPluginByName("serverConfig");
+  const websocketPlugins = _pluginLoader.getPluginByName("websocket");
   const disableWarning = Boolean(
-    config.pluginsOptions?.disableHttpServerOptionsConflictWarning
+    effectiveConfig.pluginsOptions?.disableHttpServerOptionsConflictWarning
   );
   const pluginServerConfig = deepMergeServerConfig(
     serverConfigPlugins
@@ -103,9 +109,9 @@ export function createServer(): Bun.Server<unknown> {
         (curr, prev) => deepMergeServerConfig(curr, prev, disableWarning),
         {}
       ),
-    config.HTTPServer,
+    effectiveConfig.HTTPServer,
     disableWarning
-  ) as Exclude<typeof config, null>["HTTPServer"];
+  ) as Exclude<FrameMasterConfig, null>["HTTPServer"];
 
   const pluginsRoutes = Object.assign(
     {},
@@ -177,10 +183,14 @@ export function reloadServer(): Bun.Server<unknown> {
   return globalThis.__SERVER_INSTANCE__;
 }
 
-export default async () => {
-  await InitAll();
+export default async (params?: {
+  config?: FrameMasterConfig;
+  pluginLoader?: PluginLoader;
+  builder?: Builder;
+}) => {
+  await InitAll({ loders: params });
   verboseLog("[Server] Initialization complete");
-  const config = getConfig();
+  const config = params?.config ?? getConfig();
   if (!config) {
     console.error("Configuration not loaded after InitAll");
     process.exit(1);
