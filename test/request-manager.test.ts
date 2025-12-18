@@ -4,7 +4,6 @@ import { webToken } from "@shpaw415/webtoken";
 import { setMockConfig } from "../src/server/config";
 import serve from "../src/server";
 
-let master: masterRequest;
 let server: Bun.Server<undefined>;
 process.env.WEB_TOKEN_SECRET = webToken.generateSecureSecret();
 
@@ -12,6 +11,12 @@ process.env.WEB_TOKEN_SECRET = webToken.generateSecureSecret();
 let executionOrder: string[] = [];
 let beforeRequestCalled = false;
 let contextTest = { testKey: "", requestKey: "" };
+
+const createMaster = () =>
+  new masterRequest({
+    request: new Request("http://localhost/login", { method: "POST" }),
+    server,
+  });
 
 beforeAll(async () => {
   setMockConfig({
@@ -265,10 +270,6 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
-  master = new masterRequest({
-    request: new Request("http://localhost/login", { method: "POST" }),
-    server,
-  });
   // Reset test state
   executionOrder = [];
   beforeRequestCalled = false;
@@ -278,6 +279,7 @@ beforeEach(() => {
 afterAll(() => server?.stop(true));
 
 test("set cookie to response", async () => {
+  const master = createMaster();
   master.currentState = "request";
   master.setCookie(
     "sessionId",
@@ -396,6 +398,7 @@ test("cookies: should get cookie value", async () => {
 });
 
 test("cookies: should handle encrypted cookies", async () => {
+  const master = createMaster();
   master.currentState = "request";
   const data = { userId: 123, name: "test" };
 

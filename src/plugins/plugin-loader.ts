@@ -5,7 +5,7 @@ import { getConfig } from "../server/config";
 import FrameMasterPackageJson from "../../package.json";
 import { directiveToolSingleton } from "./utils";
 
-class PluginLoader {
+export class PluginLoader {
   protected Plugins: Array<FrameMasterPlugin> = [];
   private plugin_cache: Map<
     keyof FrameMasterPlugin,
