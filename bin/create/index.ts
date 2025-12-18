@@ -97,7 +97,7 @@ export default async function CreateProject(props: CreateProjectProps) {
 
   type =
     type ??
-    ((await select({
+    (select({
       message: "Select a project type",
 
       options: [
@@ -108,10 +108,10 @@ export default async function CreateProject(props: CreateProjectProps) {
           hint: "From Community Templates",
         },
       ],
-    })) as CreateProjectProps["type"]);
+    }) as CreateProjectProps["type"]);
 
   if (type === "template" && !template) {
-    const templateResponse = await text({
+    const templateResponse = text({
       message: "Enter template name (e.g. cloudflare-react-tailwind)",
       validate: (value) =>
         value && value.length > 0
@@ -256,8 +256,8 @@ async function createFromTemplate(props: Required<CreateProjectProps>) {
       );
     }
 
+    // TODO: Fix compatibility issue with Win32 filesystem
     const nodeStream = Readable.fromWeb(response.body as any);
-
     await new Promise((resolve, reject) => {
       nodeStream
         .pipe(
@@ -270,11 +270,7 @@ async function createFromTemplate(props: Required<CreateProjectProps>) {
         .on("error", reject);
     });
 
-    onVerbose(() => console.log("Installing dependencies..."));
-    await Bun.$`bun install`.cwd(cwd);
-
-    onVerbose(() => console.log("Initializing Frame Master..."));
-    await Bun.$`bun frame-master init`.cwd(cwd);
+    Bun.spawnSync({ cwd, cmd: ["bun", "install"] });
 
     console.log(
       [

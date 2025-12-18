@@ -114,7 +114,10 @@ export function fallbackText(opt: TextOptions): string | symbol {
   console.log(`\n${S.question} ${chalk.bold(opt.message)}`);
 
   const placeholder = opt.placeholder ? chalk.dim(`(${opt.placeholder})`) : "";
-  const res = prompt(`${S.pointer} ${placeholder} `, opt.defaultValue);
+  const res = prompt(
+    `${S.pointer} ${placeholder} `,
+    opt.defaultValue ?? S.question
+  );
 
   if (!res) {
     return opt.defaultValue ?? Symbol("no-input");
@@ -198,7 +201,7 @@ export interface SelectOptions<Value> {
 
 export function fallbackSelect<Value>(
   opt: SelectOptions<Value>
-): Promise<symbol | Value> {
+): symbol | Value {
   // 1. Header with bolding
   console.log(`\n${S.question} ${chalk.bold(opt.message)}`);
 
@@ -226,14 +229,12 @@ export function fallbackSelect<Value>(
       ? String(
           opt.options.findIndex(({ value }) => value === opt.initialValue) + 1
         )
-      : undefined
+      : S.question
   );
 
-  return Promise.resolve(
-    res === undefined
-      ? opt.initialValue ?? Symbol("no-selection")
-      : opt.options[Number(res) - 1]?.value ?? Symbol("no-selection")
-  );
+  return res === undefined
+    ? opt.initialValue ?? Symbol("no-selection")
+    : opt.options[Number(res) - 1]?.value ?? Symbol("no-selection");
 }
 
 export const { text, select } = { text: fallbackText, select: fallbackSelect };
