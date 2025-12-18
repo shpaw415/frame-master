@@ -1,7 +1,7 @@
 import { mkdirSync, rmSync } from "fs";
 import type { BuildOptionsPlugin } from "../plugins/types";
 import { PluginLoader, pluginLoader } from "../plugins";
-import { pluginRegex } from "../utils";
+import { onVerbose, pluginRegex } from "../utils";
 import chalk from "chalk";
 import { join } from "path";
 import { chainPlugins } from "../plugins/plugin-chaining";
@@ -230,7 +230,19 @@ export class Builder {
       })
     ).filter((filePath) => !filesInResult.includes(filePath));
 
-    await Promise.all(fileToRemove.map((output) => Bun.file(output).delete()));
+    await Promise.all(
+      fileToRemove.map((output) => {
+        try {
+          Bun.file(output).delete();
+        } catch (e) {
+          onVerbose(() =>
+            console.warn(
+              chalk.yellow(`⚠️  Failed to delete file: \`${output}\``)
+            )
+          );
+        }
+      })
+    );
   }
 
   /**
