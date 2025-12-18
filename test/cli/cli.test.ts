@@ -245,7 +245,11 @@ describe("frame-master CLI", () => {
       mkdirSync(join(projectPath, "src"), { recursive: true });
       mkdirSync(join(projectPath, ".frame-master/build"), { recursive: true });
 
-      const testProjectEntryPoint = join(projectPath, "src", "index.ts");
+      const testProjectEntryPoint = join(
+        projectPath,
+        "src",
+        "index.ts"
+      ).replaceAll("\\", "/");
 
       // Create minimal config
       const configContent = (

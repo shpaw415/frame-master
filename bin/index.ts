@@ -102,6 +102,7 @@ program
   .action(async (name: string | undefined, options: CreateProjectProps) => {
     const createProject = (await import("./create")).default;
     await createProject({ name, ...options });
+    process.exit(0);
   });
 
 program.addCommand(pluginCommand);
@@ -110,7 +111,12 @@ program.addCommand(testCommand);
 program.addCommand(buildCommand);
 program.addCommand(ExtendCli);
 
-await program.parseAsync().catch((err) => {
-  console.error("Error executing command:", err);
-  process.exit(1);
-});
+await program
+  .parseAsync()
+  .catch((err) => {
+    console.error("Error executing command:", err);
+    process.exit(1);
+  })
+  .then(() => {
+    process.exit(0);
+  });

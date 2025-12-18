@@ -7,9 +7,10 @@ type actionList =
   | "text-validate-throw"
   | "text-validate-retry";
 
-function onAction(action: actionList, fn: () => any) {
+async function onAction(action: actionList, fn: () => any) {
   if (!argv.includes(`--${action}`)) return;
-  fn();
+  await fn();
+  process.exit(0);
 }
 
 onAction("text", () => {
