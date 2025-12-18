@@ -77,7 +77,7 @@ export default async function CreateProject(props: CreateProjectProps) {
   let { name, type, template } = props;
 
   if (!name) {
-    const response = await text({
+    const response = text({
       initialValue: "my-project",
       message: "What is the name of your project?",
       validate: (value: string) =>

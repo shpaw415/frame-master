@@ -101,21 +101,32 @@ export function onVerbose(callback: (() => void | Promise<void>) | string) {
   return callback();
 }
 
+const S = {
+  info: chalk.blue("ℹ"),
+  success: chalk.green("✔"),
+  question: chalk.cyan("?"),
+  error: chalk.red("✖"),
+  pointer: chalk.gray("›"),
+};
+
 export function fallbackText(opt: TextOptions): string | symbol {
-  console.log(chalk.yellow(opt.message));
-  const res = prompt(
-    opt.placeholder ? `(${opt.placeholder}) ` : undefined,
-    opt.defaultValue
-  );
+  // 1. Clearer header with a question symbol
+  console.log(`\n${S.question} ${chalk.bold(opt.message)}`);
+
+  const placeholder = opt.placeholder ? chalk.dim(`(${opt.placeholder})`) : "";
+  const res = prompt(`${S.pointer} ${placeholder} `, opt.defaultValue);
+
   if (!res) {
-    return opt.defaultValue || "";
+    return opt.defaultValue ?? Symbol("no-input");
   }
+
   if (opt.validate) {
     const validated = opt.validate(res);
     if (typeof validated === "undefined") {
       return res;
     } else if (typeof validated === "string") {
-      console.log(chalk.red(validated));
+      // 2. Styled error message with padding
+      console.log(`  ${S.error} ${chalk.red.italic(validated)}\n`);
       return fallbackText(opt);
     } else if (validated instanceof Error) {
       throw validated;
@@ -127,18 +138,18 @@ export function fallbackText(opt: TextOptions): string | symbol {
 export function fallbackSelect<Value>(
   opt: SelectOptions<Value>
 ): Promise<symbol | Value> {
-  console.log(chalk.yellow(opt.message));
-  console.log(
-    opt.options
-      .map(
-        (o, idx) =>
-          chalk.cyan.bold(`  ${idx + 1}. `) +
-          chalk.white(o.label) +
-          (o.hint ? chalk.gray(` (${o.hint})`) : "")
-      )
-      .join("\n")
-  );
-  console.log("Enter the number of your choice:");
+  // 1. Header with bolding
+  console.log(`\n${S.question} ${chalk.bold(opt.message)}`);
+
+  // 2. Styled options list
+  opt.options.forEach((o, idx) => {
+    const num = chalk.cyan(`${idx + 1}.`);
+    const label = chalk.white(o.label);
+    const hint = o.hint ? chalk.dim(` (${o.hint})`) : "";
+    console.log(`   ${num} ${label}${hint}`);
+  });
+
+  console.log(chalk.dim(`  (Enter the number of your choice)`));
 
   const foundInitalOption = opt.initialValue
     ? opt.options.find(({ value }) => value === opt.initialValue)
@@ -149,13 +160,14 @@ export function fallbackSelect<Value>(
   }
 
   const res = prompt(
-    "> ",
+    ` ${S.pointer} `,
     opt.initialValue
       ? String(
           opt.options.findIndex(({ value }) => value === opt.initialValue) + 1
         )
       : undefined
   );
+
   return Promise.resolve(
     res === undefined
       ? opt.initialValue ?? Symbol("no-selection")
@@ -163,9 +175,4 @@ export function fallbackSelect<Value>(
   );
 }
 
-export const { text, select } =
-  platform() === "win32"
-    ? // use fallback prompts on Windows platforms
-      { text: fallbackText, select: fallbackSelect }
-    : // default to @clack/prompts on non-Windows platforms
-      { text: _text, select: _select };
+export const { text, select } = { text: fallbackText, select: fallbackSelect };

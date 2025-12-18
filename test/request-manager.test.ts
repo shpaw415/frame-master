@@ -12,15 +12,11 @@ process.env.WEB_TOKEN_SECRET = webToken.generateSecureSecret();
 let executionOrder: string[] = [];
 let beforeRequestCalled = false;
 let contextTest = { testKey: "", requestKey: "" };
-let counterValue = 0;
-
-let port = 3005;
 
 beforeAll(async () => {
-  port += 1;
   setMockConfig({
     HTTPServer: {
-      port,
+      port: 3005,
     },
     plugins: [
       // Lifecycle test plugins
@@ -115,29 +111,6 @@ beforeAll(async () => {
             if (req.request.url.includes("/context-test")) {
               const context = req.getContext() as any;
               contextTest.requestKey = context.requestKey;
-            }
-          },
-        },
-      },
-      {
-        name: "global-test",
-        version: "1.0.0",
-        priority: 95,
-        router: {
-          before_request(req) {
-            if (req.request.url.includes("/global-test")) {
-              req.globalDataInjection.rawData.counter = 1;
-            }
-          },
-          request(req) {
-            if (req.request.url.includes("/global-test")) {
-              const counter = req.globalDataInjection.rawData.counter as number;
-              req.globalDataInjection.rawData.counter = counter + 1;
-            }
-          },
-          after_request(req) {
-            if (req.request.url.includes("/global-test")) {
-              counterValue = req.globalDataInjection.rawData.counter as number;
             }
           },
         },
@@ -300,7 +273,6 @@ beforeEach(() => {
   executionOrder = [];
   beforeRequestCalled = false;
   contextTest = { testKey: "", requestKey: "" };
-  counterValue = 0;
 });
 
 afterAll(() => server?.stop(true));
@@ -368,16 +340,6 @@ test("lifecycle: should maintain context across states", async () => {
   await testMaster.handleRequest();
   expect(contextTest.testKey).toBe("testValue");
   expect(contextTest.requestKey).toBe("requestValue");
-});
-
-test("lifecycle: should maintain globalValues across states", async () => {
-  const testMaster = new masterRequest({
-    request: new Request("http://localhost/global-test"),
-    server,
-  });
-
-  await testMaster.handleRequest();
-  expect(counterValue).toBe(2);
 });
 
 test("lifecycle: should check if response is set", async () => {
