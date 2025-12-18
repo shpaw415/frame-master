@@ -111,12 +111,7 @@ program.addCommand(testCommand);
 program.addCommand(buildCommand);
 program.addCommand(ExtendCli);
 
-await program
-  .parseAsync()
-  .catch((err) => {
-    console.error("Error executing command:", err);
-    process.exit(1);
-  })
-  .then(() => {
-    process.exit(0);
-  });
+await program.parseAsync().catch((err) => {
+  console.error("Error executing command:", err);
+  process.exit(1);
+});
