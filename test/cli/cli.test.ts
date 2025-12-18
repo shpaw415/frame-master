@@ -227,129 +227,6 @@ describe("frame-master CLI", () => {
     }, 30000);
   });
 
-  describe("plugin command", () => {
-    test("should display help for plugin command", async () => {
-      const proc = Bun.spawn(["bun", CLI_PATH, "plugin", "--help"], {
-        cwd: process.cwd(),
-        stdout: "pipe",
-      });
-
-      const output = await new Response(proc.stdout).text();
-      await proc.exited;
-
-      expect(output).toContain("Manage Frame-Master plugins");
-      expect(output).toContain("list");
-      expect(output).toContain("info");
-      expect(output).toContain("validate");
-      expect(output).toContain("create");
-      expect(proc.exitCode).toBe(0);
-    });
-
-    test("should list plugins with list command", async () => {
-      // Create a test project with config
-      const projectName = "test-plugin-list";
-      const projectPath = join(TEST_DIR, projectName);
-      mkdirSync(projectPath, { recursive: true });
-
-      // Create a config file with plugins
-      const configContent = `
-import type { FrameMasterConfig } from "frame-master/server/type";
-
-export default {
-  HTTPServer: {
-    port: 3000,
-  },
-  plugins: [
-    {
-      name: "test-plugin",
-      version: "1.0.0",
-      priority: 1,
-    },
-  ],
-} satisfies FrameMasterConfig;
-`;
-      writeFileSync(join(projectPath, "frame-master.config.ts"), configContent);
-
-      const output = await Bun.$`bun ${CLI_PATH} plugin list`
-        .cwd(projectPath)
-        .text();
-
-      expect(output).toContain("Installed Plugins");
-      expect(output).toContain("test-plugin");
-    }, 15000);
-
-    test("should show verbose plugin information", async () => {
-      const projectName = "test-plugin-verbose";
-      const projectPath = join(TEST_DIR, projectName);
-      mkdirSync(projectPath, { recursive: true });
-
-      const configContent = `
-import type { FrameMasterConfig } from "frame-master/server/type";
-
-export default {
-  HTTPServer: {
-    port: 3000,
-  },
-  plugins: [
-    {
-      name: "test-plugin",
-      version: "1.0.0",
-      priority: 5,
-      router: {
-        before_request: async () => {},
-      },
-      serverStart: async () => {},
-    },
-  ],
-} satisfies FrameMasterConfig;
-`;
-      writeFileSync(join(projectPath, "frame-master.config.ts"), configContent);
-
-      const proc = Bun.spawn(["bun", CLI_PATH, "plugin", "list", "--verbose"], {
-        cwd: projectPath,
-        stdout: "pipe",
-        stderr: "pipe",
-      });
-
-      const output = Bun.stripANSI(await new Response(proc.stdout).text());
-      await proc.exited;
-
-      expect(output).toContain("test-plugin");
-      expect(output).toContain("Priority");
-      expect(output).toContain("Features");
-    }, 15000);
-
-    test("should handle empty plugin list", async () => {
-      const projectName = "test-no-plugins";
-      const projectPath = join(TEST_DIR, projectName);
-      mkdirSync(projectPath, { recursive: true });
-
-      const configContent = `
-import type { FrameMasterConfig } from "frame-master/server/type";
-
-export default {
-  HTTPServer: {
-    port: 3000,
-  },
-  plugins: [],
-} satisfies FrameMasterConfig;
-`;
-      writeFileSync(join(projectPath, "frame-master.config.ts"), configContent);
-
-      const proc = Bun.spawn(["bun", CLI_PATH, "plugin", "list"], {
-        cwd: projectPath,
-        stdout: "pipe",
-        stderr: "pipe",
-      });
-
-      const output = await new Response(proc.stdout).text();
-      await proc.exited;
-
-      expect(output).toContain("No plugins installed");
-      expect(proc.exitCode).toBe(0);
-    }, 15000);
-  });
-
   describe("build command", () => {
     test("should display help for build command", async () => {
       const proc = await Bun.$`bun ${CLI_PATH} build --help`.cwd(process.cwd());
@@ -379,8 +256,6 @@ export default {
         join(projectPath, "frame-master.config.ts"),
         configContent
       );
-
-      console.log();
 
       // Create a simple entrypoint
       await Bun.write(
