@@ -366,7 +366,7 @@ export default {
 
       // Create project structure
       mkdirSync(join(projectPath, "src"), { recursive: true });
-      mkdirSync(join(projectPath, ".frame-master"), { recursive: true });
+      mkdirSync(join(projectPath, ".frame-master/build"), { recursive: true });
 
       const testProjectEntryPoint = join(projectPath, "src", "index.ts");
 
@@ -375,17 +375,26 @@ export default {
         await Bun.file(join(import.meta.dir, "default.config.ts")).text()
       ).replaceAll("{{TEST_PROJECT_ENTRYPOINT}}", testProjectEntryPoint);
 
-      writeFileSync(join(projectPath, "frame-master.config.ts"), configContent);
+      await Bun.write(
+        join(projectPath, "frame-master.config.ts"),
+        configContent
+      );
+
+      console.log();
 
       // Create a simple entrypoint
-      writeFileSync(testProjectEntryPoint, `console.log("Hello from build");`);
+      await Bun.write(
+        testProjectEntryPoint,
+        `console.log("Hello Frame Master");`
+      );
 
       // Set NODE_ENV
       process.env.NODE_ENV = "development";
 
       const stdout = await Bun.$`bun ${CLI_PATH} build`
         .cwd(projectPath)
-        .env({ ...process.env, NODE_ENV: "development" });
+        .env({ ...process.env, NODE_ENV: "development" })
+        .catch((e) => e);
 
       const output = Bun.stripANSI(stdout.text());
 

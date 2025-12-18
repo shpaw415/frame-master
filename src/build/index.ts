@@ -1,7 +1,7 @@
 import { mkdirSync, rmSync } from "fs";
 import type { BuildOptionsPlugin } from "../plugins/types";
 import { PluginLoader, pluginLoader } from "../plugins";
-import { onVerbose, pluginRegex } from "../utils";
+import { onVerbose, pluginRegex, verboseLog, isVerbose } from "../utils";
 import chalk from "chalk";
 import { join } from "path";
 import { chainPlugins } from "../plugins/plugin-chaining";
@@ -27,6 +27,8 @@ export type BuilderProps = {
    */
   baseEntrypoints?: string[];
 };
+
+const DEFAULT_BUILD_DIR = ".frame-master/build";
 
 export class Builder {
   private buildConfigFactory: BuilderProps["pluginBuildConfig"];
@@ -157,13 +159,13 @@ export class Builder {
     });
     const startTime = performance.now();
     this.clearBuildDir();
+
     const buildConfig = await this.getBuildConfig();
     buildConfig.entrypoints = [
       ...this.baseEntrypoints,
       ...buildConfig.entrypoints,
       ...entrypoints,
     ];
-    if (!buildConfig.outdir) buildConfig.outdir = ".frame-master/build";
 
     this.log("🔨 Building with merged configuration:", {
       entrypoints: buildConfig.entrypoints?.length || 0,
@@ -716,7 +718,7 @@ export class Builder {
           (prev, next) => this.mergeConfigSafely(prev as Bun.BuildConfig, next),
           {
             entrypoints: [],
-            outdir: "",
+            outdir: DEFAULT_BUILD_DIR,
             splitting: true,
             throw: false,
             minify: process.env.NODE_ENV === "production",
@@ -736,8 +738,15 @@ export class Builder {
           this.staticBuildConfig
         );
         this.currentBuildConfig = mergedConfig as Bun.BuildConfig;
-        return mergedConfig;
-      }) as Promise<Bun.BuildConfig>;
+        return mergedConfig as Promise<Bun.BuildConfig>;
+      })
+      .then(
+        (res) =>
+          ({
+            ...res,
+            outdir: res.outdir || DEFAULT_BUILD_DIR,
+          } as Bun.BuildConfig)
+      );
   }
 
   /**
@@ -880,25 +889,26 @@ export class Builder {
     return result;
   }
 
+  private getAbsBuildDir(): string | null {
+    const buildDir = this.currentBuildConfig?.outdir ?? DEFAULT_BUILD_DIR;
+
+    const res = buildDir.startsWith("/")
+      ? buildDir
+      : join(process.cwd(), buildDir);
+    return res;
+  }
+
   /**
    * @internal
    * Clears and recreates the build output directory.
    * Called automatically by the build method.
    */
   private clearBuildDir() {
-    const buildDir = this.currentBuildConfig?.outdir;
-    if (!buildDir)
-      return this.log("No build directory specified, skipping clear.");
-    try {
-      rmSync(buildDir, { recursive: true, force: true });
-    } catch (e) {
-      this.error(e);
-    }
-    try {
-      mkdirSync(buildDir, { recursive: true });
-    } catch (e) {
-      this.error(e);
-    }
+    const absoluteBuildDir = this.getAbsBuildDir();
+    if (!absoluteBuildDir) throw new Error("Build directory not configured.");
+
+    rmSync(absoluteBuildDir, { recursive: true, force: true });
+    mkdirSync(absoluteBuildDir, { recursive: true });
   }
 
   /**
@@ -923,15 +933,6 @@ export class Builder {
   private log(...data: any[]) {
     if (!this.isLogEnabled) return;
     console.log("[Frame-Master-plugin-react-ssr Builder]:", ...data);
-  }
-
-  /**
-   * @internal
-   * Logs errors when logging is enabled.
-   */
-  private error(...data: any[]) {
-    if (!this.isLogEnabled) return;
-    console.error("[Frame-Master-plugin-react-ssr Builder]:", ...data);
   }
 }
 /**

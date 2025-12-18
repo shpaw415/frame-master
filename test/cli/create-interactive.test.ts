@@ -43,6 +43,8 @@ describe("Create Project Interactive", () => {
     // Simulate user input
     const inputs = [`${projectName}\n`];
 
+    await Bun.sleep(1000); // Wait a moment for the process to be ready
+
     proc.stdin.write(inputs.join(""));
 
     await proc.exited;

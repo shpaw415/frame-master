@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { ensureNodeEnv, onVerbose } from "../share";
 import chalk from "chalk";
 import { InitBuild } from "frame-master/server/init";
+import { verboseLog } from "frame-master/utils";
 
 export const buildCommand = new Command("build")
   .description("Build the Frame Master project")
@@ -32,7 +33,9 @@ export const buildCommand = new Command("build")
         console.error(
           chalk.red("✗ Builder not initialized. Make sure plugins are loaded.")
         );
-        process.exit(1);
+        throw new Error(
+          "Builder not initialized. Make sure plugins are loaded."
+        );
       }
 
       // Check if a build is already in progress
@@ -45,6 +48,8 @@ export const buildCommand = new Command("build")
       const startTime = performance.now();
       const result = await builder.build();
       const duration = performance.now() - startTime;
+
+      verboseLog(result);
 
       if (result.success) {
         console.log(
@@ -129,7 +134,7 @@ export const buildCommand = new Command("build")
           }
         }
 
-        process.exit(1);
+        throw new Error("Build process failed", { cause: result.logs });
       }
     } catch (error) {
       console.error(
@@ -143,6 +148,7 @@ export const buildCommand = new Command("build")
       console.error(
         chalk.bold.red("└─────────────────────────────────────────┘") + "\n"
       );
+      console.log();
       throw new Error("Build process failed", {
         cause: error as Error,
       });

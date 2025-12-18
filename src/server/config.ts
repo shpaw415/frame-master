@@ -10,8 +10,8 @@ export const DEFAULT_CONFIG = {
 } satisfies FrameMasterConfig;
 
 export class ConfigFileNotFound extends Error {
-  constructor(errorOptions?: ErrorOptions) {
-    super("frame-master.config.ts file not found.", errorOptions);
+  constructor(filePath: string, errorOptions?: ErrorOptions) {
+    super(`Config file not found: ${filePath}`, errorOptions);
     this.name = "ConfigFileNotFound";
   }
 }
@@ -56,7 +56,7 @@ class ConfigManager {
     const realFilePath = join(process.cwd(), Paths.configFile);
     const filePath = realFilePath + (withSuffix ?? "");
     if (!(await Bun.file(realFilePath).exists()))
-      throw new ConfigFileNotFound();
+      throw new ConfigFileNotFound(realFilePath);
     try {
       const configModule = await import(filePath);
       const config = configModule?.default as FrameMasterConfig | undefined;
