@@ -1,11 +1,4 @@
 import chalk from "chalk";
-import {
-  text as _text,
-  select as _select,
-  type TextOptions,
-  type SelectOptions,
-} from "@clack/prompts";
-import { platform } from "node:os";
 
 export const BASE_URL = "https://frame-master.com";
 
@@ -108,6 +101,13 @@ const S = {
   error: chalk.red("✖"),
   pointer: chalk.gray("›"),
 };
+export interface TextOptions {
+  message: string;
+  placeholder?: string;
+  defaultValue?: string;
+  initialValue?: string;
+  validate?: (value: string | undefined) => string | Error | undefined;
+}
 
 export function fallbackText(opt: TextOptions): string | symbol {
   // 1. Clearer header with a question symbol
@@ -133,6 +133,67 @@ export function fallbackText(opt: TextOptions): string | symbol {
     }
   }
   return res;
+}
+
+type Primitive = string | number | boolean;
+
+export type Option<Value> = Value extends Primitive
+  ? {
+      /**
+       * Internal data for this option.
+       */
+      value: Value;
+      /**
+       * The optional, user-facing text for this option.
+       *
+       * By default, the `value` is converted to a string.
+       */
+      label?: string;
+      /**
+       * An optional hint to display to the user when
+       * this option might be selected.
+       *
+       * By default, no `hint` is displayed.
+       */
+      hint?: string;
+      /**
+       * Whether this option is disabled.
+       * Disabled options are visible but cannot be selected.
+       *
+       * By default, options are not disabled.
+       */
+      disabled?: boolean;
+    }
+  : {
+      /**
+       * Internal data for this option.
+       */
+      value: Value;
+      /**
+       * Required. The user-facing text for this option.
+       */
+      label: string;
+      /**
+       * An optional hint to display to the user when
+       * this option might be selected.
+       *
+       * By default, no `hint` is displayed.
+       */
+      hint?: string;
+      /**
+       * Whether this option is disabled.
+       * Disabled options are visible but cannot be selected.
+       *
+       * By default, options are not disabled.
+       */
+      disabled?: boolean;
+    };
+
+export interface SelectOptions<Value> {
+  message: string;
+  options: Option<Value>[];
+  initialValue?: Value;
+  maxItems?: number;
 }
 
 export function fallbackSelect<Value>(

@@ -80,8 +80,10 @@ export default async function CreateProject(props: CreateProjectProps) {
     const response = text({
       initialValue: "my-project",
       message: "What is the name of your project?",
-      validate: (value: string) =>
-        value.length > 0 ? undefined : new Error("Project name is required"),
+      validate: (value) =>
+        value && value.length > 0
+          ? undefined
+          : new Error("Project name is required"),
     });
     name = response.toString();
   }
@@ -111,8 +113,10 @@ export default async function CreateProject(props: CreateProjectProps) {
   if (type === "template" && !template) {
     const templateResponse = await text({
       message: "Enter template name (e.g. cloudflare-react-tailwind)",
-      validate: (value: string) =>
-        value.length > 0 ? undefined : new Error("Template name is required"),
+      validate: (value) =>
+        value && value.length > 0
+          ? undefined
+          : new Error("Template name is required"),
     });
     template = templateResponse.toString();
   }

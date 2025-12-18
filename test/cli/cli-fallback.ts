@@ -25,7 +25,7 @@ onAction("text-validate-throw", async () => {
   const res = fallbackText({
     message: "This is a fallback text prompt message with validation.",
     validate: (input) => {
-      if (input.length < 5) {
+      if (!input || input.length < 5) {
         return new Error("Input must be at least 5 characters long.");
       }
       return undefined;
@@ -37,7 +37,7 @@ onAction("text-validate-retry", async () => {
   const res = fallbackText({
     message: "This is a fallback text prompt message with validation.",
     validate: (input) => {
-      if (input.length < 5) {
+      if (!input || input.length < 5) {
         return "Input must be at least 5 characters long.";
       }
     },
