@@ -1,8 +1,9 @@
-import { mkdirSync, existsSync, rmdirSync } from "fs";
+import { mkdirSync, existsSync, rmdirSync, renameSync } from "fs";
 import { join } from "path";
 import { x } from "tar";
 import { Readable } from "stream";
 import { onVerbose, text, select } from "../share";
+import { platform, tmpdir } from "os";
 
 export type CreateProjectProps = {
   name?: string;
@@ -256,19 +257,41 @@ async function createFromTemplate(props: Required<CreateProjectProps>) {
       );
     }
 
-    // TODO: Fix compatibility issue with Win32 filesystem
-    const nodeStream = Readable.fromWeb(response.body as any);
-    await new Promise((resolve, reject) => {
-      nodeStream
-        .pipe(
-          x({
-            C: cwd,
-            strip: 1,
-          })
-        )
-        .on("finish", resolve)
-        .on("error", reject);
-    });
+    const system = platform();
+
+    if (system === "win32") {
+      if (!Bun.which("tar")) {
+        throw new Error(
+          "`tar` command not found. Please install tar to proceed."
+        );
+      }
+      const fileName = `template-${Date.now()}.tar.gz`;
+      const tmpFilePath = join(tmpdir(), fileName);
+      await Bun.write(tmpFilePath, await response.arrayBuffer());
+      const extract = Bun.spawnSync({
+        cmd: ["tar", "-xf", tmpFilePath, "--strip-components=1", "-C", name],
+        stderr: "inherit",
+        stdout: "ignore",
+      });
+      if (extract.exitCode !== 0) {
+        throw new Error("Failed to extract template archive using tar.");
+      }
+      await Bun.file(tmpFilePath).delete();
+    } else {
+      const nodeStream = Readable.fromWeb(response.body as any);
+      await new Promise((resolve, reject) => {
+        nodeStream
+          .pipe(
+            x({
+              C: cwd,
+              strip: 1,
+              p: false,
+            })
+          )
+          .on("finish", resolve)
+          .on("error", reject);
+      });
+    }
 
     Bun.spawnSync({ cwd, cmd: ["bun", "install"] });
 
