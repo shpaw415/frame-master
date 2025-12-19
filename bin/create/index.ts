@@ -2,7 +2,7 @@ import { mkdirSync, existsSync, rmdirSync, renameSync } from "fs";
 import { join } from "path";
 import { x } from "tar";
 import { Readable } from "stream";
-import { onVerbose, text, select } from "../share";
+import { onVerbose, text, select, InvalidValueError } from "../share";
 import { platform, tmpdir } from "os";
 
 export type CreateProjectProps = {
@@ -80,7 +80,6 @@ export default async function CreateProject(props: CreateProjectProps) {
 
   if (!name) {
     const response = text({
-      initialValue: "my-project",
       message: "What is the name of your project?",
       validate: (value) =>
         value && value.length > 0
@@ -100,9 +99,9 @@ export default async function CreateProject(props: CreateProjectProps) {
 
   if (template) type = "template";
 
-  type =
+  const selectType =
     type ??
-    (select({
+    select({
       message: "Select a project type",
 
       options: [
@@ -113,8 +112,15 @@ export default async function CreateProject(props: CreateProjectProps) {
           hint: "From Community Templates",
         },
       ],
-    }) as CreateProjectProps["type"]);
+    });
 
+  if (selectType instanceof InvalidValueError) {
+    throw selectType;
+  } else if (typeof selectType === "undefined") {
+    throw new Error("Project type selection is required");
+  } else {
+    type = selectType;
+  }
   if (type === "template" && !template) {
     const templateResponse = text({
       message: "Enter template name (e.g. cloudflare-react-tailwind)",

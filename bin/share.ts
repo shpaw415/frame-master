@@ -199,9 +199,28 @@ export interface SelectOptions<Value> {
   maxItems?: number;
 }
 
+export class InvalidValueError extends Error {
+  constructor(message: string, opt?: ErrorOptions) {
+    super(message, opt);
+    this.name = "InvalidValueError";
+  }
+}
+/**
+ *
+ * @returns undefined if no selection is made, the selected Value, or an InvalidValueError if the selection is invalid.
+ */
 export function fallbackSelect<Value>(
   opt: SelectOptions<Value>
-): symbol | Value {
+): InvalidValueError | undefined | Value {
+  // Validate initialValue
+  const foundInitalOption = opt.initialValue
+    ? opt.options.find(({ value }) => value === opt.initialValue)
+    : null;
+
+  if (!foundInitalOption && opt.initialValue !== undefined) {
+    throw new Error("Initial value does not match any option values.");
+  }
+
   // 1. Header with bolding
   console.log(`\n${S.question} ${chalk.bold(opt.message)}`);
 
@@ -215,14 +234,6 @@ export function fallbackSelect<Value>(
 
   console.log(chalk.dim(`  (Enter the number of your choice)`));
 
-  const foundInitalOption = opt.initialValue
-    ? opt.options.find(({ value }) => value === opt.initialValue)
-    : null;
-
-  if (!foundInitalOption && opt.initialValue !== undefined) {
-    throw new Error("Initial value does not match any option values.");
-  }
-
   const res = prompt(
     ` ${S.pointer} `,
     opt.initialValue
@@ -232,9 +243,21 @@ export function fallbackSelect<Value>(
       : S.question
   );
 
+  if (!res) return opt.initialValue ?? undefined;
+  if (
+    isNaN(parseInt(res)) ||
+    parseInt(res) < 1 ||
+    parseInt(res) > opt.options.length
+  ) {
+    console.clear();
+    console.log(`  ${S.error} ${chalk.red.italic("Invalid selection.")}`);
+    return fallbackSelect(opt);
+  }
+
   return res === undefined
-    ? opt.initialValue ?? Symbol("no-selection")
-    : opt.options[Number(res) - 1]?.value ?? Symbol("no-selection");
+    ? opt.initialValue ?? undefined
+    : opt.options[Number(res) - 1]?.value ??
+        new InvalidValueError("Invalid selection");
 }
 
 export const { text, select } = { text: fallbackText, select: fallbackSelect };
