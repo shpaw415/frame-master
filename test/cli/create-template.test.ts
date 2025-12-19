@@ -110,6 +110,7 @@ describe("Create Project from Template", () => {
 
     // Verify directory creation (it should exist because we are not mocking fs.mkdirSync completely, just letting it run in temp dir)
     expect(existsSync(projectPath)).toBe(true);
+    expect(existsSync(join(projectPath, "index.ts"))).toBe(true);
   });
 
   test("should handle template not found", async () => {
