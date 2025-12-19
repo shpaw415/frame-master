@@ -1,12 +1,11 @@
 {
   "name": "frame-master",
   "type": "module",
-  "version": "3.1.0",
+  "version": "3.1.1",
   "baseUrl": ".",
   "license": "MIT",
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/prompts": "^2.4.9",
     "@types/react-dom": "^19.2.2"
   },
   "peerDependencies": {
@@ -17,9 +16,10 @@
   },
   "dependencies": {
     "@shpaw415/webtoken": "^2.0.0",
+    "@types/git": "^0.0.21",
     "chalk": "^5.6.2",
     "commander": "^14.0.2",
-    "prompts": "^2.4.2",
+    "git": "^0.1.5",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "tar": "^7.5.2"
@@ -40,7 +40,9 @@
     "build:tool:test": "bun build bin/testing/src/frontend.tsx --outfile=bin/testing/src/frontend.js",
     "frame-master": "bun run bin/index.ts",
     "typecheck": "tsc --noEmit",
-    "test": "bun test"
+    "test": "bun test",
+    "dev": "NODE_ENV=development bun --hot frame-master dev",
+    "start": "NODE_ENV=production bun frame-master start"
   },
   "exports": {
     "./runtime": "./src/server/runtime-loader.ts",

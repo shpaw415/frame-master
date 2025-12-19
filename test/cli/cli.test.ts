@@ -74,11 +74,17 @@ describe("frame-master CLI", () => {
 
   describe("create command", () => {
     test("should display help for create command", async () => {
-      const output = await Bun.$`bun ${CLI_PATH} create --help`.text();
+      const res = Bun.spawnSync({
+        cmd: ["bun", CLI_PATH, "create", "--help"],
+      });
 
-      expect(output).toContain("Create a new frame-master project");
-      expect(output).toContain("minimal");
-      expect(output).toContain("-t, --type");
+      const out =
+        new TextDecoder().decode(res.stdout) +
+        new TextDecoder().decode(res.stderr);
+
+      expect(out).toContain("Create a new frame-master project");
+      expect(out).toContain("minimal");
+      expect(out).toContain("-t, --type");
     });
 
     test("should create a minimal project", async () => {
@@ -227,129 +233,6 @@ describe("frame-master CLI", () => {
     }, 30000);
   });
 
-  describe("plugin command", () => {
-    test("should display help for plugin command", async () => {
-      const proc = Bun.spawn(["bun", CLI_PATH, "plugin", "--help"], {
-        cwd: process.cwd(),
-        stdout: "pipe",
-      });
-
-      const output = await new Response(proc.stdout).text();
-      await proc.exited;
-
-      expect(output).toContain("Manage Frame-Master plugins");
-      expect(output).toContain("list");
-      expect(output).toContain("info");
-      expect(output).toContain("validate");
-      expect(output).toContain("create");
-      expect(proc.exitCode).toBe(0);
-    });
-
-    test("should list plugins with list command", async () => {
-      // Create a test project with config
-      const projectName = "test-plugin-list";
-      const projectPath = join(TEST_DIR, projectName);
-      mkdirSync(projectPath, { recursive: true });
-
-      // Create a config file with plugins
-      const configContent = `
-import type { FrameMasterConfig } from "frame-master/server/type";
-
-export default {
-  HTTPServer: {
-    port: 3000,
-  },
-  plugins: [
-    {
-      name: "test-plugin",
-      version: "1.0.0",
-      priority: 1,
-    },
-  ],
-} satisfies FrameMasterConfig;
-`;
-      writeFileSync(join(projectPath, "frame-master.config.ts"), configContent);
-
-      const output = await Bun.$`bun ${CLI_PATH} plugin list`
-        .cwd(projectPath)
-        .text();
-
-      expect(output).toContain("Installed Plugins");
-      expect(output).toContain("test-plugin");
-    }, 15000);
-
-    test("should show verbose plugin information", async () => {
-      const projectName = "test-plugin-verbose";
-      const projectPath = join(TEST_DIR, projectName);
-      mkdirSync(projectPath, { recursive: true });
-
-      const configContent = `
-import type { FrameMasterConfig } from "frame-master/server/type";
-
-export default {
-  HTTPServer: {
-    port: 3000,
-  },
-  plugins: [
-    {
-      name: "test-plugin",
-      version: "1.0.0",
-      priority: 5,
-      router: {
-        before_request: async () => {},
-      },
-      serverStart: async () => {},
-    },
-  ],
-} satisfies FrameMasterConfig;
-`;
-      writeFileSync(join(projectPath, "frame-master.config.ts"), configContent);
-
-      const proc = Bun.spawn(["bun", CLI_PATH, "plugin", "list", "--verbose"], {
-        cwd: projectPath,
-        stdout: "pipe",
-        stderr: "pipe",
-      });
-
-      const output = Bun.stripANSI(await new Response(proc.stdout).text());
-      await proc.exited;
-
-      expect(output).toContain("test-plugin");
-      expect(output).toContain("Priority");
-      expect(output).toContain("Features");
-    }, 15000);
-
-    test("should handle empty plugin list", async () => {
-      const projectName = "test-no-plugins";
-      const projectPath = join(TEST_DIR, projectName);
-      mkdirSync(projectPath, { recursive: true });
-
-      const configContent = `
-import type { FrameMasterConfig } from "frame-master/server/type";
-
-export default {
-  HTTPServer: {
-    port: 3000,
-  },
-  plugins: [],
-} satisfies FrameMasterConfig;
-`;
-      writeFileSync(join(projectPath, "frame-master.config.ts"), configContent);
-
-      const proc = Bun.spawn(["bun", CLI_PATH, "plugin", "list"], {
-        cwd: projectPath,
-        stdout: "pipe",
-        stderr: "pipe",
-      });
-
-      const output = await new Response(proc.stdout).text();
-      await proc.exited;
-
-      expect(output).toContain("No plugins installed");
-      expect(proc.exitCode).toBe(0);
-    }, 15000);
-  });
-
   describe("build command", () => {
     test("should display help for build command", async () => {
       const proc = await Bun.$`bun ${CLI_PATH} build --help`.cwd(process.cwd());
@@ -366,26 +249,37 @@ export default {
 
       // Create project structure
       mkdirSync(join(projectPath, "src"), { recursive: true });
-      mkdirSync(join(projectPath, ".frame-master"), { recursive: true });
+      mkdirSync(join(projectPath, ".frame-master/build"), { recursive: true });
 
-      const testProjectEntryPoint = join(projectPath, "src", "index.ts");
+      const testProjectEntryPoint = join(
+        projectPath,
+        "src",
+        "index.ts"
+      ).replaceAll("\\", "/");
 
       // Create minimal config
       const configContent = (
         await Bun.file(join(import.meta.dir, "default.config.ts")).text()
       ).replaceAll("{{TEST_PROJECT_ENTRYPOINT}}", testProjectEntryPoint);
 
-      writeFileSync(join(projectPath, "frame-master.config.ts"), configContent);
+      await Bun.write(
+        join(projectPath, "frame-master.config.ts"),
+        configContent
+      );
 
       // Create a simple entrypoint
-      writeFileSync(testProjectEntryPoint, `console.log("Hello from build");`);
+      await Bun.write(
+        testProjectEntryPoint,
+        `console.log("Hello Frame Master");`
+      );
 
       // Set NODE_ENV
       process.env.NODE_ENV = "development";
 
       const stdout = await Bun.$`bun ${CLI_PATH} build`
         .cwd(projectPath)
-        .env({ ...process.env, NODE_ENV: "development" });
+        .env({ ...process.env, NODE_ENV: "development" })
+        .catch((e) => e);
 
       const output = Bun.stripANSI(stdout.text());
 

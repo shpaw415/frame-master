@@ -2,13 +2,14 @@ import { mkdirSync, existsSync, rmdirSync } from "fs";
 import { join } from "path";
 import { x } from "tar";
 import { Readable } from "stream";
-import { onVerbose } from "../share";
-import prompts from "prompts";
+import { onVerbose, text, select, InvalidValueError } from "../share";
+import { platform, tmpdir } from "os";
 
 export type CreateProjectProps = {
   name?: string;
   type?: "minimal" | "template";
   template?: string;
+  skipInit?: boolean;
 };
 
 type GithubReleaseType = {
@@ -75,17 +76,20 @@ function fetchReleases(usernameAndRepo: string) {
 }
 
 export default async function CreateProject(props: CreateProjectProps) {
-  let { name, type, template } = props;
+  let { name, type, template, skipInit = false } = props;
 
   if (!name) {
-    const response = await prompts({
-      type: "text",
-      name: "name",
+    const response = text({
       message: "What is the name of your project?",
-      validate: (value: string) =>
-        value.length > 0 ? true : "Project name is required",
+      validate: (value) =>
+        value && value.length > 0
+          ? undefined
+          : new Error("Project name is required"),
     });
-    name = response.name;
+    if (typeof response !== "string") {
+      throw new Error("Invalid project name input");
+    }
+    name = response;
   }
 
   if (!name) {
@@ -95,42 +99,56 @@ export default async function CreateProject(props: CreateProjectProps) {
 
   if (template) type = "template";
 
-  type =
+  const selectType =
     type ??
-    ((
-      await prompts({
-        type: "select",
-        name: "type",
-        message: "Select a project type",
-        choices: [
-          { title: "Minimal (Empty Project)", value: "minimal" },
-          { title: "Template (From Community)", value: "template" },
-        ],
-      })
-    ).type as CreateProjectProps["type"]);
+    select({
+      message: "Select a project type",
 
-  if (type === "template" && !template) {
-    const templateResponse = await prompts({
-      type: "text",
-      name: "template",
-      message: "Enter template name (e.g. cloudflare-react-tailwind)",
-      validate: (value: string) =>
-        value.length > 0 ? true : "Template name is required",
+      options: [
+        { label: "Minimal", value: "minimal", hint: "Empty Project" },
+        {
+          label: "Template",
+          value: "template",
+          hint: "From Community Templates",
+        },
+      ],
     });
-    template = templateResponse.template;
+
+  if (selectType instanceof InvalidValueError) {
+    throw selectType;
+  } else if (typeof selectType === "undefined") {
+    throw new Error("Project type selection is required");
+  } else {
+    type = selectType;
+  }
+  if (type === "template" && !template) {
+    const templateResponse = text({
+      message: "Enter template name (e.g. cloudflare-react-tailwind)",
+      validate: (value) =>
+        value && value.length > 0
+          ? undefined
+          : new Error("Template name is required"),
+    });
+    template = templateResponse.toString();
   }
 
   if (template && type === "template") {
-    return await createFromTemplate({ name, type, template });
+    return await createFromTemplate({
+      name,
+      type,
+      template,
+      skipInit,
+    });
   }
-
   const cwd = join(process.cwd(), name);
   mkdirSync(cwd, {
     recursive: true,
   });
-  await Bun.$`bun init --yes`.cwd(cwd);
-  await Bun.$`bun add frame-master`.cwd(cwd);
-  await Bun.$`bun frame-master init`.cwd(cwd);
+  if (!skipInit) {
+    Bun.spawnSync({ cwd, cmd: ["bun", "init", "--yes"] });
+    Bun.spawnSync({ cwd, cmd: ["bun", "add", "frame-master"] });
+    Bun.spawnSync({ cwd, cmd: ["bun", "frame-master", "init"] });
+  }
   if (type == "minimal")
     return console.log(
       [
@@ -256,25 +274,44 @@ async function createFromTemplate(props: Required<CreateProjectProps>) {
       );
     }
 
-    const nodeStream = Readable.fromWeb(response.body as any);
+    const system = platform();
 
-    await new Promise((resolve, reject) => {
-      nodeStream
-        .pipe(
-          x({
-            C: cwd,
-            strip: 1,
-          })
-        )
-        .on("finish", resolve)
-        .on("error", reject);
-    });
-
-    onVerbose(() => console.log("Installing dependencies..."));
-    await Bun.$`bun install`.cwd(cwd);
-
-    onVerbose(() => console.log("Initializing Frame Master..."));
-    await Bun.$`bun frame-master init`.cwd(cwd);
+    if (system === "win32") {
+      if (!Bun.which("tar")) {
+        throw new Error(
+          "`tar` command not found. Please install tar to proceed."
+        );
+      }
+      const fileName = `template-${Date.now()}.tar.gz`;
+      const tmpFilePath = join(tmpdir(), fileName);
+      await Bun.write(tmpFilePath, await response.arrayBuffer());
+      const extract = Bun.spawnSync({
+        cmd: ["tar", "-xf", tmpFilePath, "--strip-components=1", "-C", name],
+        stderr: "inherit",
+        stdout: "ignore",
+      });
+      if (extract.exitCode !== 0) {
+        throw new Error("Failed to extract template archive using tar.");
+      }
+      await Bun.file(tmpFilePath).delete();
+    } else {
+      const nodeStream = Readable.fromWeb(response.body as any);
+      await new Promise((resolve, reject) => {
+        nodeStream
+          .pipe(
+            x({
+              C: cwd,
+              strip: 1,
+              p: false,
+            })
+          )
+          .on("finish", resolve)
+          .on("error", reject);
+      });
+    }
+    if (!props.skipInit) {
+      Bun.spawnSync({ cwd, cmd: ["bun", "install"] });
+    }
 
     console.log(
       [

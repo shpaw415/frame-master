@@ -98,10 +98,12 @@ program
   .description("Create a new frame-master project")
   .option("-t, --type <type>", "Type of project to create")
   .option("--template <template>", "Template to use (e.g. name@version)")
+  .option("--skipInit", "Skip installing dependencies")
   .addHelpText("after", `\n  avalable type: [ minimal ]`)
   .action(async (name: string | undefined, options: CreateProjectProps) => {
     const createProject = (await import("./create")).default;
     await createProject({ name, ...options });
+    process.exit(0);
   });
 
 program.addCommand(pluginCommand);

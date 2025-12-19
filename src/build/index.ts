@@ -1,11 +1,13 @@
-import { mkdirSync, rmSync } from "fs";
+import { existsSync, mkdirSync, rmSync } from "fs";
 import type { BuildOptionsPlugin } from "../plugins/types";
-import { pluginLoader } from "../plugins";
-import { pluginRegex } from "../utils";
+import { PluginLoader, pluginLoader } from "../plugins";
+import { onVerbose, pluginRegex, verboseLog, isVerbose } from "../utils";
 import chalk from "chalk";
 import { join } from "path";
 import { chainPlugins } from "../plugins/plugin-chaining";
 import { getConfig } from "../server/config";
+import type { FrameMasterConfig } from "frame-master/server/type";
+import { cwd } from "process";
 
 type RequiredBuilOptions = Required<BuildOptionsPlugin>;
 
@@ -26,6 +28,8 @@ export type BuilderProps = {
    */
   baseEntrypoints?: string[];
 };
+
+const DEFAULT_BUILD_DIR = ".frame-master/build";
 
 export class Builder {
   private buildConfigFactory: BuilderProps["pluginBuildConfig"];
@@ -68,6 +72,18 @@ export class Builder {
 
     this.onBeforeBuildHooks = props.beforeBuilds || [];
     this.onAfterBuildHooks = props.afterBuilds || [];
+
+    if (!existsSync(join(cwd(), DEFAULT_BUILD_DIR))) {
+      mkdirSync(join(cwd(), DEFAULT_BUILD_DIR), { recursive: true });
+    }
+    if (
+      this.staticBuildConfig.outdir !== undefined &&
+      !existsSync(join(cwd(), this.staticBuildConfig.outdir))
+    ) {
+      mkdirSync(join(cwd(), this.staticBuildConfig.outdir), {
+        recursive: true,
+      });
+    }
   }
 
   /**
@@ -156,13 +172,13 @@ export class Builder {
     });
     const startTime = performance.now();
     this.clearBuildDir();
+
     const buildConfig = await this.getBuildConfig();
     buildConfig.entrypoints = [
       ...this.baseEntrypoints,
       ...buildConfig.entrypoints,
       ...entrypoints,
     ];
-    if (!buildConfig.outdir) buildConfig.outdir = ".frame-master/build";
 
     this.log("🔨 Building with merged configuration:", {
       entrypoints: buildConfig.entrypoints?.length || 0,
@@ -229,7 +245,19 @@ export class Builder {
       })
     ).filter((filePath) => !filesInResult.includes(filePath));
 
-    await Promise.all(fileToRemove.map((output) => Bun.file(output).delete()));
+    await Promise.all(
+      fileToRemove.map((output) => {
+        try {
+          Bun.file(output).delete();
+        } catch (e) {
+          onVerbose(() =>
+            console.warn(
+              chalk.yellow(`⚠️  Failed to delete file: \`${output}\``)
+            )
+          );
+        }
+      })
+    );
   }
 
   /**
@@ -703,7 +731,7 @@ export class Builder {
           (prev, next) => this.mergeConfigSafely(prev as Bun.BuildConfig, next),
           {
             entrypoints: [],
-            outdir: "",
+            outdir: DEFAULT_BUILD_DIR,
             splitting: true,
             throw: false,
             minify: process.env.NODE_ENV === "production",
@@ -723,8 +751,15 @@ export class Builder {
           this.staticBuildConfig
         );
         this.currentBuildConfig = mergedConfig as Bun.BuildConfig;
-        return mergedConfig;
-      }) as Promise<Bun.BuildConfig>;
+        return mergedConfig as Promise<Bun.BuildConfig>;
+      })
+      .then(
+        (res) =>
+          ({
+            ...res,
+            outdir: res.outdir || DEFAULT_BUILD_DIR,
+          } as Bun.BuildConfig)
+      );
   }
 
   /**
@@ -867,25 +902,26 @@ export class Builder {
     return result;
   }
 
+  private getAbsBuildDir(): string | null {
+    const buildDir = this.currentBuildConfig?.outdir ?? DEFAULT_BUILD_DIR;
+
+    const res = buildDir.startsWith("/")
+      ? buildDir
+      : join(process.cwd(), buildDir);
+    return res;
+  }
+
   /**
    * @internal
    * Clears and recreates the build output directory.
    * Called automatically by the build method.
    */
   private clearBuildDir() {
-    const buildDir = this.currentBuildConfig?.outdir;
-    if (!buildDir)
-      return this.log("No build directory specified, skipping clear.");
-    try {
-      rmSync(buildDir, { recursive: true, force: true });
-    } catch (e) {
-      this.error(e);
-    }
-    try {
-      mkdirSync(buildDir, { recursive: true });
-    } catch (e) {
-      this.error(e);
-    }
+    const absoluteBuildDir = this.getAbsBuildDir();
+    if (!absoluteBuildDir) throw new Error("Build directory not configured.");
+
+    rmSync(absoluteBuildDir, { recursive: true, force: true });
+    mkdirSync(absoluteBuildDir, { recursive: true });
   }
 
   /**
@@ -910,15 +946,6 @@ export class Builder {
   private log(...data: any[]) {
     if (!this.isLogEnabled) return;
     console.log("[Frame-Master-plugin-react-ssr Builder]:", ...data);
-  }
-
-  /**
-   * @internal
-   * Logs errors when logging is enabled.
-   */
-  private error(...data: any[]) {
-    if (!this.isLogEnabled) return;
-    console.error("[Frame-Master-plugin-react-ssr Builder]:", ...data);
   }
 }
 /**
@@ -966,13 +993,11 @@ export class Builder {
 export let builder: Builder | null = null;
 export default Builder;
 
-export async function InitBuilder() {
-  if (builder) return;
-  if (!pluginLoader) {
-    throw new Error("Plugin loader not initialized. Cannot create builder.");
-  }
-  const config = getConfig();
-  const plugin = pluginLoader.getPluginByName("build");
+export async function createBuilder(
+  _config: FrameMasterConfig,
+  _pluginLoader: PluginLoader
+) {
+  const plugin = _pluginLoader.getPluginByName("build");
   const configFactories = plugin
     .map((plugin) => plugin.pluginParent.buildConfig)
     .filter((p) => p != undefined);
@@ -990,14 +1015,45 @@ export async function InitBuilder() {
   >;
   const logIsEnabled = plugin.some((p) => p.pluginParent.enableLoging === true);
 
-  builder = await Builder.createBuilder({
+  return await Builder.createBuilder({
     pluginBuildConfig: configFactories,
     beforeBuilds: beforeBuildHooks,
     afterBuilds: afterBuildHooks,
     enableLogging: logIsEnabled,
-    disableOnLoadChaining: config?.pluginsOptions?.disableOnLoadChaining,
-    baseEntrypoints: config?.pluginsOptions?.entrypoints,
+    disableOnLoadChaining: _config?.pluginsOptions?.disableOnLoadChaining,
+    baseEntrypoints: _config?.pluginsOptions?.entrypoints,
   });
+}
+
+export async function InitBuilder(
+  loaders?:
+    | {
+        config: FrameMasterConfig;
+        pluginLoader: PluginLoader;
+        builder?: undefined;
+      }
+    | { builder: Builder; config?: undefined; pluginLoader?: undefined }
+) {
+  if (loaders?.builder) {
+    builder = loaders.builder;
+    return;
+  } else if (builder) return;
+
+  const config = loaders?.config ?? getConfig();
+
+  if (!config) {
+    throw new Error(
+      "Frame-Master configuration not initialized. cannot create builder."
+    );
+  }
+
+  const _pluginLoader = loaders?.pluginLoader ?? pluginLoader;
+
+  if (!_pluginLoader) {
+    throw new Error("Plugin loader not initialized. Cannot create builder.");
+  }
+
+  builder = await createBuilder(config, _pluginLoader);
 }
 
 export function getBuilder() {

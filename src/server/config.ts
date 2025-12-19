@@ -10,8 +10,8 @@ export const DEFAULT_CONFIG = {
 } satisfies FrameMasterConfig;
 
 export class ConfigFileNotFound extends Error {
-  constructor(errorOptions?: ErrorOptions) {
-    super("frame-master.config.ts file not found.", errorOptions);
+  constructor(filePath: string, errorOptions?: ErrorOptions) {
+    super(`Config file not found: ${filePath}`, errorOptions);
     this.name = "ConfigFileNotFound";
   }
 }
@@ -44,12 +44,19 @@ class ConfigManager {
    * @returns Promise resolving to the loaded configuration
    * @internal - Called by Frame-Master during initialization
    */
-  async initConfig(withSuffix?: string): Promise<FrameMasterConfig> {
+  async initConfig(
+    withSuffix?: string,
+    config?: FrameMasterConfig
+  ): Promise<FrameMasterConfig> {
+    if (config) {
+      this.mergedConfig = config;
+      return this.mergedConfig;
+    }
     if (this.mergedConfig != null) return this.mergedConfig;
     const realFilePath = join(process.cwd(), Paths.configFile);
     const filePath = realFilePath + (withSuffix ?? "");
     if (!(await Bun.file(realFilePath).exists()))
-      throw new ConfigFileNotFound();
+      throw new ConfigFileNotFound(realFilePath);
     try {
       const configModule = await import(filePath);
       const config = configModule?.default as FrameMasterConfig | undefined;
@@ -112,8 +119,10 @@ export const configManager = new ConfigManager();
  * const config = await loadConfig();
  * ```
  */
-export async function InitConfig(): Promise<FrameMasterConfig> {
-  return configManager.initConfig();
+export async function InitConfig(
+  config?: FrameMasterConfig
+): Promise<FrameMasterConfig> {
+  return configManager.initConfig(undefined, config);
 }
 
 /**
@@ -173,4 +182,5 @@ export function getConfig(): FrameMasterConfig | null {
 /** Override Config for testing perpose or something else */
 export function setMockConfig(mockConfig: FrameMasterConfig) {
   configManager.setMockConfig(mockConfig);
+  return mockConfig;
 }

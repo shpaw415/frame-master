@@ -2,46 +2,34 @@ import {
   describe,
   test,
   expect,
-  spyOn,
   mock,
   beforeAll,
   afterAll,
+  afterEach,
 } from "bun:test";
-import { join } from "path";
+import { join, normalize } from "path";
 import { tmpdir } from "os";
 import { existsSync, mkdirSync, rmSync } from "fs";
-
-// Mock dependencies before importing the module
-mock.module("tar", () => ({
-  x: () => {
-    const pass = new (require("stream").PassThrough)();
-    // Trigger finish on next tick to resolve the extraction promise
-    process.nextTick(() => pass.end());
-    return pass;
-  },
-}));
-
-// Mock Bun.$
-const originalBunShell = Bun.$;
-// @ts-ignore
-Bun.$ = () =>
-  ({
-    cwd: () => Promise.resolve() as any,
-  } as any);
+import { c } from "tar";
 
 const TEST_DIR = join(tmpdir(), `frame-master-template-test-${Date.now()}`);
-
+let tarFilePath: string;
 beforeAll(() => {
   mkdirSync(TEST_DIR, { recursive: true });
 });
 
 afterAll(() => {
-  // Restore Bun.$
-  // @ts-ignore
-  Bun.$ = originalBunShell;
   if (existsSync(TEST_DIR)) {
     rmSync(TEST_DIR, { recursive: true, force: true });
   }
+});
+
+afterEach(() => {
+  Bun.file(tarFilePath)
+    .delete()
+    .catch(() => {
+      console.log("No temp tar file to delete");
+    });
 });
 
 describe("Create Project from Template", () => {
@@ -80,7 +68,12 @@ describe("Create Project from Template", () => {
 
       // Mock Tarball Download
       if (urlStr === "https://example.com/template.tar.gz") {
-        return new Response("fake-tarball-content", { status: 200 });
+        tarFilePath = join(tmpdir(), `template-${Date.now()}.tar.gz`);
+        const tarFile = await c(
+          { gzip: true, file: tarFilePath, cwd: __dirname },
+          ["mock-template-dir"]
+        ).then(() => Bun.file(tarFilePath));
+        return new Response(tarFile, { status: 200 });
       }
 
       return new Response("Not Found", { status: 404 });
@@ -88,7 +81,7 @@ describe("Create Project from Template", () => {
     global.fetch = mockFetch as any;
 
     // Import the module dynamically to ensure mocks are applied
-    const CreateProject = (await import("../../bin/create/index")).default;
+    const CreateProject = (await import("../../bin/create")).default;
 
     // Run the function
     // We need to change cwd temporarily or pass absolute path
@@ -100,7 +93,7 @@ describe("Create Project from Template", () => {
     try {
       await CreateProject({
         name: projectName,
-        type: "minimal",
+        type: "template",
         template: templateName,
       });
     } finally {
@@ -118,6 +111,7 @@ describe("Create Project from Template", () => {
 
     // Verify directory creation (it should exist because we are not mocking fs.mkdirSync completely, just letting it run in temp dir)
     expect(existsSync(projectPath)).toBe(true);
+    expect(await Bun.file(join(projectPath, "index.ts")).exists()).toBe(true);
   });
 
   test("should handle template not found", async () => {

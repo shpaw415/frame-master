@@ -3,41 +3,18 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { existsSync, mkdirSync, rmSync } from "fs";
 
-// Mock prompts
-mock.module("prompts", () => {
-  return {
-    default: async (questions: any) => {
-      if (questions.name === "name") {
-        return { name: "interactive-project" };
-      }
-      if (questions.name === "type") {
-        return { type: "minimal" };
-      }
-      return {};
-    },
-  };
-});
-
-// Mock Bun.$
-const originalBunShell = Bun.$;
-// @ts-ignore
-Bun.$ = () =>
-  ({
-    cwd: () => Promise.resolve() as any,
-  } as any);
-
 const TEST_DIR = join(tmpdir(), `frame-master-interactive-test-${Date.now()}`);
+const FRAME_MASTER_CLI_PATH = join(__dirname, "../../bin/index.ts");
 
 beforeAll(() => {
   mkdirSync(TEST_DIR, { recursive: true });
 });
 
 afterAll(() => {
-  // Restore Bun.$
-  // @ts-ignore
-  Bun.$ = originalBunShell;
   if (existsSync(TEST_DIR)) {
-    rmSync(TEST_DIR, { recursive: true, force: true });
+    try {
+      rmSync(TEST_DIR, { recursive: true, force: true });
+    } catch (e) {}
   }
 });
 
@@ -46,19 +23,35 @@ describe("Create Project Interactive", () => {
     const projectName = "interactive-project";
     const projectPath = join(TEST_DIR, projectName);
 
-    // Import the module dynamically to ensure mocks are applied
-    const CreateProject = (await import("../../bin/create/index")).default;
+    const proc = Bun.spawn({
+      cmd: [
+        "bun",
+        FRAME_MASTER_CLI_PATH,
+        "create",
+        "--type",
+        "minimal",
+        "--skipInit",
+      ],
+      cwd: TEST_DIR,
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "inherit",
+    });
 
-    const originalCwd = process.cwd();
-    process.chdir(TEST_DIR);
+    // Simulate user input
+    const inputs = `${projectName}\n`;
 
-    try {
-      // Call with empty name to trigger prompts
-      // @ts-ignore
-      await CreateProject({ type: "minimal" });
-    } finally {
-      process.chdir(originalCwd);
-    }
+    await Bun.sleep(1000); // Wait a moment for the process to be ready
+
+    proc.stdin.write(inputs);
+
+    await proc.exited;
+
+    const out = Bun.stripANSI(await new Response(proc.stdout).text());
+
+    expect(out).toContain(
+      `Successfully created minimal Frame Master project: interactive-project`
+    );
 
     // Verify directory creation (it should exist because we are not mocking fs.mkdirSync completely)
     expect(existsSync(projectPath)).toBe(true);

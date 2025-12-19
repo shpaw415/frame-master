@@ -393,6 +393,7 @@ Advanced Query Syntax:
             options.full || options.include === "longDescription"
           );
         }
+        process.exit(0);
       } catch (error) {
         console.error(
           chalk.red("❌ Search failed:"),

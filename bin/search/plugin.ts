@@ -397,6 +397,7 @@ pluginSearchCommand
         );
         process.exit(1);
       }
+      process.exit(0);
     }
   );
 export default pluginSearchCommand;
