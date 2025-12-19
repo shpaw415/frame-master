@@ -7,7 +7,7 @@ import {
   afterAll,
   afterEach,
 } from "bun:test";
-import { join } from "path";
+import { join, normalize } from "path";
 import { tmpdir } from "os";
 import { existsSync, mkdirSync, rmSync } from "fs";
 import { c } from "tar";
@@ -69,9 +69,10 @@ describe("Create Project from Template", () => {
       // Mock Tarball Download
       if (urlStr === "https://example.com/template.tar.gz") {
         tarFilePath = join(tmpdir(), `template-${Date.now()}.tar.gz`);
-        const tarFile = await c({ gzip: true, file: tarFilePath }, [
-          join(__dirname, "mock-template-dir"),
-        ]).then(() => Bun.file(tarFilePath));
+        const tarFile = await c(
+          { gzip: true, file: tarFilePath, cwd: __dirname },
+          ["mock-template-dir"]
+        ).then(() => Bun.file(tarFilePath));
         return new Response(tarFile, { status: 200 });
       }
 
@@ -110,7 +111,7 @@ describe("Create Project from Template", () => {
 
     // Verify directory creation (it should exist because we are not mocking fs.mkdirSync completely, just letting it run in temp dir)
     expect(existsSync(projectPath)).toBe(true);
-    expect(existsSync(join(projectPath, "index.ts"))).toBe(true);
+    expect(await Bun.file(join(projectPath, "index.ts")).exists()).toBe(true);
   });
 
   test("should handle template not found", async () => {
