@@ -127,7 +127,12 @@ export default async function CreateProject(props: CreateProjectProps) {
   }
 
   if (template && type === "template") {
-    return await createFromTemplate({ name, type, template, skipInit });
+    return await createFromTemplate({
+      name,
+      type,
+      template,
+      skipInit,
+    });
   }
   const cwd = join(process.cwd(), name);
   mkdirSync(cwd, {
@@ -298,8 +303,9 @@ async function createFromTemplate(props: Required<CreateProjectProps>) {
           .on("error", reject);
       });
     }
-
-    Bun.spawnSync({ cwd, cmd: ["bun", "install"] });
+    if (!props.skipInit) {
+      Bun.spawnSync({ cwd, cmd: ["bun", "install"] });
+    }
 
     console.log(
       [

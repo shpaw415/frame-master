@@ -92,7 +92,7 @@ describe("Create Project from Template", () => {
     try {
       await CreateProject({
         name: projectName,
-        type: "minimal",
+        type: "template",
         template: templateName,
       });
     } finally {
