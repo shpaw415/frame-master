@@ -1,4 +1,4 @@
-import { mkdirSync, existsSync, rmdirSync, renameSync } from "fs";
+import { mkdirSync, existsSync, rmdirSync } from "fs";
 import { join } from "path";
 import { x } from "tar";
 import { Readable } from "stream";

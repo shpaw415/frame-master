@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync } from "fs";
+import { existsSync, mkdirSync, rmSync } from "fs";
 import type { BuildOptionsPlugin } from "../plugins/types";
 import { PluginLoader, pluginLoader } from "../plugins";
 import { onVerbose, pluginRegex, verboseLog, isVerbose } from "../utils";
@@ -7,6 +7,7 @@ import { join } from "path";
 import { chainPlugins } from "../plugins/plugin-chaining";
 import { getConfig } from "../server/config";
 import type { FrameMasterConfig } from "frame-master/server/type";
+import { cwd } from "process";
 
 type RequiredBuilOptions = Required<BuildOptionsPlugin>;
 
@@ -71,6 +72,18 @@ export class Builder {
 
     this.onBeforeBuildHooks = props.beforeBuilds || [];
     this.onAfterBuildHooks = props.afterBuilds || [];
+
+    if (!existsSync(join(cwd(), DEFAULT_BUILD_DIR))) {
+      mkdirSync(join(cwd(), DEFAULT_BUILD_DIR), { recursive: true });
+    }
+    if (
+      this.staticBuildConfig.outdir !== undefined &&
+      !existsSync(join(cwd(), this.staticBuildConfig.outdir))
+    ) {
+      mkdirSync(join(cwd(), this.staticBuildConfig.outdir), {
+        recursive: true,
+      });
+    }
   }
 
   /**
