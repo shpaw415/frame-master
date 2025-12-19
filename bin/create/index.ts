@@ -9,6 +9,7 @@ export type CreateProjectProps = {
   name?: string;
   type?: "minimal" | "template";
   template?: string;
+  skipInit?: boolean;
 };
 
 type GithubReleaseType = {
@@ -75,7 +76,7 @@ function fetchReleases(usernameAndRepo: string) {
 }
 
 export default async function CreateProject(props: CreateProjectProps) {
-  let { name, type, template } = props;
+  let { name, type, template, skipInit = false } = props;
 
   if (!name) {
     const response = text({
@@ -86,7 +87,10 @@ export default async function CreateProject(props: CreateProjectProps) {
           ? undefined
           : new Error("Project name is required"),
     });
-    name = response.toString();
+    if (typeof response !== "string") {
+      throw new Error("Invalid project name input");
+    }
+    name = response;
   }
 
   if (!name) {
@@ -123,15 +127,17 @@ export default async function CreateProject(props: CreateProjectProps) {
   }
 
   if (template && type === "template") {
-    return await createFromTemplate({ name, type, template });
+    return await createFromTemplate({ name, type, template, skipInit });
   }
   const cwd = join(process.cwd(), name);
   mkdirSync(cwd, {
     recursive: true,
   });
-  await Bun.$`bun init --yes`.cwd(cwd);
-  await Bun.$`bun add frame-master`.cwd(cwd);
-  await Bun.$`bun frame-master init`.cwd(cwd);
+  if (!skipInit) {
+    Bun.spawnSync({ cwd, cmd: ["bun", "init", "--yes"] });
+    Bun.spawnSync({ cwd, cmd: ["bun", "add", "frame-master"] });
+    Bun.spawnSync({ cwd, cmd: ["bun", "frame-master", "init"] });
+  }
   if (type == "minimal")
     return console.log(
       [

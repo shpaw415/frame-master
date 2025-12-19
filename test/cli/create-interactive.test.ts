@@ -3,14 +3,6 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { existsSync, mkdirSync, rmSync } from "fs";
 
-// Mock Bun.$
-const originalBunShell = Bun.$;
-// @ts-ignore
-Bun.$ = () =>
-  ({
-    cwd: () => Promise.resolve() as any,
-  } as any);
-
 const TEST_DIR = join(tmpdir(), `frame-master-interactive-test-${Date.now()}`);
 const FRAME_MASTER_CLI_PATH = join(__dirname, "../../bin/index.ts");
 
@@ -19,11 +11,10 @@ beforeAll(() => {
 });
 
 afterAll(() => {
-  // Restore Bun.$
-  // @ts-ignore
-  Bun.$ = originalBunShell;
   if (existsSync(TEST_DIR)) {
-    rmSync(TEST_DIR, { recursive: true, force: true });
+    try {
+      rmSync(TEST_DIR, { recursive: true, force: true });
+    } catch (e) {}
   }
 });
 
@@ -33,19 +24,26 @@ describe("Create Project Interactive", () => {
     const projectPath = join(TEST_DIR, projectName);
 
     const proc = Bun.spawn({
-      cmd: ["bun", FRAME_MASTER_CLI_PATH, "create", "--type", "minimal"],
+      cmd: [
+        "bun",
+        FRAME_MASTER_CLI_PATH,
+        "create",
+        "--type",
+        "minimal",
+        "--skipInit",
+      ],
       cwd: TEST_DIR,
       stdin: "pipe",
       stdout: "pipe",
-      stderr: "pipe",
+      stderr: "inherit",
     });
 
     // Simulate user input
-    const inputs = [`${projectName}\n`];
+    const inputs = `${projectName}\n`;
 
     await Bun.sleep(1000); // Wait a moment for the process to be ready
 
-    proc.stdin.write(inputs.join(""));
+    proc.stdin.write(inputs);
 
     await proc.exited;
 

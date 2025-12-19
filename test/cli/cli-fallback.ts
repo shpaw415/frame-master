@@ -7,9 +7,9 @@ type actionList =
   | "text-validate-throw"
   | "text-validate-retry";
 
-async function onAction(action: actionList, fn: () => any) {
+function onAction(action: actionList, fn: () => any) {
   if (!argv.includes(`--${action}`)) return;
-  await fn();
+  fn();
   process.exit(0);
 }
 
@@ -22,7 +22,7 @@ onAction("text", () => {
   console.log("Result:", result);
 });
 
-onAction("text-validate-throw", async () => {
+onAction("text-validate-throw", () => {
   const res = fallbackText({
     message: "This is a fallback text prompt message with validation.",
     validate: (input) => {
@@ -34,7 +34,7 @@ onAction("text-validate-throw", async () => {
   });
   console.log("Result:", res);
 });
-onAction("text-validate-retry", async () => {
+onAction("text-validate-retry", () => {
   const res = fallbackText({
     message: "This is a fallback text prompt message with validation.",
     validate: (input) => {
@@ -46,8 +46,8 @@ onAction("text-validate-retry", async () => {
   console.log("Result:", res);
 });
 
-onAction("select", async () => {
-  const result = await fallbackSelect({
+onAction("select", () => {
+  const result = fallbackSelect({
     initialValue: "option1",
     maxItems: 5,
     message: "This is a fallback select prompt message.",

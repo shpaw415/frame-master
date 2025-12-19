@@ -74,11 +74,20 @@ describe("frame-master CLI", () => {
 
   describe("create command", () => {
     test("should display help for create command", async () => {
-      const output = await Bun.$`bun ${CLI_PATH} create --help`.text();
+      const res = Bun.spawnSync({
+        cmd: ["bun", CLI_PATH, "create", "--help"],
+      });
 
-      expect(output).toContain("Create a new frame-master project");
-      expect(output).toContain("minimal");
-      expect(output).toContain("-t, --type");
+      const out = (
+        await Promise.all([
+          res.stderr && new Response(res.stderr).text(),
+          new Response(res.stdout).text(),
+        ])
+      ).join(" ");
+
+      expect(out).toContain("Create a new frame-master project");
+      expect(out).toContain("minimal");
+      expect(out).toContain("-t, --type");
     });
 
     test("should create a minimal project", async () => {

@@ -6,11 +6,11 @@ describe("fallbackText function works correctly", () => {
   test("should ask for text input using fallbackText", async () => {
     const proc = Bun.spawn({
       cmd: [...RUN_CLIFALLBACKS_PATH, "--text"],
-      cwd: process.cwd(),
       stdin: "pipe",
       stdout: "pipe",
       stderr: "pipe",
     });
+    await Bun.sleep(1000);
     proc.stdin.write("test-project\n");
     await proc.exited;
     const err = await new Response(proc.stderr).text();
@@ -27,6 +27,7 @@ describe("fallbackText function works correctly", () => {
       stdout: "pipe",
       stderr: "pipe",
     });
+    await Bun.sleep(1000);
     proc.stdin.write("\n");
     await proc.exited;
     const err = await new Response(proc.stderr).text();
@@ -43,6 +44,7 @@ describe("fallbackText function works correctly", () => {
       stdout: "pipe",
       stderr: "pipe",
     });
+    await Bun.sleep(1000);
     proc.stdin.write("abc\n");
     await proc.exited;
     const err = await new Response(proc.stderr).text();
@@ -60,7 +62,10 @@ describe("fallbackText function works correctly", () => {
       stdout: "pipe",
       stderr: "pipe",
     });
-    proc.stdin.write("abc\nvalidInput\n");
+    await Bun.sleep(500);
+    proc.stdin.write("abc\n");
+    await Bun.sleep(500);
+    proc.stdin.write("validInput\n");
     await proc.exited;
     const err = await new Response(proc.stderr).text();
     const out = await new Response(proc.stdout).text();
@@ -81,6 +86,7 @@ describe("fallbackSelect function works correctly", () => {
       stdout: "pipe",
       stderr: "pipe",
     });
+    await Bun.sleep(1000);
     proc.stdin.write("2\n");
     await proc.exited;
     const err = await new Response(proc.stderr).text();
@@ -97,6 +103,7 @@ describe("fallbackSelect function works correctly", () => {
       stdout: "pipe",
       stderr: "pipe",
     });
+    await Bun.sleep(1000);
     proc.stdin.write("\n");
     await proc.exited;
     const err = await new Response(proc.stderr).text();
