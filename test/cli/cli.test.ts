@@ -78,12 +78,9 @@ describe("frame-master CLI", () => {
         cmd: ["bun", CLI_PATH, "create", "--help"],
       });
 
-      const out = (
-        await Promise.all([
-          res.stderr && new Response(res.stderr).text(),
-          new Response(res.stdout).text(),
-        ])
-      ).join(" ");
+      const out =
+        new TextDecoder().decode(res.stdout) +
+        new TextDecoder().decode(res.stderr);
 
       expect(out).toContain("Create a new frame-master project");
       expect(out).toContain("minimal");
