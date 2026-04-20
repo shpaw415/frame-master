@@ -132,7 +132,6 @@ describe("Create Project from Template", () => {
 		const mockExit = mock((code?: number) => {
 			throw new Error(`Process exited with code ${code}`);
 		});
-		// @ts-expect-error
 		process.exit = mockExit;
 
 		const CreateProject = (await import("../../bin/create/index")).default;
