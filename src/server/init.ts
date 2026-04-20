@@ -11,14 +11,14 @@ import { createWatcher } from "./watch";
 let inited = false;
 
 type InitProps = Partial<{
-	loders: Partial<{
+	loaders: Partial<{
 		config: FrameMasterConfig;
 		builder: Builder;
 		pluginLoader: PluginLoader;
 	}>;
 }>;
 
-async function syncRuntimeLoaders(loaders?: InitProps["loders"]) {
+async function syncRuntimeLoaders(loaders?: InitProps["loaders"]) {
 	const fmConfig = await InitConfig(loaders?.config);
 	const activePluginLoader = InitPluginLoader(loaders?.pluginLoader);
 	const activeBuilder = await InitBuilder(
@@ -43,11 +43,11 @@ async function syncRuntimeLoaders(loaders?: InitProps["loders"]) {
  *
  */
 export async function InitAll(bypass?: InitProps) {
-	const runtimeLoaders = await syncRuntimeLoaders(bypass?.loders);
+	const runtimeLoaders = await syncRuntimeLoaders(bypass?.loaders);
 	if (inited) return runtimeLoaders;
-	await runCreateContextHooks(bypass?.loders);
-	await runOnStartMainPlugins(bypass?.loders);
-	await runFileSystemWatcherPlugin(undefined, bypass?.loders);
+	await runCreateContextHooks(bypass?.loaders);
+	await runOnStartMainPlugins(bypass?.loaders);
+	await runFileSystemWatcherPlugin(undefined, bypass?.loaders);
 	await startConfigWatcher();
 	inited = true;
 	return runtimeLoaders;

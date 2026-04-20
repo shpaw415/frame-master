@@ -67,7 +67,7 @@ function deepMergeServerConfig(
 	return result;
 }
 
-function isPlainObject(value: any): boolean {
+function isPlainObject(value: unknown): boolean {
 	return (
 		value !== null &&
 		typeof value === "object" &&
@@ -119,14 +119,14 @@ export function createServer(params?: {
 		{},
 		...serverConfigPlugins
 			.map((p) => p.pluginParent.routes)
-			.filter((r) => r != undefined),
+			.filter((r) => r !== undefined),
 	) as Bun.Serve.Routes<undefined, string>;
 
 	return Bun.serve({
 		development: {
 			chromeDevToolsAutomaticWorkspaceFolders: true,
 		},
-		...(pluginServerConfig as {}),
+		...(pluginServerConfig as Record<string, unknown>),
 		fetch: (request, server) => {
 			const reqManager = new masterRequest({
 				request,
@@ -220,7 +220,7 @@ export default async (params?: {
 	pluginLoader?: PluginLoader;
 	builder?: Builder;
 }) => {
-	const runtimeLoaders = await InitAll({ loders: params });
+	const runtimeLoaders = await InitAll({ loaders: params });
 	verboseLog("[Server] Initialization complete");
 	const config = params?.config ?? runtimeLoaders?.fmConfig ?? getConfig();
 	const resolvedPluginLoader =

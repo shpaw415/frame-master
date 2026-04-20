@@ -94,7 +94,7 @@ export type Request_Plugin = (
 export type AfterRequest_Plugin = (
 	master: masterRequest,
 	//ipc: ClientIPCManager<"cluster" | "main">
-) => Promise<void | Response> | void | Response;
+) => Promise<undefined | Response> | undefined | Response;
 
 export type PreBuildContextDefaultValues = { route: string };
 
