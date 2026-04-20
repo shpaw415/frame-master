@@ -1,3 +1,5 @@
+"server-only";
+
 import { type FSWatcher, watch } from "node:fs";
 import { isAbsolute, join } from "node:path";
 

@@ -89,7 +89,7 @@ function isPlainObject(value: unknown): boolean {
 export function createServer(params?: {
 	config?: FrameMasterConfig;
 	pluginLoader?: PluginLoader;
-	builder: Builder;
+	builder?: Builder;
 }): Bun.Server<unknown> {
 	const effectiveConfig = params?.config ?? getConfig();
 	const _pluginLoader = params?.pluginLoader ?? pluginLoader;

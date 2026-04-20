@@ -1,4 +1,4 @@
-"server only";
+"server-only";
 
 import {
 	type _webToken,
@@ -714,10 +714,12 @@ export class masterRequest<
 			...this.preloadToStringArray(preloadScriptObj),
 			"process={env: __PROCESS_ENV__};",
 		].join(";");
+		// Sanitize the script content to prevent XSS via </script> or Unicode line separators
+		const sanitizedScript = this.sanitizeScriptContent(preloadSriptsStrList);
 		const rewriter = new HTMLRewriter();
 		rewriter.on("head", {
 			element(element) {
-				element.append(`<script>${preloadSriptsStrList}</script>`, {
+				element.append(`<script>${sanitizedScript}</script>`, {
 					html: true,
 				});
 			},
@@ -761,6 +763,16 @@ export class masterRequest<
 			const message = error instanceof Error ? error.message : String(error);
 			throw new FrameMasterError(`Failed to create preload object: ${message}`);
 		}
+	}
+
+	/**
+	 * Sanitizes script content to prevent XSS attacks
+	 */
+	private sanitizeScriptContent(content: string): string {
+		return content
+			.replace(/<\/script>/gi, "<\\/script>")
+			.replace(/\u2028/g, "\\u2028")
+			.replace(/\u2029/g, "\\u2029");
 	}
 
 	/**
