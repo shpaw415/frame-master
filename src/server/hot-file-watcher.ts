@@ -1,5 +1,5 @@
-import { type FSWatcher, watch } from "fs";
-import { isAbsolute, join } from "path";
+import { type FSWatcher, watch } from "node:fs";
+import { isAbsolute, join } from "node:path";
 
 export type HotFileWatcherCallback<T = void> = (
 	filePath: string,

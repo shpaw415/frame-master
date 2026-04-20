@@ -2,10 +2,11 @@
 import type { Server } from "bun";
 import { fileURLToPath, serve } from "bun";
 import { Command } from "commander";
-import { InitBuilder } from "frame-master/build";
+import { type Builder, getBuilder } from "frame-master/build";
 import { getConfig } from "../../src/server/config";
 import { InitAll } from "../../src/server/init";
 import { masterRequest } from "../../src/server/request-manager";
+import type { FrameMasterConfig } from "frame-master/server/type";
 
 export const testCommand = new Command("test");
 
@@ -45,7 +46,7 @@ class TestServer {
 	private history: TestResult[] = [];
 	private server: Server<undefined>;
 	private guiServer: Server<undefined>;
-	private wsClients: Set<any> = new Set();
+	private wsClients: Set<Bun.ServerWebSocket<unknown>> = new Set();
 	private consoleLogs: ConsoleLog[] = [];
 	private originalConsole = {
 		log: console.log,
@@ -98,7 +99,7 @@ class TestServer {
 
 	private interceptConsole() {
 		const createInterceptor = (level: string) => {
-			return (...args: any[]) => {
+			return (...args: unknown[]) => {
 				const timestamp = new Date().toLocaleTimeString();
 				const message = args
 					.map((arg) => {
@@ -181,7 +182,7 @@ class TestServer {
 					// Send current history on connect
 					ws.send(JSON.stringify({ type: "history", data: this.history }));
 				},
-				message: async (ws, message) => {
+				message: async (_ws, message) => {
 					try {
 						const msg = JSON.parse(message as string);
 
@@ -211,13 +212,13 @@ class TestServer {
 		customHeaders?: Record<string, string>,
 	) {
 		if (!pathname.startsWith("/")) {
-			pathname = "/" + pathname;
+			pathname = `/${pathname}`;
 		}
 
 		this.broadcastToGUI({ type: "test_start" });
 
 		const startTime = performance.now();
-		const config = getConfig()!;
+		const config = getConfig() as FrameMasterConfig;
 		const baseUrl = `http://localhost:${config.HTTPServer.port}`;
 
 		try {
@@ -231,7 +232,11 @@ class TestServer {
 				headers: requestHeaders,
 			});
 
-			const master = new masterRequest({ request, server: this.server });
+			const master = new masterRequest({
+				request,
+				server: this.server,
+				builder: getBuilder() as Builder,
+			});
 
 			// Capture states
 			const stateSnapshots: TestResult["states"] = {
@@ -263,7 +268,7 @@ class TestServer {
 
 			const duration = performance.now() - startTime;
 			const bodyPreview =
-				bodyText.length > 2000 ? bodyText.slice(0, 2000) + "..." : bodyText;
+				bodyText.length > 2000 ? `${bodyText.slice(0, 2000)}...` : bodyText;
 
 			const headers: Record<string, string> = {};
 			response.headers.forEach((value, key) => {
@@ -302,9 +307,11 @@ class TestServer {
 		};
 	}
 
-	private broadcastToGUI(message: any) {
+	private broadcastToGUI(message: unknown) {
 		const data = JSON.stringify(message);
-		this.wsClients.forEach((ws) => ws.send(data));
+		this.wsClients.forEach((ws) => {
+			ws.send(data);
+		});
 	}
 }
 
