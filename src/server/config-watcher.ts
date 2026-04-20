@@ -19,7 +19,7 @@ export type ConfigReloadCallback = (
  * 1. Reloads the configuration from disk
  * 2. Reinitializes the plugin loader with the new config
  * 3. Reinitializes the builder with new plugin build configs
- * 4. Reloads the HTTP server with new routes and settings
+ * 4. Reloads the HTTP server with new routes and settings, then reruns serverReady hooks
  * 5. Calls any registered callbacks with the new config
  *
  * @example
@@ -85,7 +85,7 @@ class ConfigWatcher {
       await this.runReloadHooks();
 
       // 3. Reload the HTTP server with new routes and config
-      reloadServer();
+      await reloadServer();
 
       // 4. Notify all registered callbacks
       const newConfig = getConfig();
