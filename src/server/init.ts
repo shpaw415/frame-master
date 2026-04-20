@@ -1,12 +1,12 @@
-import { InitPluginLoader, pluginLoader, reloadPluginLoader } from "../plugins";
-import type { PluginLoader } from "../plugins";
-import { InitConfig, reloadConfig, getConfig } from "./config";
-import { InitBuilder, reloadBuilder, getBuilder } from "../build";
-import type Builder from "../build";
 import cluster from "node:cluster";
-import { createWatcher } from "./watch";
+import type Builder from "../build";
+import { getBuilder, InitBuilder, reloadBuilder } from "../build";
+import type { PluginLoader } from "../plugins";
+import { InitPluginLoader, pluginLoader, reloadPluginLoader } from "../plugins";
+import { getConfig, InitConfig, reloadConfig } from "./config";
 import { startConfigWatcher } from "./config-watcher";
 import type { FrameMasterConfig } from "./type";
+import { createWatcher } from "./watch";
 
 let inited = false;
 
@@ -141,7 +141,7 @@ async function runCreateContextHooks(params?: {
 
 	const createContextPlugins = _pluginLoader.getPluginByName("createContext");
 
-	const errors: Array<{ name: string; error: any }> = [];
+	const errors: Array<{ name: string; error: Error }> = [];
 
 	await Promise.all(
 		createContextPlugins.map(async (plugin) => {
@@ -149,7 +149,7 @@ async function runCreateContextHooks(params?: {
 				await plugin.pluginParent(_config);
 			} catch (error) {
 				console.error(`Error in plugin ${plugin.name} createContext():`, error);
-				errors.push({ name: plugin.name, error });
+				errors.push({ name: plugin.name, error: error as Error });
 			}
 		}),
 	);
@@ -173,7 +173,6 @@ async function runOnStartMainPlugins(params?: {
 	if (!_pluginLoader) throw new Error("Plugin loader not initialized");
 	if (!_config) throw new Error("Config not initialized");
 	if (!cluster.isPrimary) return;
-	if (!_pluginLoader) throw new Error("Plugin loader not initialized");
 	await Promise.all(
 		_pluginLoader.getPluginByName("serverStart").map(async (plugin) => {
 			try {
@@ -181,7 +180,7 @@ async function runOnStartMainPlugins(params?: {
 			} catch (error) {
 				console.error(`Error in plugin ${plugin.name} main():`, error);
 			}
-			if (process.env.NODE_ENV != "production") {
+			if (process.env.NODE_ENV !== "production") {
 				try {
 					await plugin.pluginParent.dev_main?.();
 				} catch (error) {
@@ -236,10 +235,9 @@ async function runFileSystemWatcherPlugin(
 	// Skip if not in dev mode, unless forced (for hot-reload)
 	if (
 		(!globalThis.__DRY_RUN__ && !forceRun) ||
-		process.env.NODE_ENV == "production"
+		process.env.NODE_ENV === "production"
 	)
 		return;
-	if (!_pluginLoader) throw new Error("Plugin loader not initialized");
 
 	// Stop existing watchers before creating new ones
 	cleanupFileSystemWatchers();
@@ -262,9 +260,9 @@ async function runFileSystemWatcherPlugin(
 			createWatcher({
 				path: DirToWatch,
 				callback(event, file, absolutePath) {
-					OnFileSystemChangeCallbacks.forEach((callback) =>
-						callback(event, file, absolutePath),
-					);
+					OnFileSystemChangeCallbacks.forEach((callback) => {
+						callback(event, file, absolutePath);
+					});
 				},
 			}),
 		),

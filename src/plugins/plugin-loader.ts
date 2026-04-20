@@ -1,10 +1,10 @@
 "server only";
 
-import type { FrameMasterPlugin } from "./types";
-import { getConfig } from "../server/config";
-import FrameMasterPackageJson from "../../package.json";
-import { directiveToolSingleton } from "./utils";
 import type { FrameMasterConfig } from "frame-master/server/type";
+import FrameMasterPackageJson from "../../package.json";
+import { getConfig } from "../server/config";
+import type { FrameMasterPlugin } from "./types";
+import { directiveToolSingleton } from "./utils";
 
 export class PluginLoader {
 	protected Plugins: Array<FrameMasterPlugin> = [];
@@ -15,7 +15,7 @@ export class PluginLoader {
 			pluginParent: FrameMasterPlugin[keyof FrameMasterPlugin];
 		}>
 	> = new Map();
-	private sub_plugin_cache: Map<string, Array<any>> = new Map();
+	private sub_plugin_cache: Map<string, Array<unknown>> = new Map();
 
 	constructor(config: FrameMasterConfig) {
 		if (!config) {
@@ -89,7 +89,7 @@ export class PluginLoader {
 		const subPluginArray = from
 			.map((sub) => ({
 				name: sub.name,
-				subPlugin: (sub.pluginParent as any)[name],
+				subPlugin: (sub.pluginParent as never)[name],
 			}))
 			.filter((value) => value.subPlugin !== undefined);
 
@@ -150,7 +150,7 @@ export class PluginLoader {
 					requiredFrameMasterPlugins,
 				) as Array<[string, string]>) {
 					const pluginFounded = installedPlugin.find(
-						({ name }) => name == pluginName,
+						({ name }) => name === pluginName,
 					);
 
 					if (!pluginFounded) {
@@ -194,7 +194,7 @@ export function InitPluginLoader(_pluginLoader?: PluginLoader) {
 		return pluginLoader;
 	}
 	const currentConfig = getConfig();
-	if (!currentConfig && !currentConfig) {
+	if (!currentConfig) {
 		throw new Error(
 			"Frame Master config has not been loaded. Call loadConfig() before InitPluginLoader().",
 		);

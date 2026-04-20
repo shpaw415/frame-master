@@ -5,10 +5,10 @@ import TemplateSearchCommand from "./template";
 export const searchCommand = new Command("search");
 
 searchCommand
-  .description("Search for Frame-Master plugins and templates")
-  .addHelpText(
-    "after",
-    `
+	.description("Search for Frame-Master plugins and templates")
+	.addHelpText(
+		"after",
+		`
 Examples:
   $ frame-master search plugins react
   $ frame-master search plugins "server side rendering"
@@ -24,8 +24,8 @@ Advanced Query Syntax:
   author:value      Filter by author
   npm:value         Filter by npm package name
   category:value    Filter by category
-`
-  );
+`,
+	);
 
 searchCommand.addCommand(PluginSearchCommand);
 searchCommand.addCommand(TemplateSearchCommand);

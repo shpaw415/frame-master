@@ -1,15 +1,15 @@
-import { getConfig } from "./config";
-import { masterRequest } from "./request-manager";
-import masterRoutes from "./frame-master-routes";
-import { logRequest } from "./log";
-import { pluginLoader } from "../plugins";
-import type { PluginLoader } from "../plugins";
-import type { FileSystemWatcher } from "./watch";
-import { InitAll, runServerReadyHooks } from "./init";
-import { verboseLog } from "frame-master/utils";
-import type { FrameMasterConfig } from "./type";
 import type Builder from "frame-master/build";
+import { verboseLog } from "frame-master/utils";
 import { getBuilder } from "../build";
+import type { PluginLoader } from "../plugins";
+import { pluginLoader } from "../plugins";
+import { getConfig } from "./config";
+import masterRoutes from "./frame-master-routes";
+import { InitAll, runServerReadyHooks } from "./init";
+import { logRequest } from "./log";
+import { masterRequest } from "./request-manager";
+import type { FrameMasterConfig } from "./type";
+import type { FileSystemWatcher } from "./watch";
 
 declare global {
 	var __FILESYSTEM_WATCHER__: FileSystemWatcher[];
@@ -179,7 +179,7 @@ export function createServer(params?: {
 export async function reloadServer(): Promise<Bun.Server<unknown>> {
 	// Stop existing server if running
 	if (globalThis.__SERVER_INSTANCE__) {
-		globalThis.__SERVER_INSTANCE__.stop();
+		await globalThis.__SERVER_INSTANCE__.stop();
 		console.log("[Server] Stopped existing server for reload");
 	}
 

@@ -1,8 +1,8 @@
 import { afterEach, expect, test } from "bun:test";
-import serve, { reloadServer } from "../src/server";
-import type { FrameMasterConfig } from "frame-master/server/type";
-import { PluginLoader } from "frame-master/plugins";
 import { createBuilder } from "frame-master/build";
+import { PluginLoader } from "frame-master/plugins";
+import type { FrameMasterConfig } from "frame-master/server/type";
+import serve, { reloadServer } from "../src/server";
 
 let server: Bun.Server<unknown> | undefined;
 

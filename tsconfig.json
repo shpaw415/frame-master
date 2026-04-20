@@ -1,40 +1,40 @@
 {
-  "compilerOptions": {
-    // Environment setup & latest features
-    "lib": ["ESNext", "DOM", "DOM.Iterable"],
-    "target": "ESNext",
-    "module": "Preserve",
-    "moduleDetection": "force",
-    "jsx": "react-jsx",
-    "allowJs": true,
+	"compilerOptions": {
+		// Environment setup & latest features
+		"lib": ["ESNext", "DOM", "DOM.Iterable"],
+		"target": "ESNext",
+		"module": "Preserve",
+		"moduleDetection": "force",
+		"jsx": "react-jsx",
+		"allowJs": true,
 
-    // Bundler mode
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
-    "noEmit": true,
+		// Bundler mode
+		"moduleResolution": "bundler",
+		"allowImportingTsExtensions": true,
+		"verbatimModuleSyntax": true,
+		"noEmit": true,
 
-    // Best practices
-    "strict": true,
-    "skipLibCheck": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": true,
-    "noImplicitOverride": true,
+		// Best practices
+		"strict": true,
+		"skipLibCheck": true,
+		"noFallthroughCasesInSwitch": true,
+		"noUncheckedIndexedAccess": true,
+		"noImplicitOverride": true,
 
-    // Some stricter flags (disabled by default)
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noPropertyAccessFromIndexSignature": false,
-    "paths": {
-      "frame-master/*": ["./src/*"],
-      "frame-master/plugin": ["./src/plugins/index.ts"],
-      "frame-master/plugin/types": ["./src/plugins/types.ts"],
-      "frame-master/plugin/react": ["./src/plugins/react-stack/index.ts"],
-      "frame-master/server": ["./src/server/index.ts"],
-      "frame-master/runtime": ["./src/server/runtime-loader.ts"],
-      "frame-master/server/types": ["./src/server/type.ts"],
-      "frame-master/server/request": ["./src/server/request-manager.ts"]
-    }
-  },
-  "include": ["src", "bin", "config", "test"]
+		// Some stricter flags (disabled by default)
+		"noUnusedLocals": false,
+		"noUnusedParameters": false,
+		"noPropertyAccessFromIndexSignature": false,
+		"paths": {
+			"frame-master/*": ["./src/*"],
+			"frame-master/plugin": ["./src/plugins/index.ts"],
+			"frame-master/plugin/types": ["./src/plugins/types.ts"],
+			"frame-master/plugin/react": ["./src/plugins/react-stack/index.ts"],
+			"frame-master/server": ["./src/server/index.ts"],
+			"frame-master/runtime": ["./src/server/runtime-loader.ts"],
+			"frame-master/server/types": ["./src/server/type.ts"],
+			"frame-master/server/request": ["./src/server/request-manager.ts"]
+		}
+	},
+	"include": ["src", "bin", "config", "test"]
 }

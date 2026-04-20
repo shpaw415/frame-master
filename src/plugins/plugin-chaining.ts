@@ -1,41 +1,41 @@
-import type { BunPlugin, PluginBuilder, OnLoadCallback } from "bun";
-import { isVerbose, verboseLog } from "../utils";
+import type { BunPlugin, OnLoadCallback, PluginBuilder } from "bun";
 import chalk from "chalk";
+import { isVerbose, verboseLog } from "../utils";
 
 type OnLoadArgs = Parameters<OnLoadCallback>[0];
 type OnLoadResult = Awaited<ReturnType<OnLoadCallback>>;
 type OnLoadConstraints = Parameters<PluginBuilder["onLoad"]>[0];
 
 interface RegisteredOnLoad {
-  filter: RegExp;
-  namespace?: string;
-  callback: OnLoadCallback;
-  pluginName: string;
+	filter: RegExp;
+	namespace?: string;
+	callback: OnLoadCallback;
+	pluginName: string;
 }
 
 interface NonOnLoadPlugin {
-  name: string;
-  setup: (build: PluginBuilder) => void;
+	name: string;
+	setup: (build: PluginBuilder) => void;
 }
 
 /**
  * Callback type for finally handlers.
  */
 type FinallyCallback = (args: {
-  contents: string | Uint8Array;
-  path: string;
-  loader: Bun.Loader;
+	contents: string | Uint8Array;
+	path: string;
+	loader: Bun.Loader;
 }) =>
-  | { contents: string | Uint8Array }
-  | Promise<{ contents: string | Uint8Array }>;
+	| { contents: string | Uint8Array }
+	| Promise<{ contents: string | Uint8Array }>;
 
 /**
  * Registered finally handler for a specific loader.
  */
 interface RegisteredFinally {
-  loader: Bun.Loader;
-  callback: FinallyCallback;
-  pluginName: string;
+	loader: Bun.Loader;
+	callback: FinallyCallback;
+	pluginName: string;
 }
 
 /**
@@ -78,655 +78,652 @@ interface RegisteredFinally {
  * ```
  */
 export class PluginProxy {
-  private onLoadHandlers: RegisteredOnLoad[] = [];
-  private nonOnLoadSetups: NonOnLoadPlugin[] = [];
-  private finallyHandlers: RegisteredFinally[] = [];
-  private suffix: string;
-  private formatedSuffix: string;
-
-  constructor(opt: { suffix?: string } = {}) {
-    this.suffix = opt.suffix ?? "";
-    this.formatedSuffix = this.suffix ? `:${this.suffix}` : "";
-  }
-
-  /**
-   * Add a BunPlugin to the proxy. Its onLoad handlers will be collected
-   * for chaining, while other handlers are preserved.
-   */
-  addPlugin(plugin: BunPlugin): void {
-    verboseLog(
-      chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
-      chalk.white("Adding plugin:"),
-      chalk.green(plugin.name)
-    );
-
-    const { onLoadCallbacks, finallyCallbacks, otherSetup } =
-      this.extractPluginSetup(plugin.name, plugin);
-
-    if (onLoadCallbacks.length > 0) {
-      verboseLog(
-        chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
-        chalk.gray("  └─"),
-        chalk.white(
-          `Found ${chalk.yellow(onLoadCallbacks.length)} onLoad handler(s):`
-        ),
-        chalk.magenta(onLoadCallbacks.map((h) => h.filter.source).join(", "))
-      );
-    }
-
-    if (finallyCallbacks.length > 0) {
-      verboseLog(
-        chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
-        chalk.gray("  └─"),
-        chalk.white(
-          `Found ${chalk.yellow(finallyCallbacks.length)} finally handler(s):`
-        ),
-        chalk.magenta(finallyCallbacks.map((h) => h.loader).join(", "))
-      );
-    }
-
-    this.onLoadHandlers.push(...onLoadCallbacks);
-    this.finallyHandlers.push(...finallyCallbacks);
-
-    if (otherSetup) {
-      verboseLog(
-        chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
-        chalk.gray("  └─"),
-        chalk.white("Found other handlers"),
-        chalk.gray("(onResolve, onStart, etc.)")
-      );
-      this.nonOnLoadSetups.push({
-        name: plugin.name,
-        setup: otherSetup,
-      });
-    }
-  }
-
-  /**
-   * Add multiple BunPlugins to the proxy.
-   */
-  addPlugins(plugins: BunPlugin[]): void {
-    for (const plugin of plugins) {
-      this.addPlugin(plugin);
-    }
-  }
-
-  /**
-   * Creates the final proxied BunPlugin that chains all onLoad handlers.
-   */
-  createChainedPlugin(): BunPlugin {
-    const self = this;
-    const stats = this.getStats();
-
-    const Name = `[PluginChaining${this.formatedSuffix}]`;
-
-    verboseLog(chalk.cyan(Name), chalk.white("Creating chained plugin:"));
-    verboseLog(
-      chalk.cyan(Name),
-      chalk.gray("  └─"),
-      chalk.white("Total onLoad handlers:"),
-      chalk.yellow(stats.totalOnLoadHandlers)
-    );
-    verboseLog(
-      chalk.cyan(Name),
-      chalk.gray("  └─"),
-      chalk.white("Unique patterns:"),
-      chalk.yellow(stats.uniquePatterns)
-    );
-    verboseLog(
-      chalk.cyan(Name),
-      chalk.gray("  └─"),
-      chalk.white("Namespaces:"),
-      chalk.yellow(stats.uniqueNamespaces)
-    );
-    verboseLog(
-      chalk.cyan(Name),
-      chalk.gray("  └─"),
-      chalk.white("Plugins:"),
-      stats.pluginNames.map((n) => chalk.green(n)).join(chalk.gray(", "))
-    );
-
-    return {
-      name: "frame-master-chained-loader",
-      setup(build) {
-        // First, run all non-onLoad setups (onResolve, onStart, etc.)
-        for (const plugin of self.nonOnLoadSetups) {
-          plugin.setup(build);
-        }
-
-        // Separate handlers into global (no namespace) and namespace-specific
-        const { globalHandlers, handlersByNamespace } =
-          self.groupHandlersWithGlobalSupport();
-
-        for (const [
-          namespace,
-          namespaceHandlers,
-        ] of handlersByNamespace.entries()) {
-          // Combine namespace-specific handlers with global handlers
-          // Global handlers (no namespace specified) should match all namespaces
-          const handlers = [...namespaceHandlers, ...globalHandlers];
-
-          // Create a combined filter that matches if ANY handler's filter matches
-          const combinedFilter = self.createCombinedFilter(handlers);
-
-          build.onLoad(
-            {
-              filter: combinedFilter,
-              namespace: namespace === "file" ? undefined : namespace,
-            },
-            async (args) => {
-              // Find all handlers whose filter matches this specific file
-              const matchingHandlers = handlers.filter((h) =>
-                h.filter.test(args.path)
-              );
-
-              if (matchingHandlers.length === 0) {
-                return undefined;
-              }
-
-              return self.executeChainedOnLoad(args, matchingHandlers);
-            }
-          );
-        }
-
-        // If there are global handlers but no namespace-specific handlers,
-        // we still need to register them for the default "file" namespace
-        if (globalHandlers.length > 0 && handlersByNamespace.size === 0) {
-          const combinedFilter = self.createCombinedFilter(globalHandlers);
-          build.onLoad({ filter: combinedFilter }, async (args) => {
-            const matchingHandlers = globalHandlers.filter((h) =>
-              h.filter.test(args.path)
-            );
-            if (matchingHandlers.length === 0) {
-              return undefined;
-            }
-            return self.executeChainedOnLoad(args, matchingHandlers);
-          });
-        }
-
-        // Register catch-all handlers for loaders with finally handlers
-        // This ensures finally handlers run even when no onLoad handlers match
-        self.registerFinallyOnlyHandlers(build);
-      },
-    };
-  }
-
-  /**
-   * Register catch-all onLoad handlers for loaders that have finally handlers
-   * but may not have matching onLoad handlers.
-   */
-  private registerFinallyOnlyHandlers(build: PluginBuilder): void {
-    // Get unique loaders from finally handlers
-    const finallyLoaders = new Set(this.finallyHandlers.map((h) => h.loader));
-    if (finallyLoaders.size === 0) return;
-
-    // Map loaders to file extension patterns
-    const loaderToExtension: Record<string, RegExp> = {
-      tsx: /\.tsx$/,
-      ts: /\.ts$/,
-      jsx: /\.jsx$/,
-      js: /\.js$/,
-      css: /\.css$/,
-      html: /\.html$/,
-      json: /\.json$/,
-      text: /\.txt$/,
-      toml: /\.toml$/,
-    };
-
-    for (const loader of finallyLoaders) {
-      const extensionPattern = loaderToExtension[loader];
-      if (!extensionPattern) continue;
-
-      // Check if any existing onLoad handler already covers this pattern
-      const hasExistingHandler = this.onLoadHandlers.some((h) => {
-        // Check if the handler's filter would match files of this loader type
-        const testPath = `.test.${loader === "text" ? "txt" : loader}`;
-        return h.filter.test(testPath);
-      });
-
-      if (hasExistingHandler) continue;
-
-      verboseLog(
-        chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
-        chalk.gray("  └─"),
-        chalk.white("Registering finally-only handler for loader:"),
-        chalk.magenta(loader)
-      );
-
-      // Register a pass-through onLoad handler that just reads the file
-      // This ensures the finally handlers can process these files
-      const self = this;
-      build.onLoad({ filter: extensionPattern }, async (args) => {
-        const contents = await Bun.file(args.path).text();
-        // Execute with empty handlers array - this will just apply finally handlers
-        return self.executeChainedOnLoad(
-          {
-            ...args,
-            __chainedContents: contents,
-            __chainedLoader: loader,
-          } as any,
-          []
-        );
-      });
-    }
-  }
-
-  /**
-   * Groups handlers by namespace, separating global handlers (no namespace).
-   * Global handlers will be included in all namespace groups at runtime.
-   */
-  private groupHandlersWithGlobalSupport(): {
-    globalHandlers: RegisteredOnLoad[];
-    handlersByNamespace: Map<string, RegisteredOnLoad[]>;
-  } {
-    const globalHandlers: RegisteredOnLoad[] = [];
-    const handlersByNamespace = new Map<string, RegisteredOnLoad[]>();
-
-    for (const handler of this.onLoadHandlers) {
-      if (!handler.namespace) {
-        // No namespace = global handler, matches all namespaces
-        globalHandlers.push(handler);
-      } else {
-        // Namespace-specific handler
-        const existing = handlersByNamespace.get(handler.namespace) || [];
-        existing.push(handler);
-        handlersByNamespace.set(handler.namespace, existing);
-      }
-    }
-
-    // Ensure "file" namespace exists if we have global handlers
-    // This is the default namespace for regular file loads
-    if (globalHandlers.length > 0 && !handlersByNamespace.has("file")) {
-      handlersByNamespace.set("file", []);
-    }
-
-    return { globalHandlers, handlersByNamespace };
-  }
-
-  /**
-   * Groups handlers by namespace only.
-   * Actual file matching is done at runtime to support different filters matching same files.
-   * @deprecated Use groupHandlersWithGlobalSupport instead
-   */
-  private groupHandlersByNamespace(): Map<string, RegisteredOnLoad[]> {
-    const groups = new Map<string, RegisteredOnLoad[]>();
-
-    for (const handler of this.onLoadHandlers) {
-      const key = handler.namespace || "file";
-      const existing = groups.get(key) || [];
-      existing.push(handler);
-      groups.set(key, existing);
-    }
-
-    return groups;
-  }
-
-  /**
-   * Creates a combined regex that matches if ANY of the handler filters match.
-   * This ensures we intercept all files that could be handled by any plugin.
-   */
-  private createCombinedFilter(handlers: RegisteredOnLoad[]): RegExp {
-    if (handlers.length === 1) {
-      return handlers[0]!.filter;
-    }
-
-    // Combine all filter patterns with alternation
-    const patterns = handlers.map((h) => `(?:${h.filter.source})`);
-    const combined = new RegExp(patterns.join("|"));
-    return combined;
-  }
-
-  /**
-   * Extracts onLoad callbacks and other setup logic from a plugin.
-   */
-  private extractPluginSetup(
-    pluginName: string,
-    plugin: BunPlugin
-  ): {
-    onLoadCallbacks: RegisteredOnLoad[];
-    finallyCallbacks: RegisteredFinally[];
-    otherSetup: ((build: PluginBuilder) => void) | null;
-  } {
-    const onLoadCallbacks: RegisteredOnLoad[] = [];
-    const finallyCallbacks: RegisteredFinally[] = [];
-    const otherCalls: Array<(build: PluginBuilder) => void> = [];
-
-    // Create a proxy builder to intercept setup calls
-    // We create a deferred config getter that will be populated when the real build runs
-    let realBuild: PluginBuilder | null = null;
-
-    const proxyBuilder = {
-      onLoad(constraints: OnLoadConstraints, callback: OnLoadCallback) {
-        onLoadCallbacks.push({
-          filter: constraints.filter,
-          namespace: constraints.namespace,
-          callback,
-          pluginName,
-        });
-        return proxyBuilder;
-      },
-      onResolve(
-        constraints: Parameters<PluginBuilder["onResolve"]>[0],
-        callback: Parameters<PluginBuilder["onResolve"]>[1]
-      ) {
-        otherCalls.push((build) => build.onResolve(constraints, callback));
-        return proxyBuilder;
-      },
-      onStart(callback: Parameters<PluginBuilder["onStart"]>[0]) {
-        otherCalls.push((build) => build.onStart(callback));
-        return proxyBuilder;
-      },
-      onBeforeParse(constraints: any, callback: any) {
-        otherCalls.push((build) => {
-          if (
-            "onBeforeParse" in build &&
-            typeof build.onBeforeParse === "function"
-          ) {
-            build.onBeforeParse(constraints, callback);
-          }
-        });
-        return proxyBuilder;
-      },
-      // Build-time only
-      onEnd: ((callback: () => void) => {
-        otherCalls.push((build) => {
-          if ("onEnd" in build && typeof build.onEnd === "function") {
-            (build as any).onEnd(callback);
-          }
-        });
-        return proxyBuilder;
-      }) as any,
-      // Frame-Master extension: finally handler for post-processing
-      finally(loader: Bun.Loader, callback: FinallyCallback) {
-        finallyCallbacks.push({
-          loader,
-          callback,
-          pluginName,
-        });
-        return proxyBuilder;
-      },
-      // Use a getter so config is accessed from the real build when available
-      get config() {
-        return realBuild?.config ?? ({} as any);
-      },
-      module: (() => proxyBuilder) as any,
-      target: "browser" as const,
-      virtual: (() => proxyBuilder) as any,
-    } as PluginBuilder;
-
-    // Run the plugin's setup to collect handlers
-    plugin.setup(proxyBuilder);
-
-    return {
-      onLoadCallbacks,
-      finallyCallbacks,
-      otherSetup:
-        otherCalls.length > 0
-          ? (build) => {
-              realBuild = build;
-              otherCalls.forEach((fn) => fn(build));
-            }
-          : null,
-    };
-  }
-
-  /**
-   * Groups handlers by their filter pattern.
-   * Handlers with matching filters will be chained.
-   */
-  private groupHandlersByFilter(): Map<string, RegisteredOnLoad[]> {
-    const groups = new Map<string, RegisteredOnLoad[]>();
-
-    for (const handler of this.onLoadHandlers) {
-      const key = `${handler.filter.source}::${handler.namespace || "file"}`;
-      const existing = groups.get(key) || [];
-      existing.push(handler);
-      groups.set(key, existing);
-    }
-
-    return groups;
-  }
-
-  /**
-   * Executes chained onLoad handlers for a single file.
-   * Each handler receives the original args, but we track the accumulated content.
-   */
-  private async executeChainedOnLoad(
-    originalArgs: OnLoadArgs & {
-      __chainedContents?: string | Uint8Array;
-      __chainedLoader?: Bun.Loader;
-    },
-    handlers: RegisteredOnLoad[]
-  ): Promise<OnLoadResult> {
-    // Initialize from pre-populated args if available (for finally-only handlers)
-    let accumulatedContents: string | Uint8Array | undefined =
-      originalArgs.__chainedContents;
-    let accumulatedLoader: Bun.Loader | undefined =
-      originalArgs.__chainedLoader;
-    let lastResult: OnLoadResult = undefined;
-
-    if (handlers.length > 1) {
-      verboseLog(
-        chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
-        chalk.white(`Chaining ${chalk.yellow(handlers.length)} handlers for:`),
-        chalk.blue(originalArgs.path)
-      );
-      verboseLog(
-        chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
-        chalk.gray("  └─"),
-        chalk.white("Handler order:"),
-        handlers.map((h) => chalk.green(h.pluginName)).join(chalk.gray(" → "))
-      );
-    }
-
-    for (let i = 0; i < handlers.length; i++) {
-      const handler = handlers[i];
-      if (!handler) continue;
-
-      // Create a custom args object that provides access to the current content and loader
-      // Preserve binary data as Uint8Array, don't convert to string
-      const chainedArgs: OnLoadArgs & {
-        __chainedContents?: string | Uint8Array;
-        __chainedLoader?: Bun.Loader;
-      } = {
-        ...originalArgs,
-        __chainedContents: accumulatedContents,
-        __chainedLoader: accumulatedLoader,
-      };
-
-      try {
-        const startTime = performance.now();
-        const result = await handler.callback(chainedArgs);
-        const duration = performance.now() - startTime;
-
-        if (result && typeof result === "object") {
-          // Update accumulated content with this handler's output
-          if ("contents" in result && result.contents !== undefined) {
-            const prevLength =
-              typeof accumulatedContents === "string"
-                ? accumulatedContents.length
-                : accumulatedContents?.length ?? 0;
-            accumulatedContents = result.contents as string | Uint8Array;
-            const newLength =
-              typeof accumulatedContents === "string"
-                ? accumulatedContents.length
-                : accumulatedContents?.length ?? 0;
-
-            if (handlers.length > 1) {
-              verboseLog(
-                chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
-                chalk.gray("  └─"),
-                chalk.gray(`[${i + 1}/${handlers.length}]`),
-                chalk.green(handler.pluginName) + chalk.white(":"),
-                chalk.magenta(prevLength),
-                chalk.gray("→"),
-                chalk.magenta(newLength),
-                chalk.white("bytes"),
-                chalk.gray(`(${duration.toFixed(2)}ms)`)
-              );
-            }
-          }
-          if (
-            "loader" in result &&
-            result.loader &&
-            result.loader !== "object"
-          ) {
-            accumulatedLoader = result.loader as Bun.Loader;
-          }
-          lastResult = result;
-
-          // Check for preventChaining flag to stop the chain early
-          if ("preventChaining" in result && result.preventChaining === true) {
-            if (handlers.length > 1) {
-              verboseLog(
-                chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
-                chalk.gray("  └─"),
-                chalk.yellow("Chain stopped by"),
-                chalk.green(handler.pluginName),
-                chalk.gray(`(preventChaining: true)`)
-              );
-            }
-            break;
-          }
-        }
-      } catch (error) {
-        console.error(
-          `[PluginProxy] Error in onLoad handler from plugin "${handler.pluginName}" for file ${originalArgs.path}:`,
-          error
-        );
-        throw error;
-      }
-    }
-
-    // Apply finally handlers for the accumulated loader
-    if (accumulatedLoader && accumulatedContents !== undefined) {
-      const matchingFinallyHandlers = this.finallyHandlers.filter(
-        (h) => h.loader === accumulatedLoader
-      );
-
-      if (matchingFinallyHandlers.length > 0) {
-        verboseLog(
-          chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
-          chalk.gray("  └─"),
-          chalk.white(
-            `Applying ${chalk.yellow(
-              matchingFinallyHandlers.length
-            )} finally handler(s) for loader:`
-          ),
-          chalk.magenta(accumulatedLoader)
-        );
-
-        for (const handler of matchingFinallyHandlers) {
-          try {
-            const startTime = performance.now();
-            const result = await handler.callback({
-              contents: accumulatedContents,
-              path: originalArgs.path,
-              loader: accumulatedLoader,
-            });
-            const duration = performance.now() - startTime;
-
-            if (result && "contents" in result) {
-              const prevLength =
-                typeof accumulatedContents === "string"
-                  ? accumulatedContents.length
-                  : accumulatedContents.length;
-              accumulatedContents = result.contents;
-              const newLength =
-                typeof accumulatedContents === "string"
-                  ? accumulatedContents.length
-                  : accumulatedContents.length;
-
-              verboseLog(
-                chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
-                chalk.gray("  └─"),
-                chalk.blue("finally"),
-                chalk.green(handler.pluginName) + chalk.white(":"),
-                chalk.magenta(prevLength),
-                chalk.gray("→"),
-                chalk.magenta(newLength),
-                chalk.white("bytes"),
-                chalk.gray(`(${duration.toFixed(2)}ms)`)
-              );
-            }
-          } catch (error) {
-            console.error(
-              `[PluginProxy] Error in finally handler from plugin "${handler.pluginName}" for loader ${accumulatedLoader}:`,
-              error
-            );
-            throw error;
-          }
-        }
-      }
-    }
-
-    // Return the final accumulated result
-    if (lastResult && typeof lastResult === "object") {
-      return {
-        ...lastResult,
-        contents:
-          accumulatedContents ??
-          ("contents" in lastResult ? lastResult.contents : undefined),
-        loader:
-          accumulatedLoader ??
-          ("loader" in lastResult
-            ? (lastResult.loader as Bun.Loader)
-            : undefined),
-      } as OnLoadResult;
-    }
-
-    // Handle finally-only case (no onLoad handlers, but finally handlers ran)
-    if (accumulatedContents !== undefined && accumulatedLoader) {
-      return {
-        contents: accumulatedContents,
-        loader: accumulatedLoader,
-      } as OnLoadResult;
-    }
-
-    return lastResult;
-  }
-
-  /**
-   * Reset the proxy, clearing all registered handlers.
-   */
-  reset(): void {
-    this.onLoadHandlers = [];
-    this.nonOnLoadSetups = [];
-    this.finallyHandlers = [];
-  }
-
-  /**
-   * Get statistics about registered handlers.
-   */
-  getStats(): {
-    totalOnLoadHandlers: number;
-    uniquePatterns: number;
-    uniqueNamespaces: number;
-    pluginNames: string[];
-  } {
-    const namespaceGroups = this.groupHandlersByNamespace();
-    const uniquePatterns = new Set(
-      this.onLoadHandlers.map((h) => h.filter.source)
-    ).size;
-
-    const pluginNames = [
-      ...new Set(this.onLoadHandlers.map((h) => h.pluginName)),
-    ];
-
-    return {
-      totalOnLoadHandlers: this.onLoadHandlers.length,
-      uniquePatterns,
-      uniqueNamespaces: namespaceGroups.size,
-      pluginNames,
-    };
-  }
+	private onLoadHandlers: RegisteredOnLoad[] = [];
+	private nonOnLoadSetups: NonOnLoadPlugin[] = [];
+	private finallyHandlers: RegisteredFinally[] = [];
+	private suffix: string;
+	private formatedSuffix: string;
+
+	constructor(opt: { suffix?: string } = {}) {
+		this.suffix = opt.suffix ?? "";
+		this.formatedSuffix = this.suffix ? `:${this.suffix}` : "";
+	}
+
+	/**
+	 * Add a BunPlugin to the proxy. Its onLoad handlers will be collected
+	 * for chaining, while other handlers are preserved.
+	 */
+	addPlugin(plugin: BunPlugin): void {
+		verboseLog(
+			chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
+			chalk.white("Adding plugin:"),
+			chalk.green(plugin.name),
+		);
+
+		const { onLoadCallbacks, finallyCallbacks, otherSetup } =
+			this.extractPluginSetup(plugin.name, plugin);
+
+		if (onLoadCallbacks.length > 0) {
+			verboseLog(
+				chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
+				chalk.gray("  └─"),
+				chalk.white(
+					`Found ${chalk.yellow(onLoadCallbacks.length)} onLoad handler(s):`,
+				),
+				chalk.magenta(onLoadCallbacks.map((h) => h.filter.source).join(", ")),
+			);
+		}
+
+		if (finallyCallbacks.length > 0) {
+			verboseLog(
+				chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
+				chalk.gray("  └─"),
+				chalk.white(
+					`Found ${chalk.yellow(finallyCallbacks.length)} finally handler(s):`,
+				),
+				chalk.magenta(finallyCallbacks.map((h) => h.loader).join(", ")),
+			);
+		}
+
+		this.onLoadHandlers.push(...onLoadCallbacks);
+		this.finallyHandlers.push(...finallyCallbacks);
+
+		if (otherSetup) {
+			verboseLog(
+				chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
+				chalk.gray("  └─"),
+				chalk.white("Found other handlers"),
+				chalk.gray("(onResolve, onStart, etc.)"),
+			);
+			this.nonOnLoadSetups.push({
+				name: plugin.name,
+				setup: otherSetup,
+			});
+		}
+	}
+
+	/**
+	 * Add multiple BunPlugins to the proxy.
+	 */
+	addPlugins(plugins: BunPlugin[]): void {
+		for (const plugin of plugins) {
+			this.addPlugin(plugin);
+		}
+	}
+
+	/**
+	 * Creates the final proxied BunPlugin that chains all onLoad handlers.
+	 */
+	createChainedPlugin(): BunPlugin {
+		const self = this;
+		const stats = this.getStats();
+
+		const Name = `[PluginChaining${this.formatedSuffix}]`;
+
+		verboseLog(chalk.cyan(Name), chalk.white("Creating chained plugin:"));
+		verboseLog(
+			chalk.cyan(Name),
+			chalk.gray("  └─"),
+			chalk.white("Total onLoad handlers:"),
+			chalk.yellow(stats.totalOnLoadHandlers),
+		);
+		verboseLog(
+			chalk.cyan(Name),
+			chalk.gray("  └─"),
+			chalk.white("Unique patterns:"),
+			chalk.yellow(stats.uniquePatterns),
+		);
+		verboseLog(
+			chalk.cyan(Name),
+			chalk.gray("  └─"),
+			chalk.white("Namespaces:"),
+			chalk.yellow(stats.uniqueNamespaces),
+		);
+		verboseLog(
+			chalk.cyan(Name),
+			chalk.gray("  └─"),
+			chalk.white("Plugins:"),
+			stats.pluginNames.map((n) => chalk.green(n)).join(chalk.gray(", ")),
+		);
+
+		return {
+			name: "frame-master-chained-loader",
+			setup(build) {
+				// First, run all non-onLoad setups (onResolve, onStart, etc.)
+				for (const plugin of self.nonOnLoadSetups) {
+					plugin.setup(build);
+				}
+
+				// Separate handlers into global (no namespace) and namespace-specific
+				const { globalHandlers, handlersByNamespace } =
+					self.groupHandlersWithGlobalSupport();
+
+				for (const [
+					namespace,
+					namespaceHandlers,
+				] of handlersByNamespace.entries()) {
+					// Combine namespace-specific handlers with global handlers
+					// Global handlers (no namespace specified) should match all namespaces
+					const handlers = [...namespaceHandlers, ...globalHandlers];
+
+					// Create a combined filter that matches if ANY handler's filter matches
+					const combinedFilter = self.createCombinedFilter(handlers);
+
+					build.onLoad(
+						{
+							filter: combinedFilter,
+							namespace: namespace === "file" ? undefined : namespace,
+						},
+						async (args) => {
+							// Find all handlers whose filter matches this specific file
+							const matchingHandlers = handlers.filter((h) =>
+								h.filter.test(args.path),
+							);
+
+							if (matchingHandlers.length === 0) {
+								return undefined;
+							}
+
+							return self.executeChainedOnLoad(args, matchingHandlers);
+						},
+					);
+				}
+
+				// If there are global handlers but no namespace-specific handlers,
+				// we still need to register them for the default "file" namespace
+				if (globalHandlers.length > 0 && handlersByNamespace.size === 0) {
+					const combinedFilter = self.createCombinedFilter(globalHandlers);
+					build.onLoad({ filter: combinedFilter }, async (args) => {
+						const matchingHandlers = globalHandlers.filter((h) =>
+							h.filter.test(args.path),
+						);
+						if (matchingHandlers.length === 0) {
+							return undefined;
+						}
+						return self.executeChainedOnLoad(args, matchingHandlers);
+					});
+				}
+
+				// Register catch-all handlers for loaders with finally handlers
+				// This ensures finally handlers run even when no onLoad handlers match
+				self.registerFinallyOnlyHandlers(build);
+			},
+		};
+	}
+
+	/**
+	 * Register catch-all onLoad handlers for loaders that have finally handlers
+	 * but may not have matching onLoad handlers.
+	 */
+	private registerFinallyOnlyHandlers(build: PluginBuilder): void {
+		// Get unique loaders from finally handlers
+		const finallyLoaders = new Set(this.finallyHandlers.map((h) => h.loader));
+		if (finallyLoaders.size === 0) return;
+
+		// Map loaders to file extension patterns
+		const loaderToExtension: Record<string, RegExp> = {
+			tsx: /\.tsx$/,
+			ts: /\.ts$/,
+			jsx: /\.jsx$/,
+			js: /\.js$/,
+			css: /\.css$/,
+			html: /\.html$/,
+			json: /\.json$/,
+			text: /\.txt$/,
+			toml: /\.toml$/,
+		};
+
+		for (const loader of finallyLoaders) {
+			const extensionPattern = loaderToExtension[loader];
+			if (!extensionPattern) continue;
+
+			// Check if any existing onLoad handler already covers this pattern
+			const hasExistingHandler = this.onLoadHandlers.some((h) => {
+				// Check if the handler's filter would match files of this loader type
+				const testPath = `.test.${loader === "text" ? "txt" : loader}`;
+				return h.filter.test(testPath);
+			});
+
+			if (hasExistingHandler) continue;
+
+			verboseLog(
+				chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
+				chalk.gray("  └─"),
+				chalk.white("Registering finally-only handler for loader:"),
+				chalk.magenta(loader),
+			);
+
+			build.onLoad({ filter: extensionPattern }, async (args) => {
+				const contents = await Bun.file(args.path).text();
+				// Execute with empty handlers array - this will just apply finally handlers
+				return this.executeChainedOnLoad(
+					{
+						...args,
+						__chainedContents: contents,
+						__chainedLoader: loader,
+					} as any,
+					[],
+				);
+			});
+		}
+	}
+
+	/**
+	 * Groups handlers by namespace, separating global handlers (no namespace).
+	 * Global handlers will be included in all namespace groups at runtime.
+	 */
+	private groupHandlersWithGlobalSupport(): {
+		globalHandlers: RegisteredOnLoad[];
+		handlersByNamespace: Map<string, RegisteredOnLoad[]>;
+	} {
+		const globalHandlers: RegisteredOnLoad[] = [];
+		const handlersByNamespace = new Map<string, RegisteredOnLoad[]>();
+
+		for (const handler of this.onLoadHandlers) {
+			if (!handler.namespace) {
+				// No namespace = global handler, matches all namespaces
+				globalHandlers.push(handler);
+			} else {
+				// Namespace-specific handler
+				const existing = handlersByNamespace.get(handler.namespace) || [];
+				existing.push(handler);
+				handlersByNamespace.set(handler.namespace, existing);
+			}
+		}
+
+		// Ensure "file" namespace exists if we have global handlers
+		// This is the default namespace for regular file loads
+		if (globalHandlers.length > 0 && !handlersByNamespace.has("file")) {
+			handlersByNamespace.set("file", []);
+		}
+
+		return { globalHandlers, handlersByNamespace };
+	}
+
+	/**
+	 * Groups handlers by namespace only.
+	 * Actual file matching is done at runtime to support different filters matching same files.
+	 * @deprecated Use groupHandlersWithGlobalSupport instead
+	 */
+	private groupHandlersByNamespace(): Map<string, RegisteredOnLoad[]> {
+		const groups = new Map<string, RegisteredOnLoad[]>();
+
+		for (const handler of this.onLoadHandlers) {
+			const key = handler.namespace || "file";
+			const existing = groups.get(key) || [];
+			existing.push(handler);
+			groups.set(key, existing);
+		}
+
+		return groups;
+	}
+
+	/**
+	 * Creates a combined regex that matches if ANY of the handler filters match.
+	 * This ensures we intercept all files that could be handled by any plugin.
+	 */
+	private createCombinedFilter(handlers: RegisteredOnLoad[]): RegExp {
+		if (handlers.length === 1) {
+			return handlers[0]!.filter;
+		}
+
+		// Combine all filter patterns with alternation
+		const patterns = handlers.map((h) => `(?:${h.filter.source})`);
+		const combined = new RegExp(patterns.join("|"));
+		return combined;
+	}
+
+	/**
+	 * Extracts onLoad callbacks and other setup logic from a plugin.
+	 */
+	private extractPluginSetup(
+		pluginName: string,
+		plugin: BunPlugin,
+	): {
+		onLoadCallbacks: RegisteredOnLoad[];
+		finallyCallbacks: RegisteredFinally[];
+		otherSetup: ((build: PluginBuilder) => void) | null;
+	} {
+		const onLoadCallbacks: RegisteredOnLoad[] = [];
+		const finallyCallbacks: RegisteredFinally[] = [];
+		const otherCalls: Array<(build: PluginBuilder) => void> = [];
+
+		// Create a proxy builder to intercept setup calls
+		// We create a deferred config getter that will be populated when the real build runs
+		let realBuild: PluginBuilder | null = null;
+
+		const proxyBuilder = {
+			onLoad(constraints: OnLoadConstraints, callback: OnLoadCallback) {
+				onLoadCallbacks.push({
+					filter: constraints.filter,
+					namespace: constraints.namespace,
+					callback,
+					pluginName,
+				});
+				return proxyBuilder;
+			},
+			onResolve(
+				constraints: Parameters<PluginBuilder["onResolve"]>[0],
+				callback: Parameters<PluginBuilder["onResolve"]>[1],
+			) {
+				otherCalls.push((build) => build.onResolve(constraints, callback));
+				return proxyBuilder;
+			},
+			onStart(callback: Parameters<PluginBuilder["onStart"]>[0]) {
+				otherCalls.push((build) => build.onStart(callback));
+				return proxyBuilder;
+			},
+			onBeforeParse(constraints: any, callback: any) {
+				otherCalls.push((build) => {
+					if (
+						"onBeforeParse" in build &&
+						typeof build.onBeforeParse === "function"
+					) {
+						build.onBeforeParse(constraints, callback);
+					}
+				});
+				return proxyBuilder;
+			},
+			// Build-time only
+			onEnd: ((callback: () => void) => {
+				otherCalls.push((build) => {
+					if ("onEnd" in build && typeof build.onEnd === "function") {
+						(build as any).onEnd(callback);
+					}
+				});
+				return proxyBuilder;
+			}) as any,
+			// Frame-Master extension: finally handler for post-processing
+			finally(loader: Bun.Loader, callback: FinallyCallback) {
+				finallyCallbacks.push({
+					loader,
+					callback,
+					pluginName,
+				});
+				return proxyBuilder;
+			},
+			// Use a getter so config is accessed from the real build when available
+			get config() {
+				return realBuild?.config ?? ({} as any);
+			},
+			module: (() => proxyBuilder) as any,
+			target: "browser" as const,
+			virtual: (() => proxyBuilder) as any,
+		} as PluginBuilder;
+
+		// Run the plugin's setup to collect handlers
+		plugin.setup(proxyBuilder);
+
+		return {
+			onLoadCallbacks,
+			finallyCallbacks,
+			otherSetup:
+				otherCalls.length > 0
+					? (build) => {
+							realBuild = build;
+							otherCalls.forEach((fn) => fn(build));
+						}
+					: null,
+		};
+	}
+
+	/**
+	 * Groups handlers by their filter pattern.
+	 * Handlers with matching filters will be chained.
+	 */
+	private groupHandlersByFilter(): Map<string, RegisteredOnLoad[]> {
+		const groups = new Map<string, RegisteredOnLoad[]>();
+
+		for (const handler of this.onLoadHandlers) {
+			const key = `${handler.filter.source}::${handler.namespace || "file"}`;
+			const existing = groups.get(key) || [];
+			existing.push(handler);
+			groups.set(key, existing);
+		}
+
+		return groups;
+	}
+
+	/**
+	 * Executes chained onLoad handlers for a single file.
+	 * Each handler receives the original args, but we track the accumulated content.
+	 */
+	private async executeChainedOnLoad(
+		originalArgs: OnLoadArgs & {
+			__chainedContents?: string | Uint8Array;
+			__chainedLoader?: Bun.Loader;
+		},
+		handlers: RegisteredOnLoad[],
+	): Promise<OnLoadResult> {
+		// Initialize from pre-populated args if available (for finally-only handlers)
+		let accumulatedContents: string | Uint8Array | undefined =
+			originalArgs.__chainedContents;
+		let accumulatedLoader: Bun.Loader | undefined =
+			originalArgs.__chainedLoader;
+		let lastResult: OnLoadResult;
+
+		if (handlers.length > 1) {
+			verboseLog(
+				chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
+				chalk.white(`Chaining ${chalk.yellow(handlers.length)} handlers for:`),
+				chalk.blue(originalArgs.path),
+			);
+			verboseLog(
+				chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
+				chalk.gray("  └─"),
+				chalk.white("Handler order:"),
+				handlers.map((h) => chalk.green(h.pluginName)).join(chalk.gray(" → ")),
+			);
+		}
+
+		for (let i = 0; i < handlers.length; i++) {
+			const handler = handlers[i];
+			if (!handler) continue;
+
+			// Create a custom args object that provides access to the current content and loader
+			// Preserve binary data as Uint8Array, don't convert to string
+			const chainedArgs: OnLoadArgs & {
+				__chainedContents?: string | Uint8Array;
+				__chainedLoader?: Bun.Loader;
+			} = {
+				...originalArgs,
+				__chainedContents: accumulatedContents,
+				__chainedLoader: accumulatedLoader,
+			};
+
+			try {
+				const startTime = performance.now();
+				const result = await handler.callback(chainedArgs);
+				const duration = performance.now() - startTime;
+
+				if (result && typeof result === "object") {
+					// Update accumulated content with this handler's output
+					if ("contents" in result && result.contents !== undefined) {
+						const prevLength =
+							typeof accumulatedContents === "string"
+								? accumulatedContents.length
+								: (accumulatedContents?.length ?? 0);
+						accumulatedContents = result.contents as string | Uint8Array;
+						const newLength =
+							typeof accumulatedContents === "string"
+								? accumulatedContents.length
+								: (accumulatedContents?.length ?? 0);
+
+						if (handlers.length > 1) {
+							verboseLog(
+								chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
+								chalk.gray("  └─"),
+								chalk.gray(`[${i + 1}/${handlers.length}]`),
+								chalk.green(handler.pluginName) + chalk.white(":"),
+								chalk.magenta(prevLength),
+								chalk.gray("→"),
+								chalk.magenta(newLength),
+								chalk.white("bytes"),
+								chalk.gray(`(${duration.toFixed(2)}ms)`),
+							);
+						}
+					}
+					if (
+						"loader" in result &&
+						result.loader &&
+						result.loader !== "object"
+					) {
+						accumulatedLoader = result.loader as Bun.Loader;
+					}
+					lastResult = result;
+
+					// Check for preventChaining flag to stop the chain early
+					if ("preventChaining" in result && result.preventChaining === true) {
+						if (handlers.length > 1) {
+							verboseLog(
+								chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
+								chalk.gray("  └─"),
+								chalk.yellow("Chain stopped by"),
+								chalk.green(handler.pluginName),
+								chalk.gray(`(preventChaining: true)`),
+							);
+						}
+						break;
+					}
+				}
+			} catch (error) {
+				console.error(
+					`[PluginProxy] Error in onLoad handler from plugin "${handler.pluginName}" for file ${originalArgs.path}:`,
+					error,
+				);
+				throw error;
+			}
+		}
+
+		// Apply finally handlers for the accumulated loader
+		if (accumulatedLoader && accumulatedContents !== undefined) {
+			const matchingFinallyHandlers = this.finallyHandlers.filter(
+				(h) => h.loader === accumulatedLoader,
+			);
+
+			if (matchingFinallyHandlers.length > 0) {
+				verboseLog(
+					chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
+					chalk.gray("  └─"),
+					chalk.white(
+						`Applying ${chalk.yellow(
+							matchingFinallyHandlers.length,
+						)} finally handler(s) for loader:`,
+					),
+					chalk.magenta(accumulatedLoader),
+				);
+
+				for (const handler of matchingFinallyHandlers) {
+					try {
+						const startTime = performance.now();
+						const result = await handler.callback({
+							contents: accumulatedContents,
+							path: originalArgs.path,
+							loader: accumulatedLoader,
+						});
+						const duration = performance.now() - startTime;
+
+						if (result && "contents" in result) {
+							const prevLength =
+								typeof accumulatedContents === "string"
+									? accumulatedContents.length
+									: accumulatedContents.length;
+							accumulatedContents = result.contents;
+							const newLength =
+								typeof accumulatedContents === "string"
+									? accumulatedContents.length
+									: accumulatedContents.length;
+
+							verboseLog(
+								chalk.cyan(`[PluginChaining${this.formatedSuffix}]`),
+								chalk.gray("  └─"),
+								chalk.blue("finally"),
+								chalk.green(handler.pluginName) + chalk.white(":"),
+								chalk.magenta(prevLength),
+								chalk.gray("→"),
+								chalk.magenta(newLength),
+								chalk.white("bytes"),
+								chalk.gray(`(${duration.toFixed(2)}ms)`),
+							);
+						}
+					} catch (error) {
+						console.error(
+							`[PluginProxy] Error in finally handler from plugin "${handler.pluginName}" for loader ${accumulatedLoader}:`,
+							error,
+						);
+						throw error;
+					}
+				}
+			}
+		}
+
+		// Return the final accumulated result
+		if (lastResult && typeof lastResult === "object") {
+			return {
+				...lastResult,
+				contents:
+					accumulatedContents ??
+					("contents" in lastResult ? lastResult.contents : undefined),
+				loader:
+					accumulatedLoader ??
+					("loader" in lastResult
+						? (lastResult.loader as Bun.Loader)
+						: undefined),
+			} as OnLoadResult;
+		}
+
+		// Handle finally-only case (no onLoad handlers, but finally handlers ran)
+		if (accumulatedContents !== undefined && accumulatedLoader) {
+			return {
+				contents: accumulatedContents,
+				loader: accumulatedLoader,
+			} as OnLoadResult;
+		}
+
+		return lastResult;
+	}
+
+	/**
+	 * Reset the proxy, clearing all registered handlers.
+	 */
+	reset(): void {
+		this.onLoadHandlers = [];
+		this.nonOnLoadSetups = [];
+		this.finallyHandlers = [];
+	}
+
+	/**
+	 * Get statistics about registered handlers.
+	 */
+	getStats(): {
+		totalOnLoadHandlers: number;
+		uniquePatterns: number;
+		uniqueNamespaces: number;
+		pluginNames: string[];
+	} {
+		const namespaceGroups = this.groupHandlersByNamespace();
+		const uniquePatterns = new Set(
+			this.onLoadHandlers.map((h) => h.filter.source),
+		).size;
+
+		const pluginNames = [
+			...new Set(this.onLoadHandlers.map((h) => h.pluginName)),
+		];
+
+		return {
+			totalOnLoadHandlers: this.onLoadHandlers.length,
+			uniquePatterns,
+			uniqueNamespaces: namespaceGroups.size,
+			pluginNames,
+		};
+	}
 }
 
 /**
  * Creates a new PluginProxy instance.
  */
 export function createPluginProxy(): PluginProxy {
-  return new PluginProxy();
+	return new PluginProxy();
 }
 
 /**
@@ -781,12 +778,12 @@ export function createPluginProxy(): PluginProxy {
  * ```
  */
 export function chainPlugins(
-  plugins: BunPlugin[],
-  opt?: { suffix?: string }
+	plugins: BunPlugin[],
+	opt?: { suffix?: string },
 ): BunPlugin {
-  const proxy = new PluginProxy(opt);
-  proxy.addPlugins(plugins);
-  return proxy.createChainedPlugin();
+	const proxy = new PluginProxy(opt);
+	proxy.addPlugins(plugins);
+	return proxy.createChainedPlugin();
 }
 
 /**
@@ -794,24 +791,24 @@ export function chainPlugins(
  * Use this type when your plugin may be part of a chain.
  */
 export type ChainedOnLoadArgs = OnLoadArgs & {
-  /**
-   * Content from previous handlers in the chain.
-   * Will be undefined if this is the first handler or if chaining is disabled.
-   * Can be string for text content or Uint8Array for binary content.
-   *
-   * @example
-   * ```typescript
-   * build.onLoad({ filter: /\.tsx$/ }, async (args: ChainedOnLoadArgs) => {
-   *   const content = args.__chainedContents ?? await Bun.file(args.path).text();
-   *   return { contents: transform(content), loader: "tsx" };
-   * });
-   * ```
-   */
-  __chainedContents?: string | Uint8Array;
-  /**
-   * Loader set by the previous handler in the chain.
-   */
-  __chainedLoader?: Bun.Loader;
+	/**
+	 * Content from previous handlers in the chain.
+	 * Will be undefined if this is the first handler or if chaining is disabled.
+	 * Can be string for text content or Uint8Array for binary content.
+	 *
+	 * @example
+	 * ```typescript
+	 * build.onLoad({ filter: /\.tsx$/ }, async (args: ChainedOnLoadArgs) => {
+	 *   const content = args.__chainedContents ?? await Bun.file(args.path).text();
+	 *   return { contents: transform(content), loader: "tsx" };
+	 * });
+	 * ```
+	 */
+	__chainedContents?: string | Uint8Array;
+	/**
+	 * Loader set by the previous handler in the chain.
+	 */
+	__chainedLoader?: Bun.Loader;
 };
 
 /**
@@ -830,7 +827,7 @@ export type ChainedOnLoadArgs = OnLoadArgs & {
  * ```
  */
 export type ChainedOnLoadCallback = (
-  args: ChainedOnLoadArgs
+	args: ChainedOnLoadArgs,
 ) => OnLoadResult | Promise<OnLoadResult>;
 
 /**
@@ -849,30 +846,30 @@ export type ChainedOnLoadCallback = (
  * ```
  */
 export async function getChainableContent(
-  args: OnLoadArgs | ChainedOnLoadArgs
+	args: OnLoadArgs | ChainedOnLoadArgs,
 ): Promise<string> {
-  const chainedArgs = args as ChainedOnLoadArgs;
-  if (chainedArgs.__chainedContents !== undefined) {
-    if (typeof chainedArgs.__chainedContents === "string") {
-      return chainedArgs.__chainedContents;
-    }
-    // Convert Uint8Array to string
-    return new TextDecoder().decode(chainedArgs.__chainedContents);
-  }
+	const chainedArgs = args as ChainedOnLoadArgs;
+	if (chainedArgs.__chainedContents !== undefined) {
+		if (typeof chainedArgs.__chainedContents === "string") {
+			return chainedArgs.__chainedContents;
+		}
+		// Convert Uint8Array to string
+		return new TextDecoder().decode(chainedArgs.__chainedContents);
+	}
 
-  // Only read from disk for "file" namespace (default)
-  // Virtual modules (custom namespaces) don't exist on disk
-  const isFileNamespace = !args.namespace || args.namespace === "file";
-  if (!isFileNamespace) {
-    return "";
-  }
+	// Only read from disk for "file" namespace (default)
+	// Virtual modules (custom namespaces) don't exist on disk
+	const isFileNamespace = !args.namespace || args.namespace === "file";
+	if (!isFileNamespace) {
+		return "";
+	}
 
-  try {
-    return await Bun.file(args.path).text();
-  } catch (error) {
-    // File might not exist (virtual path in file namespace), return empty string
-    return "";
-  }
+	try {
+		return await Bun.file(args.path).text();
+	} catch (error) {
+		// File might not exist (virtual path in file namespace), return empty string
+		return "";
+	}
 }
 
 /**
@@ -891,30 +888,30 @@ export async function getChainableContent(
  * ```
  */
 export async function getChainableBinaryContent(
-  args: OnLoadArgs | ChainedOnLoadArgs
+	args: OnLoadArgs | ChainedOnLoadArgs,
 ): Promise<Uint8Array> {
-  const chainedArgs = args as ChainedOnLoadArgs;
-  if (chainedArgs.__chainedContents !== undefined) {
-    if (chainedArgs.__chainedContents instanceof Uint8Array) {
-      return chainedArgs.__chainedContents;
-    }
-    // Convert string to Uint8Array
-    return new TextEncoder().encode(chainedArgs.__chainedContents);
-  }
+	const chainedArgs = args as ChainedOnLoadArgs;
+	if (chainedArgs.__chainedContents !== undefined) {
+		if (chainedArgs.__chainedContents instanceof Uint8Array) {
+			return chainedArgs.__chainedContents;
+		}
+		// Convert string to Uint8Array
+		return new TextEncoder().encode(chainedArgs.__chainedContents);
+	}
 
-  // Only read from disk for "file" namespace (default)
-  // Virtual modules (custom namespaces) don't exist on disk
-  const isFileNamespace = !args.namespace || args.namespace === "file";
-  if (!isFileNamespace) {
-    return new Uint8Array(0);
-  }
+	// Only read from disk for "file" namespace (default)
+	// Virtual modules (custom namespaces) don't exist on disk
+	const isFileNamespace = !args.namespace || args.namespace === "file";
+	if (!isFileNamespace) {
+		return new Uint8Array(0);
+	}
 
-  try {
-    return new Uint8Array(await Bun.file(args.path).arrayBuffer());
-  } catch (error) {
-    // File might not exist (virtual path in file namespace), return empty array
-    return new Uint8Array(0);
-  }
+	try {
+		return new Uint8Array(await Bun.file(args.path).arrayBuffer());
+	} catch (error) {
+		// File might not exist (virtual path in file namespace), return empty array
+		return new Uint8Array(0);
+	}
 }
 
 /**
@@ -932,12 +929,12 @@ export async function getChainableBinaryContent(
  * ```
  */
 export function hasChainedTextContent(
-  args: OnLoadArgs | ChainedOnLoadArgs
+	args: OnLoadArgs | ChainedOnLoadArgs,
 ): args is ChainedOnLoadArgs & { __chainedContents: string } {
-  return (
-    "__chainedContents" in args &&
-    typeof (args as ChainedOnLoadArgs).__chainedContents === "string"
-  );
+	return (
+		"__chainedContents" in args &&
+		typeof (args as ChainedOnLoadArgs).__chainedContents === "string"
+	);
 }
 
 /**
@@ -955,12 +952,12 @@ export function hasChainedTextContent(
  * ```
  */
 export function hasChainedBinaryContent(
-  args: OnLoadArgs | ChainedOnLoadArgs
+	args: OnLoadArgs | ChainedOnLoadArgs,
 ): args is ChainedOnLoadArgs & { __chainedContents: Uint8Array } {
-  return (
-    "__chainedContents" in args &&
-    (args as ChainedOnLoadArgs).__chainedContents instanceof Uint8Array
-  );
+	return (
+		"__chainedContents" in args &&
+		(args as ChainedOnLoadArgs).__chainedContents instanceof Uint8Array
+	);
 }
 
 /**
@@ -976,10 +973,10 @@ export function hasChainedBinaryContent(
  * ```
  */
 export function hasChainedContent(
-  args: OnLoadArgs | ChainedOnLoadArgs
+	args: OnLoadArgs | ChainedOnLoadArgs,
 ): args is ChainedOnLoadArgs & { __chainedContents: string | Uint8Array } {
-  return (
-    "__chainedContents" in args &&
-    (args as ChainedOnLoadArgs).__chainedContents !== undefined
-  );
+	return (
+		"__chainedContents" in args &&
+		(args as ChainedOnLoadArgs).__chainedContents !== undefined
+	);
 }

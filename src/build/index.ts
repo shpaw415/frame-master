@@ -1,13 +1,13 @@
-import { existsSync, mkdirSync, rmSync } from "fs";
-import type { BuildOptionsPlugin } from "../plugins/types";
-import { PluginLoader, pluginLoader } from "../plugins";
-import { onVerbose, pluginRegex, verboseLog, isVerbose } from "../utils";
 import chalk from "chalk";
-import { join } from "path";
-import { chainPlugins } from "../plugins/plugin-chaining";
-import { getConfig } from "../server/config";
 import type { FrameMasterConfig } from "frame-master/server/type";
+import { existsSync, mkdirSync, rmSync } from "fs";
+import { join } from "path";
 import { cwd } from "process";
+import { type PluginLoader, pluginLoader } from "../plugins";
+import { chainPlugins } from "../plugins/plugin-chaining";
+import type { BuildOptionsPlugin } from "../plugins/types";
+import { getConfig } from "../server/config";
+import { isVerbose, onVerbose, pluginRegex, verboseLog } from "../utils";
 
 type RequiredBuilOptions = Required<BuildOptionsPlugin>;
 
@@ -166,9 +166,9 @@ export class Builder {
 			);
 		}
 		this._isBuilding = true;
-		const self = this;
+
 		this.buildPromise = new Promise<Bun.BuildOutput>((resolve) => {
-			self.buildResolver = resolve;
+			this.buildResolver = resolve;
 		});
 		const startTime = performance.now();
 		this.clearBuildDir();

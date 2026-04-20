@@ -1,19 +1,19 @@
-import type { FrameMasterConfig } from "./type";
 import { join } from "path";
 import Paths from "../paths";
+import type { FrameMasterConfig } from "./type";
 
 export const DEFAULT_CONFIG = {
-  HTTPServer: {
-    port: 3000,
-  },
-  plugins: [],
+	HTTPServer: {
+		port: 3000,
+	},
+	plugins: [],
 } satisfies FrameMasterConfig;
 
 export class ConfigFileNotFound extends Error {
-  constructor(filePath: string, errorOptions?: ErrorOptions) {
-    super(`Config file not found: ${filePath}`, errorOptions);
-    this.name = "ConfigFileNotFound";
-  }
+	constructor(filePath: string, errorOptions?: ErrorOptions) {
+		super(`Config file not found: ${filePath}`, errorOptions);
+		this.name = "ConfigFileNotFound";
+	}
 }
 
 /**
@@ -25,77 +25,77 @@ export class ConfigFileNotFound extends Error {
  * @internal - Use exported functions instead of direct instantiation
  */
 class ConfigManager {
-  public mergedConfig: FrameMasterConfig | null = null;
+	public mergedConfig: FrameMasterConfig | null = null;
 
-  /**
-   * Getter for accessing the merged configuration.
-   * @returns The current configuration or null if not yet loaded
-   */
-  public get config() {
-    return this.mergedConfig;
-  }
+	/**
+	 * Getter for accessing the merged configuration.
+	 * @returns The current configuration or null if not yet loaded
+	 */
+	public get config() {
+		return this.mergedConfig;
+	}
 
-  /**
-   * Loads the Frame-Master configuration from `frame-master.config.ts`.
-   *
-   * If config is already loaded, returns cached version.
-   * Falls back to minimal default config if file is missing or empty.
-   *
-   * @returns Promise resolving to the loaded configuration
-   * @internal - Called by Frame-Master during initialization
-   */
-  async initConfig(
-    withSuffix?: string,
-    config?: FrameMasterConfig
-  ): Promise<FrameMasterConfig> {
-    if (config) {
-      this.mergedConfig = config;
-      return this.mergedConfig;
-    }
-    if (this.mergedConfig != null) return this.mergedConfig;
-    const realFilePath = join(process.cwd(), Paths.configFile);
-    const filePath = realFilePath + (withSuffix ?? "");
-    if (!(await Bun.file(realFilePath).exists()))
-      throw new ConfigFileNotFound(realFilePath);
-    try {
-      const configModule = await import(filePath);
-      const config = configModule?.default as FrameMasterConfig | undefined;
+	/**
+	 * Loads the Frame-Master configuration from `frame-master.config.ts`.
+	 *
+	 * If config is already loaded, returns cached version.
+	 * Falls back to minimal default config if file is missing or empty.
+	 *
+	 * @returns Promise resolving to the loaded configuration
+	 * @internal - Called by Frame-Master during initialization
+	 */
+	async initConfig(
+		withSuffix?: string,
+		config?: FrameMasterConfig,
+	): Promise<FrameMasterConfig> {
+		if (config) {
+			this.mergedConfig = config;
+			return this.mergedConfig;
+		}
+		if (this.mergedConfig != null) return this.mergedConfig;
+		const realFilePath = join(process.cwd(), Paths.configFile);
+		const filePath = realFilePath + (withSuffix ?? "");
+		if (!(await Bun.file(realFilePath).exists()))
+			throw new ConfigFileNotFound(realFilePath);
+		try {
+			const configModule = await import(filePath);
+			const config = configModule?.default as FrameMasterConfig | undefined;
 
-      if (!config)
-        throw new Error("Config file does not export the config as default.");
+			if (!config)
+				throw new Error("Config file does not export the config as default.");
 
-      this.mergedConfig = config;
-      return this.mergedConfig;
-    } catch (error) {
-      throw new Error("Error when loading Config file frame-master.config.ts", {
-        cause: error,
-      });
-    }
-  }
+			this.mergedConfig = config;
+			return this.mergedConfig;
+		} catch (error) {
+			throw new Error("Error when loading Config file frame-master.config.ts", {
+				cause: error,
+			});
+		}
+	}
 
-  /**
-   * Reloads the configuration by clearing cache and re-importing.
-   *
-   * Useful for hot-reloading or testing scenarios.
-   *
-   * @returns Promise resolving to the reloaded configuration
-   */
-  async reloadConfig(): Promise<FrameMasterConfig> {
-    this.mergedConfig = null;
-    return this.initConfig(`?t=${Bun.randomUUIDv7()}`);
-  }
+	/**
+	 * Reloads the configuration by clearing cache and re-importing.
+	 *
+	 * Useful for hot-reloading or testing scenarios.
+	 *
+	 * @returns Promise resolving to the reloaded configuration
+	 */
+	async reloadConfig(): Promise<FrameMasterConfig> {
+		this.mergedConfig = null;
+		return this.initConfig(`?t=${Bun.randomUUIDv7()}`);
+	}
 
-  /**
-   * Returns the current configuration without loading.
-   *
-   * @returns The configuration object or null if not yet loaded
-   */
-  getConfig(): FrameMasterConfig | null {
-    return this.mergedConfig;
-  }
-  setMockConfig(mockConfig: FrameMasterConfig) {
-    this.mergedConfig = mockConfig;
-  }
+	/**
+	 * Returns the current configuration without loading.
+	 *
+	 * @returns The configuration object or null if not yet loaded
+	 */
+	getConfig(): FrameMasterConfig | null {
+		return this.mergedConfig;
+	}
+	setMockConfig(mockConfig: FrameMasterConfig) {
+		this.mergedConfig = mockConfig;
+	}
 }
 
 /**
@@ -120,9 +120,9 @@ export const configManager = new ConfigManager();
  * ```
  */
 export async function InitConfig(
-  config?: FrameMasterConfig
+	config?: FrameMasterConfig,
 ): Promise<FrameMasterConfig> {
-  return configManager.initConfig(undefined, config);
+	return configManager.initConfig(undefined, config);
 }
 
 /**
@@ -140,7 +140,7 @@ export async function InitConfig(
  * ```
  */
 export async function reloadConfig(): Promise<FrameMasterConfig> {
-  return configManager.reloadConfig();
+	return configManager.reloadConfig();
 }
 
 /**
@@ -176,11 +176,11 @@ export async function reloadConfig(): Promise<FrameMasterConfig> {
  * ```
  */
 export function getConfig(): FrameMasterConfig | null {
-  return configManager.getConfig();
+	return configManager.getConfig();
 }
 
 /** Override Config for testing perpose or something else */
 export function setMockConfig(mockConfig: FrameMasterConfig) {
-  configManager.setMockConfig(mockConfig);
-  return mockConfig;
+	configManager.setMockConfig(mockConfig);
+	return mockConfig;
 }

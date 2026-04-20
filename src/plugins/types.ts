@@ -1,13 +1,13 @@
+import type { Command } from "commander";
+import type { Builder } from "../build";
+import type { masterRequest } from "../server/request-manager";
+import type { FrameMasterConfig } from "../server/type";
+import type { PluginLoader } from "./plugin-loader";
 import type {
 	ClientIPCManager,
 	DirectiveDefinition,
 	Directives,
 } from "./utils";
-import type { masterRequest } from "../server/request-manager";
-import type { Builder } from "../build";
-import type { Command } from "commander";
-import type { FrameMasterConfig } from "../server/type";
-import type { PluginLoader } from "./plugin-loader";
 
 export type WatchEventType = "change" | "rename";
 
