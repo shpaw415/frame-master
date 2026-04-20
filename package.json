@@ -9,7 +9,7 @@
 		"@types/react-dom": "^19.2.2"
 	},
 	"peerDependencies": {
-		"typescript": "^5.9.3"
+		"typescript": "^6.0.3"
 	},
 	"bin": {
 		"frame-master": "bin/index.ts"
