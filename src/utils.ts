@@ -5,13 +5,13 @@ export { directiveToolSingleton as directiveManager };
 
 type RouteCallback = (master: masterRequest) => void | Promise<void>;
 type MethodKeys =
-  | "POST"
-  | "GET"
-  | "DELETE"
-  | "PUT"
-  | "PATCH"
-  | "OPTIONS"
-  | "HEAD";
+	| "POST"
+	| "GET"
+	| "DELETE"
+	| "PUT"
+	| "PATCH"
+	| "OPTIONS"
+	| "HEAD";
 
 /**
  * to use on router plugin
@@ -28,40 +28,40 @@ type MethodKeys =
  * }
  * */
 export function onRoute(
-  master: masterRequest,
-  routes: Record<
-    string,
-    RouteCallback | Partial<Record<MethodKeys, RouteCallback>>
-  >
+	master: masterRequest,
+	routes: Record<
+		string,
+		RouteCallback | Partial<Record<MethodKeys, RouteCallback>>
+	>,
 ) {
-  const currentRoute = routes[master.URL.pathname];
+	const currentRoute = routes[master.URL.pathname];
 
-  if (typeof currentRoute == "function") {
-    return currentRoute(master);
-  } else if (currentRoute) {
-    return currentRoute[master.request.method as MethodKeys]?.(master);
-  }
+	if (typeof currentRoute == "function") {
+		return currentRoute(master);
+	} else if (currentRoute) {
+		return currentRoute[master.request.method as MethodKeys]?.(master);
+	}
 }
 
 export function join(...parts: string[]) {
-  return parts
-    .map((part, index) => {
-      // Normalize backslashes to forward slashes
-      part = part.replace(/\\/g, "/");
+	return parts
+		.map((part, index) => {
+			// Normalize backslashes to forward slashes
+			part = part.replace(/\\/g, "/");
 
-      if (index === 0) {
-        // First part: remove trailing slashes only
-        return part.replace(/\/+$/g, "");
-      } else if (index === parts.length - 1) {
-        // Last part: remove leading slashes only (preserve filenames like index.js)
-        return part.replace(/^\/+/g, "");
-      } else {
-        // Middle parts: remove both leading and trailing slashes
-        return part.replace(/^\/+|\/+$/g, "");
-      }
-    })
-    .filter((part) => part.length > 0)
-    .join("/");
+			if (index === 0) {
+				// First part: remove trailing slashes only
+				return part.replace(/\/+$/g, "");
+			} else if (index === parts.length - 1) {
+				// Last part: remove leading slashes only (preserve filenames like index.js)
+				return part.replace(/^\/+/g, "");
+			} else {
+				// Middle parts: remove both leading and trailing slashes
+				return part.replace(/^\/+|\/+$/g, "");
+			}
+		})
+		.filter((part) => part.length > 0)
+		.join("/");
 }
 
 /**
@@ -115,14 +115,14 @@ export function join(...parts: string[]) {
  * });
  */
 export function pluginRegex({ path, ext }: { path: string[]; ext: string[] }) {
-  return new RegExp(
-    `^${escapeRegExp(join(...path))}\\/.*\\.(${ext
-      .map(escapeRegExp)
-      .join("|")})$`
-  );
+	return new RegExp(
+		`^${escapeRegExp(join(...path))}\\/.*\\.(${ext
+			.map(escapeRegExp)
+			.join("|")})$`,
+	);
 }
 function escapeRegExp(string: string) {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /**
@@ -162,15 +162,15 @@ function escapeRegExp(string: string) {
  * ```
  */
 export function isVerbose(): boolean {
-  return process.env.FRAME_MASTER_VERBOSE === "true";
+	return process.env.FRAME_MASTER_VERBOSE === "true";
 }
 
 export function onVerbose(
-  callback: () => void | Promise<void>
+	callback: () => void | Promise<void>,
 ): void | Promise<void> {
-  if (isVerbose()) {
-    return callback();
-  }
+	if (isVerbose()) {
+		return callback();
+	}
 }
 
 /**
@@ -188,9 +188,9 @@ export function onVerbose(
  * ```
  */
 export function verboseLog(...args: unknown[]): void {
-  if (isVerbose()) {
-    console.log(...args);
-  }
+	if (isVerbose()) {
+		console.log(...args);
+	}
 }
 
 /**
@@ -232,7 +232,7 @@ export function verboseLog(...args: unknown[]): void {
  * ```
  */
 export function isBuildMode(): boolean {
-  return globalThis.process.env.BUILD_MODE === "true";
+	return globalThis.process.env.BUILD_MODE === "true";
 }
 
 /**
@@ -252,7 +252,7 @@ export function isBuildMode(): boolean {
  * ```
  */
 export function isServerRunning(): boolean {
-  return Boolean(globalThis.__SERVER_INSTANCE__);
+	return Boolean(globalThis.__SERVER_INSTANCE__);
 }
 
 /**
@@ -270,7 +270,7 @@ export function isServerRunning(): boolean {
  * ```
  */
 export function isDev(): boolean {
-  return process.env.NODE_ENV !== "production";
+	return process.env.NODE_ENV !== "production";
 }
 
 /**
@@ -288,5 +288,5 @@ export function isDev(): boolean {
  * ```
  */
 export function isProd(): boolean {
-  return process.env.NODE_ENV === "production";
+	return process.env.NODE_ENV === "production";
 }

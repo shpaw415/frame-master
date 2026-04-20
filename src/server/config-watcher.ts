@@ -1,15 +1,15 @@
+import { isVerbose, verboseLog } from "frame-master/utils";
 import { join } from "path";
 import Paths from "../paths";
-import { getConfig } from "./config";
 import { pluginLoader } from "../plugins";
+import { getConfig } from "./config";
 import { HotFileWatcher } from "./hot-file-watcher";
 import { reloadServer } from "./index";
 import { reinitAll } from "./init";
 import type { FrameMasterConfig } from "./type";
-import { isVerbose, verboseLog } from "frame-master/utils";
 
 export type ConfigReloadCallback = (
-  newConfig: FrameMasterConfig
+	newConfig: FrameMasterConfig,
 ) => void | Promise<void>;
 
 /**
@@ -19,7 +19,7 @@ export type ConfigReloadCallback = (
  * 1. Reloads the configuration from disk
  * 2. Reinitializes the plugin loader with the new config
  * 3. Reinitializes the builder with new plugin build configs
- * 4. Reloads the HTTP server with new routes and settings
+ * 4. Reloads the HTTP server with new routes and settings, then reruns serverReady hooks
  * 5. Calls any registered callbacks with the new config
  *
  * @example
@@ -32,117 +32,117 @@ export type ConfigReloadCallback = (
  * ```
  */
 class ConfigWatcher {
-  private fileWatcher: HotFileWatcher | null = null;
-  private callbacks: Set<ConfigReloadCallback> = new Set();
-  private configPath: string;
+	private fileWatcher: HotFileWatcher | null = null;
+	private callbacks: Set<ConfigReloadCallback> = new Set();
+	private configPath: string;
 
-  constructor() {
-    this.configPath = join(process.cwd(), Paths.configFile);
-  }
+	constructor() {
+		this.configPath = join(process.cwd(), Paths.configFile);
+	}
 
-  /**
-   * Register a callback to be called when the config is reloaded.
-   *
-   * @param callback - Function to call with the new config
-   * @returns Unsubscribe function
-   */
-  onReload(callback: ConfigReloadCallback): () => void {
-    this.callbacks.add(callback);
-    return () => this.callbacks.delete(callback);
-  }
+	/**
+	 * Register a callback to be called when the config is reloaded.
+	 *
+	 * @param callback - Function to call with the new config
+	 * @returns Unsubscribe function
+	 */
+	onReload(callback: ConfigReloadCallback): () => void {
+		this.callbacks.add(callback);
+		return () => this.callbacks.delete(callback);
+	}
 
-  /**
-   * Start watching the config file for changes.
-   */
-  async start(): Promise<void> {
-    if (this.fileWatcher?.isActive()) {
-      verboseLog("[ConfigWatcher] Already watching config file");
-      return;
-    }
+	/**
+	 * Start watching the config file for changes.
+	 */
+	async start(): Promise<void> {
+		if (this.fileWatcher?.isActive()) {
+			verboseLog("[ConfigWatcher] Already watching config file");
+			return;
+		}
 
-    this.fileWatcher = new HotFileWatcher({
-      filePath: this.configPath,
-      onReload: () => this.reload(),
-      debounceDelay: 100,
-      name: "ConfigWatcher",
-      verbose: isVerbose(),
-    });
+		this.fileWatcher = new HotFileWatcher({
+			filePath: this.configPath,
+			onReload: () => this.reload(),
+			debounceDelay: 100,
+			name: "ConfigWatcher",
+			verbose: isVerbose(),
+		});
 
-    await this.fileWatcher.start();
-  }
+		await this.fileWatcher.start();
+	}
 
-  /**
-   * Reload the configuration and reinitialize dependent systems.
-   */
-  async reload(): Promise<void> {
-    verboseLog("[ConfigWatcher] Reloading configuration...");
+	/**
+	 * Reload the configuration and reinitialize dependent systems.
+	 */
+	async reload(): Promise<void> {
+		verboseLog("[ConfigWatcher] Reloading configuration...");
 
-    try {
-      // 1. Reinitialize everything (config, plugins, builder, hooks, watchers)
-      await reinitAll();
+		try {
+			// 1. Reinitialize everything (config, plugins, builder, hooks, watchers)
+			await reinitAll();
 
-      // 2. Run onConfigReload plugin hooks
-      await this.runReloadHooks();
+			// 2. Run onConfigReload plugin hooks
+			await this.runReloadHooks();
 
-      // 3. Reload the HTTP server with new routes and config
-      reloadServer();
+			// 3. Reload the HTTP server with new routes and config
+			await reloadServer();
 
-      // 4. Notify all registered callbacks
-      const newConfig = getConfig();
-      if (newConfig) {
-        for (const callback of this.callbacks) {
-          try {
-            await callback(newConfig);
-          } catch (error) {
-            console.error("[ConfigWatcher] Error in reload callback:", error);
-          }
-        }
-      }
+			// 4. Notify all registered callbacks
+			const newConfig = getConfig();
+			if (newConfig) {
+				for (const callback of this.callbacks) {
+					try {
+						await callback(newConfig);
+					} catch (error) {
+						console.error("[ConfigWatcher] Error in reload callback:", error);
+					}
+				}
+			}
 
-      verboseLog("[ConfigWatcher] Configuration reloaded successfully");
-    } catch (error) {
-      console.error("[ConfigWatcher] Failed to reload configuration:", error);
-    }
-  }
+			verboseLog("[ConfigWatcher] Configuration reloaded successfully");
+		} catch (error) {
+			console.error("[ConfigWatcher] Failed to reload configuration:", error);
+		}
+	}
 
-  /**
-   * Run any plugin hooks that should execute on config reload.
-   */
-  private async runReloadHooks(): Promise<void> {
-    if (!pluginLoader) return;
+	/**
+	 * Run any plugin hooks that should execute on config reload.
+	 */
+	private async runReloadHooks(): Promise<void> {
+		if (!pluginLoader) return;
 
-    // Get plugins that have onConfigReload hook
-    const reloadPlugins = pluginLoader.getPluginByName("onConfigReload");
+		// Get plugins that have onConfigReload hook
+		const reloadPlugins = pluginLoader.getPluginByName("onConfigReload");
 
-    await Promise.all(
-      reloadPlugins.map(async (plugin) => {
-        try {
-          await plugin.pluginParent?.();
-        } catch (error) {
-          console.error(
-            `[ConfigWatcher] Error in plugin ${plugin.name} onConfigReload:`,
-            error
-          );
-        }
-      })
-    );
-  }
+		await Promise.all(
+			reloadPlugins.map(async (plugin) => {
+				try {
+					await plugin.pluginParent?.();
+				} catch (error) {
+					console.error(
+						`[ConfigWatcher] Error in plugin ${plugin.name} onConfigReload:`,
+						error,
+					);
+				}
+			}),
+		);
+	}
 
-  /**
-   * Stop watching the config file.
-   */
-  stop(): void {
-    this.fileWatcher?.stop();
-    this.fileWatcher = null;
-    verboseLog("[ConfigWatcher] Stopped watching config file");
-  }
+	/**
+	 * Stop watching the config file.
+	 */
+	stop(): void {
+		this.fileWatcher?.stop();
+		this.fileWatcher = null;
+		verboseLog("[ConfigWatcher] Stopped watching config file");
+	}
 
-  /**
-   * Check if currently watching the config file.
-   */
-  isActive(): boolean {
-    return this.fileWatcher?.isActive() ?? false;
-  }
+	/**
+	 * Check if currently watching the config file.
+	 */
+	isActive(): boolean {
+		return this.fileWatcher?.isActive() ?? false;
+	}
 }
 
 /**
@@ -163,17 +163,17 @@ export const configWatcher = new ConfigWatcher();
  * ```
  */
 export async function startConfigWatcher(): Promise<void> {
-  if (process.env.NODE_ENV === "production") {
-    return;
-  }
-  await configWatcher.start();
+	if (process.env.NODE_ENV === "production") {
+		return;
+	}
+	await configWatcher.start();
 }
 
 /**
  * Stop watching the config file.
  */
 export function stopConfigWatcher(): void {
-  configWatcher.stop();
+	configWatcher.stop();
 }
 
 /**
@@ -195,7 +195,7 @@ export function stopConfigWatcher(): void {
  * ```
  */
 export function onConfigReload(callback: ConfigReloadCallback): () => void {
-  return configWatcher.onReload(callback);
+	return configWatcher.onReload(callback);
 }
 
 /**
@@ -209,5 +209,5 @@ export function onConfigReload(callback: ConfigReloadCallback): () => void {
  * ```
  */
 export async function triggerConfigReload(): Promise<void> {
-  await configWatcher.reload();
+	await configWatcher.reload();
 }

@@ -1,7 +1,7 @@
 import TestGUI from "./GUI";
 
 export function App() {
-  return <TestGUI />;
+	return <TestGUI />;
 }
 
 export default App;
