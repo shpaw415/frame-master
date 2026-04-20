@@ -1,4 +1,4 @@
-"server only";
+"server-only";
 
 import {
 	type _webToken,
@@ -16,6 +16,7 @@ import { fixReactJSXDEV } from "./react-fix";
 import type { FrameMasterConfig } from "./type";
 import { errorToJSXPage } from "./utils/error-to-jsx";
 import { formatHTML } from "./utils/html-formating";
+import type Builder from "frame-master/build";
 
 fixReactJSXDEV();
 
@@ -48,7 +49,9 @@ type Writable<T> = {
 	-readonly [P in keyof T]: T[P];
 };
 
-export class masterRequest<ContextType extends Record<string, unknown> = {}> {
+export class masterRequest<
+	ContextType extends Record<string, unknown> = Record<string, unknown>,
+> {
 	public request: Request;
 
 	public currentState: RequestState = "before_request";
@@ -68,7 +71,7 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
 
 	private _awaitingCookies: Array<{
 		name: string;
-		data: any;
+		data: Record<string, unknown>;
 		options?: CookieOptions;
 		dataOptions?: SetDataOptions;
 	}> = [];
@@ -108,8 +111,8 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
 	public URL: URL;
 
 	public router: {
-		server: any;
-		client: any;
+		server: string;
+		client: string;
 	} = {
 		server: "",
 		client: "",
@@ -121,16 +124,18 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
 	public pluginLoader: PluginLoader;
 	public serverInstance: Bun.Server<undefined>;
 	public isLogPrevented: boolean = false;
+	public builder: Builder;
 
 	constructor(props: {
 		request: Request;
 		server: Bun.Server<undefined>;
 		config?: FrameMasterConfig;
 		pluginLoader?: PluginLoader;
+		builder: Builder;
 	}) {
 		this.request = props.request;
 		this.serverInstance = props.server;
-		this.serverConfig = props.config ?? getConfig()!;
+		this.serverConfig = props.config ?? (getConfig() as FrameMasterConfig);
 		this.pluginLoader =
 			props.pluginLoader ?? new PluginLoader(this.serverConfig);
 
@@ -139,6 +144,17 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
 		this.isAskingHTML = Boolean(
 			this.request.headers.get("accept")?.includes("text/html"),
 		);
+		this.builder = props.builder;
+
+		if (
+			!this.request ||
+			!this.serverInstance ||
+			!this.serverConfig ||
+			!this.pluginLoader ||
+			!this.builder
+		) {
+			throw new Error("Missing required parameters for masterRequest");
+		}
 	}
 
 	async handleRequest(): Promise<Response> {
@@ -183,7 +199,7 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
 			}
 		}
 		this._triggerAwaitingCookies();
-		return this._response!;
+		return this._response as Response;
 	}
 	/** Prevent server logging */
 	preventLog() {
@@ -210,7 +226,9 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
 	getContext<
 		CutsomContextType = undefined,
 	>(): CutsomContextType extends undefined ? ContextType : CutsomContextType {
-		return this.context as any;
+		return this.context as CutsomContextType extends undefined
+			? ContextType
+			: CutsomContextType;
 	}
 	/**
 	 * Sets the context data for the request.
@@ -221,7 +239,7 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
 			? ContextType
 			: CutsomContextType,
 	) {
-		this.context = { ...this.context, ...(context as any) };
+		this.context = { ...this.context, ...context };
 		return context;
 	}
 	public get response(): Response | undefined {
@@ -326,7 +344,7 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
 	}
 
 	setHeader(name: string, value: string) {
-		if (this.currentState == "after_request") {
+		if (this.currentState === "after_request") {
 			if (!this._response)
 				throw new ResponseNotSetError(
 					"Response is not set when trying to set header in after_request",
@@ -369,7 +387,7 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
 		for (const [key, val] of Object.entries(values)) {
 			try {
 				this.globalDataInjection.data[key] =
-					typeof val == "undefined" ? "undefined" : JSON.stringify(val);
+					typeof val === "undefined" ? "undefined" : JSON.stringify(val);
 				this.globalDataInjection.rawData[key] = val;
 			} catch (error) {
 				console.error(`Failed to serialize value for key "${key}":`, error);
@@ -417,9 +435,9 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
 	 * Converts global data to JS format for script injection
 	 */
 	globalDataToJSFormat() {
-		return this.preloadToStringArray(this.globalDataInjection.data as any).join(
-			";",
-		);
+		return this.preloadToStringArray(
+			this.globalDataInjection.data as never,
+		).join(";");
 	}
 
 	private _deleteCookie(name: string, options?: DeleteCookieOptions) {
@@ -531,7 +549,10 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
 				);
 			} else if (typeof this._response_body !== "string")
 				return this.setResponseThenReturn(
-					new Response(this._response_body as any, this._response_init),
+					new Response(
+						this._response_body as globalThis.BodyInit,
+						this._response_init,
+					),
 				);
 
 			let formattedStringData: string;
@@ -679,6 +700,7 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
 					return after?.(transformedText, this, context);
 				} catch (e) {
 					console.error(`Error in html_rewrite plugin, name: ${name}:`, e);
+					return undefined;
 				}
 			}),
 		);
@@ -692,10 +714,12 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
 			...this.preloadToStringArray(preloadScriptObj),
 			"process={env: __PROCESS_ENV__};",
 		].join(";");
+		// Sanitize the script content to prevent XSS via </script> or Unicode line separators
+		const sanitizedScript = this.sanitizeScriptContent(preloadSriptsStrList);
 		const rewriter = new HTMLRewriter();
 		rewriter.on("head", {
 			element(element) {
-				element.append("<script>" + preloadSriptsStrList + "</script>", {
+				element.append(`<script>${sanitizedScript}</script>`, {
 					html: true,
 				});
 			},
@@ -739,6 +763,16 @@ export class masterRequest<ContextType extends Record<string, unknown> = {}> {
 			const message = error instanceof Error ? error.message : String(error);
 			throw new FrameMasterError(`Failed to create preload object: ${message}`);
 		}
+	}
+
+	/**
+	 * Sanitizes script content to prevent XSS attacks
+	 */
+	private sanitizeScriptContent(content: string): string {
+		return content
+			.replace(/<\/script>/gi, "<\\/script>")
+			.replace(/\u2028/g, "\\u2028")
+			.replace(/\u2029/g, "\\u2029");
 	}
 
 	/**

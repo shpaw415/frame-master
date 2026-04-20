@@ -89,14 +89,18 @@ function isPlainObject(value: unknown): boolean {
 export function createServer(params?: {
 	config?: FrameMasterConfig;
 	pluginLoader?: PluginLoader;
+	builder?: Builder;
 }): Bun.Server<unknown> {
 	const effectiveConfig = params?.config ?? getConfig();
 	const _pluginLoader = params?.pluginLoader ?? pluginLoader;
+	const builder = params?.builder ?? getBuilder();
 
 	if (!effectiveConfig) {
 		throw new Error("Configuration not loaded");
 	} else if (!_pluginLoader) {
 		throw new Error("Plugin loader not initialized");
+	} else if (!builder) {
+		throw new Error("Builder not initialized");
 	}
 
 	const serverConfigPlugins = _pluginLoader.getPluginByName("serverConfig");
@@ -133,6 +137,7 @@ export function createServer(params?: {
 				server,
 				config: effectiveConfig,
 				pluginLoader: _pluginLoader,
+				builder,
 			});
 			const result = reqManager.handleRequest();
 			result.then(() => !reqManager.isLogPrevented && logRequest(request));
@@ -201,6 +206,7 @@ export async function reloadServer(): Promise<Bun.Server<unknown>> {
 	globalThis.__SERVER_INSTANCE__ = createServer({
 		config,
 		pluginLoader: resolvedPluginLoader,
+		builder: resolvedBuilder,
 	});
 
 	await runServerReadyHooks({
@@ -242,6 +248,7 @@ export default async (params?: {
 	globalThis.__SERVER_INSTANCE__ = createServer({
 		config,
 		pluginLoader: resolvedPluginLoader,
+		builder: resolvedBuilder,
 	});
 
 	await runServerReadyHooks({

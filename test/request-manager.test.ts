@@ -271,6 +271,7 @@ const createMaster = () =>
 		server,
 		config,
 		pluginLoader,
+		builder,
 	});
 
 beforeAll(async () => {
@@ -307,6 +308,7 @@ test("lifecycle: should execute before_request state", async () => {
 	const testMaster = new masterRequest({
 		request: new Request("http://localhost/before-test"),
 		server,
+		builder,
 	});
 
 	await testMaster.handleRequest();
@@ -317,6 +319,7 @@ test("lifecycle: should execute request state after before_request", async () =>
 	const testMaster = new masterRequest({
 		request: new Request("http://localhost/order-test"),
 		server,
+		builder,
 	});
 
 	await testMaster.handleRequest();
@@ -327,6 +330,7 @@ test("lifecycle: should execute after_request state last", async () => {
 	const testMaster = new masterRequest({
 		request: new Request("http://localhost/after-test"),
 		server,
+		builder,
 	});
 
 	await testMaster.handleRequest();
@@ -337,6 +341,7 @@ test("lifecycle: should not allow setting response in before_request", async () 
 	const testMaster = new masterRequest({
 		request: new Request("http://localhost/early-response"),
 		server,
+		builder,
 	});
 
 	const res = await testMaster.handleRequest();
@@ -350,6 +355,7 @@ test("lifecycle: should maintain context across states", async () => {
 	const testMaster = new masterRequest({
 		request: new Request("http://localhost/context-test"),
 		server,
+		builder,
 	});
 
 	await testMaster.handleRequest();
@@ -361,6 +367,7 @@ test("lifecycle: should check if response is set", async () => {
 	const testMaster = new masterRequest({
 		request: new Request("http://localhost/response-check"),
 		server,
+		builder,
 	});
 
 	await testMaster.handleRequest();
@@ -370,6 +377,7 @@ test("lifecycle: should handle errors gracefully", async () => {
 	const testMaster = new masterRequest({
 		request: new Request("http://localhost/error-test"),
 		server,
+		builder,
 	});
 
 	const res = await testMaster.handleRequest();
@@ -380,6 +388,7 @@ test("lifecycle: should respect plugin priority order", async () => {
 	const testMaster = new masterRequest({
 		request: new Request("http://localhost/priority-test"),
 		server,
+		builder,
 	});
 
 	await testMaster.handleRequest();
@@ -396,6 +405,7 @@ test("cookies: should get cookie value", async () => {
 			},
 		}),
 		server,
+		builder,
 	});
 
 	const sessionCookie = testMaster.getCookie<{ sessionId?: string }>(
@@ -428,6 +438,7 @@ test("response: should set custom headers", async () => {
 	const testMaster = new masterRequest({
 		request: new Request("http://localhost/header-test"),
 		server,
+		builder,
 	});
 
 	const res = await testMaster.handleRequest();
@@ -443,6 +454,7 @@ test("request: should access request method and URL", async () => {
 			method: "POST",
 		}),
 		server,
+		builder,
 	});
 
 	expect(testMaster.request.method).toBe("POST");
@@ -461,6 +473,7 @@ test("request: should parse JSON body", async () => {
 			body: JSON.stringify(body),
 		}),
 		server,
+		builder,
 	});
 
 	const parsedBody = await testMaster.request.json();
@@ -472,6 +485,7 @@ test("modifiers: should NOT apply global values to JSON responses", async () => 
 	const testMaster = new masterRequest({
 		request: new Request("http://localhost/json-response"),
 		server,
+		builder,
 	});
 
 	const res = await testMaster.handleRequest();
@@ -487,6 +501,7 @@ test("modifiers: should NOT apply global values to plain text responses", async 
 	const testMaster = new masterRequest({
 		request: new Request("http://localhost/text-response"),
 		server,
+		builder,
 	});
 
 	const res = await testMaster.handleRequest();
@@ -502,6 +517,7 @@ test("modifiers: should apply global values to HTML responses", async () => {
 	const testMaster = new masterRequest({
 		request: new Request("http://localhost/html-response"),
 		server,
+		builder,
 	});
 
 	const res = await testMaster.handleRequest();
@@ -517,6 +533,7 @@ test("modifiers: should NOT apply global values when no content type is set", as
 	const testMaster = new masterRequest({
 		request: new Request("http://localhost/no-content-type"),
 		server,
+		builder,
 	});
 
 	const res = await testMaster.handleRequest();
