@@ -1,13 +1,13 @@
+import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { cwd } from "node:process";
 import chalk from "chalk";
 import type { FrameMasterConfig } from "frame-master/server/type";
-import { existsSync, mkdirSync, rmSync } from "fs";
-import { join } from "path";
-import { cwd } from "process";
 import { type PluginLoader, pluginLoader } from "../plugins";
 import { chainPlugins } from "../plugins/plugin-chaining";
 import type { BuildOptionsPlugin } from "../plugins/types";
 import { getConfig } from "../server/config";
-import { isVerbose, onVerbose, pluginRegex, verboseLog } from "../utils";
+import { onVerbose, pluginRegex } from "../utils";
 
 type RequiredBuilOptions = Required<BuildOptionsPlugin>;
 
@@ -61,13 +61,13 @@ export class Builder {
 		this.baseEntrypoints = props.baseEntrypoints ?? [];
 
 		this.staticBuildConfig = props.pluginBuildConfig
-			.filter((c) => typeof c != "function")
+			.filter((c) => typeof c !== "function")
 			.reduce(
 				(prev, next) => this.mergeConfigSafely(prev as Bun.BuildConfig, next),
 				{} as Partial<Bun.BuildConfig>,
 			);
 		this.buildConfigFactory = props.pluginBuildConfig.filter(
-			(c) => typeof c == "function",
+			(c) => typeof c === "function",
 		);
 
 		this.onBeforeBuildHooks = props.beforeBuilds || [];
@@ -248,14 +248,15 @@ export class Builder {
 		await Promise.all(
 			fileToRemove.map((output) => {
 				try {
-					Bun.file(output).delete();
-				} catch (e) {
+					return Bun.file(output).delete();
+				} catch (_e) {
 					onVerbose(() =>
 						console.warn(
 							chalk.yellow(`⚠️  Failed to delete file: \`${output}\``),
 						),
 					);
 				}
+				return Promise.resolve();
 			}),
 		);
 	}
@@ -481,7 +482,7 @@ export class Builder {
 		return {
 			contents: Object.keys(module)
 				.map((e) => {
-					return e == "default"
+					return e === "default"
 						? `export default function _default() { ${toErrorString(
 								"default",
 							)} };`
@@ -928,7 +929,7 @@ export class Builder {
 	 * @internal
 	 * Type guard to check if a value is a plain object (not Array, Date, RegExp, etc.).
 	 */
-	private isPlainObject(value: any): boolean {
+	private isPlainObject(value: unknown): boolean {
 		return (
 			value !== null &&
 			typeof value === "object" &&
@@ -943,7 +944,7 @@ export class Builder {
 	 * @internal
 	 * Logs messages when logging is enabled.
 	 */
-	private log(...data: any[]) {
+	private log(...data: unknown[]) {
 		if (!this.isLogEnabled) return;
 		console.log("[Frame-Master-plugin-react-ssr Builder]:", ...data);
 	}
@@ -1000,16 +1001,16 @@ export async function createBuilder(
 	const plugin = _pluginLoader.getPluginByName("build");
 	const configFactories = plugin
 		.map((plugin) => plugin.pluginParent.buildConfig)
-		.filter((p) => p != undefined);
+		.filter((p) => p !== undefined);
 	const beforeBuildHooks = plugin
 		.map((plugin) => plugin.pluginParent.beforeBuild)
-		.filter((p) => p != undefined) as Exclude<
+		.filter((p) => p !== undefined) as Exclude<
 		BuilderProps["beforeBuilds"],
 		undefined
 	>;
 	const afterBuildHooks = plugin
 		.map((plugin) => plugin.pluginParent.afterBuild)
-		.filter((p) => p != undefined) as Exclude<
+		.filter((p) => p !== undefined) as Exclude<
 		BuilderProps["afterBuilds"],
 		undefined
 	>;
