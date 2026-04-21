@@ -3,10 +3,10 @@ import type { Server } from "bun";
 import { fileURLToPath, serve } from "bun";
 import { Command } from "commander";
 import { type Builder, getBuilder } from "frame-master/build";
+import type { FrameMasterConfig } from "frame-master/server/type";
 import { getConfig } from "../../src/server/config";
 import { InitAll } from "../../src/server/init";
 import { masterRequest } from "../../src/server/request-manager";
-import type { FrameMasterConfig } from "frame-master/server/type";
 
 export const testCommand = new Command("test");
 

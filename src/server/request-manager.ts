@@ -6,6 +6,7 @@ import {
 	webToken,
 } from "@shpaw415/webtoken";
 import type { BodyInit } from "bun";
+import type Builder from "frame-master/build";
 import { PluginLoader } from "frame-master/plugins";
 import { renderToReadableStream, renderToString } from "react-dom/server";
 import { directiveToolSingleton } from "../plugins/utils";
@@ -16,7 +17,6 @@ import { fixReactJSXDEV } from "./react-fix";
 import type { FrameMasterConfig } from "./type";
 import { errorToJSXPage } from "./utils/error-to-jsx";
 import { formatHTML } from "./utils/html-formating";
-import type Builder from "frame-master/build";
 
 fixReactJSXDEV();
 
