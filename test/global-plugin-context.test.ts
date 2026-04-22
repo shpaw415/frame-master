@@ -30,6 +30,68 @@ afterEach(() => {
 	globalThis.__GLOBAL_CONTEXT__ = {};
 });
 
+test("createContext reruns for explicit serve loaders after prior initialization", async () => {
+	const bootstrapConfig: FrameMasterConfig = {
+		HTTPServer: {
+			port: 0,
+		},
+		plugins: [
+			{
+				name: "bootstrap-plugin",
+				version: "1.0.0",
+				priority: 1,
+				serverReady: () => undefined,
+			},
+		],
+	};
+
+	const bootstrapPluginLoader = new PluginLoader(bootstrapConfig);
+	const bootstrapBuilder = await createBuilder(
+		bootstrapConfig,
+		bootstrapPluginLoader,
+	);
+
+	server = await serve({
+		config: bootstrapConfig,
+		pluginLoader: bootstrapPluginLoader,
+		builder: bootstrapBuilder,
+	});
+	server.stop(true);
+	server = undefined;
+	globalThis.__GLOBAL_CONTEXT__ = {};
+
+	const config: FrameMasterConfig = {
+		HTTPServer: {
+			port: 0,
+		},
+		plugins: [
+			{
+				name: "context-owner",
+				version: "1.0.0",
+				priority: 1,
+				createContext: async () => ({
+					count: 1,
+					source: "createContext",
+				}),
+			},
+		],
+	};
+
+	const readyPluginLoader = new PluginLoader(config);
+	const builder = await createBuilder(config, readyPluginLoader);
+
+	server = await serve({
+		config,
+		pluginLoader: readyPluginLoader,
+		builder,
+	});
+
+	expect(getGlobalPluginContext("context-owner")).toEqual({
+		count: 1,
+		source: "createContext",
+	});
+});
+
 test("plugins can share typed global context through helper APIs", async () => {
 	const config: FrameMasterConfig = {
 		HTTPServer: {

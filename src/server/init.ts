@@ -45,7 +45,12 @@ async function syncRuntimeLoaders(loaders?: InitProps["loaders"]) {
  */
 export async function InitAll(bypass?: InitProps) {
 	const runtimeLoaders = await syncRuntimeLoaders(bypass?.loaders);
-	if (inited) return runtimeLoaders;
+	if (inited) {
+		if (bypass?.loaders) {
+			await runCreateContextHooks(bypass.loaders);
+		}
+		return runtimeLoaders;
+	}
 	await runCreateContextHooks(bypass?.loaders);
 	await runOnStartMainPlugins(bypass?.loaders);
 	await runFileSystemWatcherPlugin(undefined, bypass?.loaders);
