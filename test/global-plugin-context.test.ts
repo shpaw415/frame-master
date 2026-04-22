@@ -3,9 +3,9 @@ import { createBuilder } from "frame-master/build";
 import {
 	getGlobalPluginContext,
 	mergeGlobalPluginContext,
+	PluginLoader,
 	setGlobalPluginContext,
 } from "frame-master/plugin";
-import { PluginLoader } from "frame-master/plugins";
 import type { FrameMasterConfig } from "frame-master/server/type";
 import serve from "../src/server";
 
