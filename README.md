@@ -247,6 +247,52 @@ await builder.build("/src/client.ts");
 // Result: { external: ["react", "lodash"], minify: true }
 ```
 
+### Global Plugin Context
+
+Use request context for per-request data and global plugin context for shared plugin state.
+
+```typescript
+import {
+  getGlobalPluginContext,
+  mergeGlobalPluginContext,
+  setGlobalPluginContext,
+} from "frame-master/plugin";
+
+declare module "frame-master/plugin/types" {
+  interface GlobalPluginContextMap {
+    "auth-plugin": {
+      issuer: string;
+      tokenCache: Map<string, string>;
+    };
+    "audit-plugin": {
+      lastSeenIssuer: string;
+    };
+  }
+}
+
+// Plugin A initializes shared state during startup
+createContext: async () => ({
+  issuer: "frame-master",
+  tokenCache: new Map(),
+})
+
+// Plugin B reads and updates Plugin A's shared state
+serverReady: () => {
+  const authContext = getGlobalPluginContext("auth-plugin");
+
+  setGlobalPluginContext("audit-plugin", {
+    lastSeenIssuer: authContext?.issuer ?? "unknown",
+  });
+
+  mergeGlobalPluginContext("auth-plugin", {
+    issuer: authContext?.issuer ?? "frame-master",
+    tokenCache: authContext?.tokenCache ?? new Map(),
+  });
+}
+```
+
+`master.setContext()` and `master.getContext()` remain request-scoped. Global plugin context is shared across plugins and is initialized from `createContext()`.
+
 ### Runtime vs Build Plugins
 
 **Two separate systems:**

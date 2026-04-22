@@ -1,7 +1,7 @@
 import type Builder from "frame-master/build";
 import { verboseLog } from "frame-master/utils";
 import { getBuilder } from "../build";
-import type { PluginLoader } from "../plugins";
+import type { PluginContext, PluginLoader } from "../plugins";
 import { pluginLoader } from "../plugins";
 import { getConfig } from "./config";
 import masterRoutes from "./frame-master-routes";
@@ -15,9 +15,11 @@ declare global {
 	var __FILESYSTEM_WATCHER__: FileSystemWatcher[];
 	var __DRY_RUN__: boolean;
 	var __SERVER_INSTANCE__: Bun.Server<unknown>;
+	var __GLOBAL_CONTEXT__: PluginContext;
 }
 globalThis.__FILESYSTEM_WATCHER__ ??= [];
 globalThis.__DRY_RUN__ ??= true;
+globalThis.__GLOBAL_CONTEXT__ ??= {};
 
 function deepMergeServerConfig(
 	target: any,

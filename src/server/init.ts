@@ -3,6 +3,7 @@ import type Builder from "../build";
 import { getBuilder, InitBuilder, reloadBuilder } from "../build";
 import type { PluginLoader } from "../plugins";
 import { InitPluginLoader, pluginLoader, reloadPluginLoader } from "../plugins";
+import { mergeGlobalPluginContext } from "../plugins/utils";
 import { getConfig, InitConfig, reloadConfig } from "./config";
 import { startConfigWatcher } from "./config-watcher";
 import type { FrameMasterConfig } from "./type";
@@ -146,7 +147,10 @@ async function runCreateContextHooks(params?: {
 	await Promise.all(
 		createContextPlugins.map(async (plugin) => {
 			try {
-				await plugin.pluginParent(_config);
+				const ctx = await plugin.pluginParent(_config);
+				if (typeof ctx !== "undefined") {
+					mergeGlobalPluginContext(plugin.name, ctx);
+				}
 			} catch (error) {
 				console.error(`Error in plugin ${plugin.name} createContext():`, error);
 				errors.push({ name: plugin.name, error: error as Error });
