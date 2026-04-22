@@ -86,6 +86,37 @@ type Requirement = Partial<{
 	bunVersion: string;
 }>;
 
+/**
+ * Extend this interface via module augmentation to expose typed global context
+ * from one plugin to other plugins.
+ *
+ * @example
+ * ```typescript
+ * declare module "frame-master/plugin/types" {
+ *   interface GlobalPluginContextMap {
+ *     "auth-plugin": {
+ *       issuer: string;
+ *       tokenCache: Map<string, string>;
+ *     };
+ *   }
+ * }
+ * ```
+ */
+// biome-ignore lint/suspicious/noEmptyInterface: plugin authors extend this via module augmentation.
+export interface GlobalPluginContextMap {}
+
+export type PluginContextKey = keyof GlobalPluginContextMap | (string & {});
+
+export type PluginGlobalContext<
+	PluginName extends PluginContextKey = PluginContextKey,
+> = PluginName extends keyof GlobalPluginContextMap
+	? GlobalPluginContextMap[PluginName]
+	: unknown;
+
+export type PluginContext = Partial<GlobalPluginContextMap> & {
+	[pluginName: string]: unknown;
+};
+
 export type Request_Plugin = (
 	master: masterRequest,
 	//ipc: ClientIPCManager<"cluster" | "main">
@@ -690,6 +721,10 @@ export type FrameMasterPlugin<
 		 * and builder have been set up. Use it to set up plugin-specific state,
 		 * initialize connections, or perform any setup that depends on the configuration.
 		 *
+		 * Returned values are stored in the global plugin context namespace for this
+		 * plugin and can be accessed by other plugins through the helpers exported from
+		 * `frame-master/plugin` or `frame-master/plugin/utils`.
+		 *
 		 * **Run on the main thread**
 		 *
 		 * @param config - The loaded Frame-Master configuration
@@ -700,25 +735,33 @@ export type FrameMasterPlugin<
 		 *   name: "my-plugin",
 		 *   version: "1.0.0",
 		 *   createContext: (config) => {
-		 *     console.log("Plugin initializing with port:", config.HTTPServer.port);
-		 *     myPluginState.init(config);
+		 *     return {
+		 *       port: config.HTTPServer.port,
+		 *       startedAt: Date.now(),
+		 *     };
 		 *   }
 		 * }
 		 * ```
 		 *
 		 * @example
 		 * ```typescript
+		 * import { getGlobalPluginContext } from "frame-master/plugin";
+		 *
+		 * const authContext = getGlobalPluginContext("auth-plugin");
+		 *
 		 * // Async context creation
 		 * {
 		 *   name: "database-plugin",
 		 *   version: "1.0.0",
 		 *   createContext: async (config) => {
-		 *     await connectToDatabase(config.HTTPServer);
+		 *     return {
+		 *       pool: await connectToDatabase(config.HTTPServer),
+		 *     };
 		 *   }
 		 * }
 		 * ```
 		 */
-		createContext?: (config: FrameMasterConfig) => void | Promise<void>;
+		createContext?: (config: FrameMasterConfig) => unknown | Promise<unknown>;
 		/**
 		 * WebSocket event handlers for real-time communication.
 		 *
