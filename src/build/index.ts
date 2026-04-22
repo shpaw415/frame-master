@@ -946,7 +946,7 @@ export class Builder {
 	 */
 	private log(...data: unknown[]) {
 		if (!this.isLogEnabled) return;
-		console.log("[Frame-Master-plugin-react-ssr Builder]:", ...data);
+		console.log("[Frame-Master Builder]:", ...data);
 	}
 }
 /**
@@ -958,7 +958,7 @@ export class Builder {
  * - All `buildConfig` functions from loaded plugins
  * - All `beforeBuild` hooks from loaded plugins
  * - All `afterBuild` hooks from loaded plugins
- * - Logging enabled if any plugin has `enableLoging: true`
+ * - Logging enabled if any plugin has `enableLogging: true`
  *
  * The singleton pattern ensures all plugins contribute to a single unified build process,
  * allowing proper merging of configurations and coordinated execution of hooks.
