@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { join } from "path";
+import { join } from "node:path";
 import { pluginRegex } from "../src/utils";
 
 describe("utils tests", () => {
@@ -13,9 +13,7 @@ describe("utils tests", () => {
 			"src/components/Button.tsx",
 			"src/components/utils/helper.ts",
 			"src/components/index.ts",
-		].map((path) => {
-			expect(regex.test(path)).toBe(true);
-		});
+		].map((path) => expect(regex.test(path)).toBe(true));
 
 		[
 			"src/pages/index.tsx",
@@ -23,8 +21,6 @@ describe("utils tests", () => {
 			"src/components/subdir/image.png",
 			"src/components2/Button.tsx",
 			join(process.cwd(), "src", "components", "Button.tsx"),
-		].map((path) => {
-			expect(regex.test(path)).toBe(false);
-		});
+		].map((path) => expect(regex.test(path)).toBe(false));
 	});
 });

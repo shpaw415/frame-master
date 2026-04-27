@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { join } from "path";
+import { beforeEach, describe, expect, test } from "bun:test";
+import { join } from "node:path";
 
 /**
  * Test Suite for Template Search CLI Feature
@@ -19,7 +19,7 @@ const CLI_PATH = join(__dirname, "..", "..", "bin", "index.ts");
 
 describe("TemplateSearchQueryBuilder", () => {
 	// We need to import the module dynamically to test the query builder
-	let searchTemplates: () => any;
+	let searchTemplates: typeof import("../../bin/search/template").searchTemplates;
 
 	beforeEach(async () => {
 		const module = await import("../../bin/search/template");
