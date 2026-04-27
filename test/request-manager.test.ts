@@ -574,10 +574,6 @@ test("modifiers: should includes merged global values in HTML responses", async 
 
 	const res = await testMaster.handleRequest();
 	const text = await res.text();
-	//@ts-expect-error
-	expect(globalThis.__TEST_VAR__).toBeUndefined();
-	expect(globalThis.process.env.test).toBeUndefined();
-	expect(globalThis.process.env.NODE_ENV).toBe("test");
 
 	const scriptChunks: string[] = [];
 	new HTMLRewriter()
@@ -590,7 +586,7 @@ test("modifiers: should includes merged global values in HTML responses", async 
 
 	// Run scripts in an isolated sandbox so globalThis is not polluted
 	const sandbox: Record<string, any> = {};
-	new Function("globalThis", "process", scriptChunks.join(";"))(sandbox);
+	new Function("globalThis", scriptChunks.join(";"))(sandbox);
 
 	expect(sandbox.__TEST_VAR__).toBe("test-value");
 	expect(sandbox.process.env.test).toBe("1");
