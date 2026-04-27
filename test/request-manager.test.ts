@@ -1,11 +1,17 @@
-import { afterAll, beforeAll, beforeEach, expect, test } from "bun:test";
+import {
+	afterAll,
+	afterEach,
+	beforeAll,
+	beforeEach,
+	expect,
+	test,
+} from "bun:test";
 import { webToken } from "@shpaw415/webtoken";
 import type Builder from "frame-master/build";
 import { createBuilder } from "frame-master/build";
 import { PluginLoader } from "frame-master/plugins";
 import type { FrameMasterConfig } from "frame-master/server/type";
 import serve from "../src/server";
-import { setMockConfig } from "../src/server/config";
 import { masterRequest } from "../src/server/request-manager";
 
 let server: Bun.Server<undefined>;
@@ -98,19 +104,19 @@ const config: FrameMasterConfig = {
 			router: {
 				before_request(req) {
 					if (req.request.url.includes("/context-test")) {
-						req.setContext({ testKey: "testValue" } as any);
+						req.setContext({ testKey: "testValue" });
 					}
 				},
 				request(req) {
 					if (req.request.url.includes("/context-test")) {
-						const context = req.getContext() as any;
+						const context = req.getContext<{ testKey: string }>();
 						contextTest.testKey = context.testKey;
-						req.setContext({ requestKey: "requestValue" } as any);
+						req.setContext({ requestKey: "requestValue" });
 					}
 				},
 				after_request(req) {
 					if (req.request.url.includes("/context-test")) {
-						const context = req.getContext() as any;
+						const context = req.getContext<{ requestKey: string }>();
 						contextTest.requestKey = context.requestKey;
 					}
 				},
@@ -214,7 +220,8 @@ const config: FrameMasterConfig = {
 				request(req) {
 					// JSON response - modifiers should NOT be applied
 					if (req.request.url.includes("/json-response")) {
-						req.setGlobalValues({ __TEST_VAR__: "test-value" } as any);
+						//@ts-expect-error
+						req.setGlobalValues({ __TEST_VAR__: "test-value" });
 						req.setResponse('{"data": "test"}', {
 							status: 200,
 							headers: { "Content-Type": "application/json" },
@@ -222,7 +229,8 @@ const config: FrameMasterConfig = {
 					}
 					// Plain text response - modifiers should NOT be applied
 					if (req.request.url.includes("/text-response")) {
-						req.setGlobalValues({ __TEST_VAR__: "test-value" } as any);
+						//@ts-expect-error
+						req.setGlobalValues({ __TEST_VAR__: "test-value" });
 						req.setResponse("Plain text content", {
 							status: 200,
 							headers: { "Content-Type": "text/plain" },
@@ -230,7 +238,8 @@ const config: FrameMasterConfig = {
 					}
 					// HTML response - modifiers SHOULD be applied
 					if (req.request.url.includes("/html-response")) {
-						req.setGlobalValues({ __TEST_VAR__: "test-value" } as any);
+						//@ts-expect-error
+						req.setGlobalValues({ __TEST_VAR__: "test-value" });
 						req.setResponse(
 							"<html><head></head><body>HTML content</body></html>",
 							{
@@ -241,10 +250,21 @@ const config: FrameMasterConfig = {
 					}
 					// No content type - modifiers should NOT be applied
 					if (req.request.url.includes("/no-content-type")) {
-						req.setGlobalValues({ __TEST_VAR__: "test-value" } as any);
+						//@ts-expect-error
+						req.setGlobalValues({ __TEST_VAR__: "test-value" });
 						req.setResponse("No content type", {
 							status: 200,
 						});
+					}
+					if (req.request.url.includes("/multiple-env")) {
+						//@ts-expect-error
+						req.setGlobalValues({ __TEST_VAR__: "test-value" });
+						req.setResponse(
+							`<html><head><script>globalThis.process ??= {};globalThis.process.env ??= {};globalThis.process.env.test = "1";globalThis.process.env.NODE_ENV="fm-test";</script></head><body>HTML content</body></html>`,
+							{
+								headers: { "Content-Type": "text/html" },
+							},
+						);
 					}
 				},
 			},
@@ -543,4 +563,36 @@ test("modifiers: should NOT apply global values when no content type is set", as
 	expect(text).not.toContain("globalThis");
 	expect(text).not.toContain("__TEST_VAR__");
 	expect(text.trim()).toBe("No content type");
+});
+
+test("modifiers: should includes merged global values in HTML responses", async () => {
+	const testMaster = new masterRequest({
+		request: new Request("http://localhost/multiple-env"),
+		server,
+		builder,
+	});
+
+	const res = await testMaster.handleRequest();
+	const text = await res.text();
+	//@ts-expect-error
+	expect(globalThis.__TEST_VAR__).toBeUndefined();
+	expect(globalThis.process.env.test).toBeUndefined();
+	expect(globalThis.process.env.NODE_ENV).toBe("test");
+
+	const scriptChunks: string[] = [];
+	new HTMLRewriter()
+		.on("script", {
+			text(content) {
+				if (content.text) scriptChunks.push(content.text);
+			},
+		})
+		.transform(text);
+
+	// Run scripts in an isolated sandbox so globalThis is not polluted
+	const sandbox: Record<string, any> = {};
+	new Function("globalThis", "process", scriptChunks.join(";"))(sandbox);
+
+	expect(sandbox.__TEST_VAR__).toBe("test-value");
+	expect(sandbox.process.env.test).toBe("1");
+	expect(sandbox.process.env.NODE_ENV).toBe("fm-test");
 });

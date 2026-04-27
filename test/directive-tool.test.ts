@@ -1,21 +1,11 @@
-import {
-	afterAll,
-	beforeAll,
-	beforeEach,
-	describe,
-	expect,
-	test,
-} from "bun:test";
-import { mkdirSync, rmSync, writeFileSync } from "fs";
-import { join } from "path";
-import { pluginLoader, reloadPluginLoader } from "../src/plugins/plugin-loader";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { reloadPluginLoader } from "../src/plugins/plugin-loader";
 import type { FrameMasterPlugin } from "../src/plugins/types";
 import {
-	type BaseDirectives,
 	createCustomDirective,
 	createDirective,
-	type DirectiveDefinition,
-	type Directives,
 	DirectiveTool,
 	directiveToolSingleton,
 } from "../src/plugins/utils";
@@ -47,7 +37,8 @@ describe("DirectiveTool", () => {
 			writeFileSync(testFile, '"use-custom";\nexport const x = 1;');
 
 			// pathIs should detect the directive
-			expect(tool.pathIs("use-custom" as any, testFile)).resolves.toBe(true);
+			//@ts-expect-error
+			expect(tool.pathIs("use-custom", testFile)).resolves.toBe(true);
 		});
 
 		test("should support chaining", () => {
@@ -142,8 +133,10 @@ describe("Plugin Directives Registration", () => {
 		writeFileSync(testFile, '"use-my-plugin-directive";\nexport const x = 1;');
 
 		// The directiveToolSingleton should now recognize the custom directive
+
 		const result = await directiveToolSingleton.pathIs(
-			"use-my-plugin-directive" as any,
+			//@ts-expect-error
+			"use-my-plugin-directive",
 			testFile,
 		);
 		expect(result).toBe(true);
@@ -179,7 +172,8 @@ describe("Plugin Directives Registration", () => {
 		const testFileA = join(TEST_DIR, "directive-a-test.ts");
 		writeFileSync(testFileA, '"directive-a";\nexport const a = 1;');
 		const resultA = await directiveToolSingleton.pathIs(
-			"directive-a" as any,
+			//@ts-expect-error
+			"directive-a",
 			testFileA,
 		);
 		expect(resultA).toBe(true);
@@ -188,7 +182,8 @@ describe("Plugin Directives Registration", () => {
 		const testFileB = join(TEST_DIR, "directive-b-test.ts");
 		writeFileSync(testFileB, '"directive-b";\nexport const b = 2;');
 		const resultB = await directiveToolSingleton.pathIs(
-			"directive-b" as any,
+			//@ts-expect-error
+			"directive-b",
 			testFileB,
 		);
 		expect(resultB).toBe(true);
@@ -228,9 +223,11 @@ describe("Plugin Directives Registration", () => {
 					version: "1.0.0",
 					directives: [
 						{ name: "valid-directive", regex: /valid/ },
-						{ name: "", regex: /empty-name/ } as any, // Empty name
-						{ name: "missing-regex" } as any, // Missing regex
-						{ regex: /missing-name/ } as any, // Missing name
+						{ name: "", regex: /empty-name/ }, // Empty name
+						//@ts-expect-error
+						{ name: "missing-regex" }, // Missing regex
+						//@ts-expect-error
+						{ regex: /missing-name/ }, // Missing name
 					],
 				},
 			],
@@ -301,7 +298,8 @@ describe("Directive Helper Functions", () => {
 			const testFile = join(TEST_DIR, "custom-helper-test.ts");
 			writeFileSync(testFile, '"test-custom";\nexport const x = 1;');
 
-			const result = await tool.pathIs(directive.name as any, testFile);
+			//@ts-expect-error
+			const result = await tool.pathIs(directive.name, testFile);
 			expect(result).toBe(true);
 		});
 	});
@@ -319,8 +317,8 @@ describe("DirectiveDefinition Type", () => {
 		} as const;
 
 		expect(plugin.directives).toHaveLength(2);
-		expect(plugin.directives![0]!.name).toBe("use-client");
-		expect(plugin.directives![1]!.name).toBe("use-server");
+		expect(plugin.directives?.at(0)?.name).toBe("use-client");
+		expect(plugin.directives?.at(1)?.name).toBe("use-server");
 	});
 
 	test("should allow string names for custom directives", () => {
@@ -335,7 +333,7 @@ describe("DirectiveDefinition Type", () => {
 			],
 		};
 
-		expect(plugin.directives![0]!.name).toBe("my-arbitrary-directive");
+		expect(plugin.directives?.at(0)?.name).toBe("my-arbitrary-directive");
 	});
 
 	test("should mix base and custom directives", () => {
@@ -353,8 +351,8 @@ describe("DirectiveDefinition Type", () => {
 		};
 
 		expect(plugin.directives).toHaveLength(3);
-		expect(plugin.directives![0]!.name).toBe("use-client");
-		expect(plugin.directives![1]!.name).toBe("use-analytics");
-		expect(plugin.directives![2]!.name).toBe("use-tracking");
+		expect(plugin.directives?.at(0)?.name).toBe("use-client");
+		expect(plugin.directives?.at(1)?.name).toBe("use-analytics");
+		expect(plugin.directives?.at(2)?.name).toBe("use-tracking");
 	});
 });

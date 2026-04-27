@@ -712,7 +712,7 @@ export class masterRequest<
 		const preloadScriptObj = await this.makePreLoadObject();
 		const preloadSriptsStrList = [
 			...this.preloadToStringArray(preloadScriptObj),
-			"process={env: __PROCESS_ENV__};",
+			"process={env: {...globalThis.__PROCESS_ENV__, ...globalThis?.process?.env ?? {}}};",
 		].join(";");
 		// Sanitize the script content to prevent XSS via </script> or Unicode line separators
 		const sanitizedScript = this.sanitizeScriptContent(preloadSriptsStrList);
