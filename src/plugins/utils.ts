@@ -39,7 +39,7 @@ export type BaseDirectives =
  * await directiveToolSingleton.pathIs("use-custom", filePath); // ✓ Type-safe
  * ```
  */
-export type CustomDirectives = {};
+export interface CustomDirectives {}
 
 // Combined type that includes both base and custom directives
 export type Directives = BaseDirectives | keyof CustomDirectives;
@@ -206,7 +206,7 @@ export class DirectiveTool {
 		route?: string,
 	): Promise<boolean> {
 		if (!this.filePaths.includes(filePath))
-			return (await this.addEntry(filePath, route)) == directive;
+			return (await this.addEntry(filePath, route)) === directive;
 		return (
 			this.entries.get(directive)?.some((entry) => entry.path === filePath) ??
 			false
@@ -398,7 +398,7 @@ class IPCManager<ProcessType extends IPCProcessType = IPCProcessType> {
 	public type: ProcessType = "main" as ProcessType;
 	private onMessageCallbacks: Map<
 		string,
-		(message: any, from: IPCProcessType) => Promise<unknown> | unknown
+		(message: unknown, from: IPCProcessType) => Promise<unknown> | unknown
 	> = new Map();
 
 	private processes: IPCProcesses = {
@@ -419,7 +419,7 @@ class IPCManager<ProcessType extends IPCProcessType = IPCProcessType> {
 	}
 
 	private initMain() {
-		cluster.on("message", async (worker, _message) => {
+		cluster.on("message", async (_worker, _message) => {
 			this.__DISPATCH__(_message);
 		});
 	}
@@ -443,7 +443,9 @@ class IPCManager<ProcessType extends IPCProcessType = IPCProcessType> {
 		this.isClusterInited = true;
 		this.queuedMessages
 			.filter((msg) => msg.to === "cluster")
-			.forEach((msg) => this.__DISPATCH__(msg));
+			.forEach((msg) => {
+				this.__DISPATCH__(msg);
+			});
 		this.queuedMessages = this.queuedMessages.filter(
 			(msg) => msg.to !== "cluster",
 		);
@@ -494,7 +496,7 @@ class IPCManager<ProcessType extends IPCProcessType = IPCProcessType> {
 	): Promise<ResponseData> {
 		const requestID = Bun.randomUUIDv7();
 
-		if (this.type == "main" && !this.isClusterInited && to == "cluster") {
+		if (this.type === "main" && !this.isClusterInited && to === "cluster") {
 			this.queuedMessages.push({
 				from: this.type,
 				to,
@@ -553,7 +555,7 @@ class IPCManager<ProcessType extends IPCProcessType = IPCProcessType> {
 			}
 		} else if (this.type !== "main") {
 			process.send?.(message);
-		} else if (message.to == "cluster") {
+		} else if (message.to === "cluster") {
 			if (this.processes.clusters === null) {
 				console.warn(
 					"IPCManager: Cluster processes are not initialized. Message ignored.",
@@ -601,7 +603,7 @@ class IPCManager<ProcessType extends IPCProcessType = IPCProcessType> {
 			from: this.type,
 			to,
 			requestID,
-			data: typeof data == "undefined" ? (null as T) : data,
+			data: typeof data === "undefined" ? (null as T) : data,
 			type: "response",
 			id: "",
 		};
@@ -631,7 +633,7 @@ export function serializeError(
 	}
 
 	// Handle non-Error objects that might have error-like properties
-	const errorObj = error as any;
+	const errorObj = error;
 
 	// Protect against circular references
 	if (visited.has(errorObj)) {
@@ -654,8 +656,8 @@ export function serializeError(
 			(errorObj.cause && typeof errorObj.cause === "object")
 		) {
 			try {
-				cause = serializeError(errorObj.cause, visited);
-			} catch (causeError) {
+				cause = serializeError(errorObj.cause as Error, visited);
+			} catch (_causeError) {
 				// If serializing the cause fails, create a fallback
 				cause = {
 					name: "SerializationError",
