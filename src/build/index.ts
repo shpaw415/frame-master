@@ -563,6 +563,10 @@ export class Builder {
 			entrypoints: this.baseEntrypoints,
 		}) as Bun.BuildConfig;
 
+		if (this.currentBuildConfig.outdir === undefined) {
+			this.currentBuildConfig.outdir = this.outDir;
+		}
+
 		return this.currentBuildConfig;
 	}
 

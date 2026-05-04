@@ -115,4 +115,61 @@ describe("builder", () => {
 			outEntrypoints.some((c) => c.path.endsWith(join("/index.html"))),
 		).toBeTruthy();
 	});
+	test("should set outdir to .frame-master/build if not set by the user", async () => {
+		const fmConfig: FrameMasterConfig = {
+			HTTPServer: {
+				port: 3000,
+			},
+			pluginsOptions: {
+				entrypoints: ["/index.html"],
+			},
+			plugins: [
+				{
+					name: "test-plugin",
+					version: "0",
+					build: {
+						enableLoging: false,
+						buildConfig: () => ({
+							files: {
+								"/index.html": "Hello World",
+							},
+						}),
+					},
+				},
+			],
+		};
+
+		const builder = await createBuilder(fmConfig, new PluginLoader(fmConfig));
+		const newConfig = await builder.createConfigs();
+		expect(newConfig.outdir).toBe(".frame-master/build");
+	});
+	test("should use the outdir set by the user", async () => {
+		const fmConfig: FrameMasterConfig = {
+			HTTPServer: {
+				port: 3000,
+			},
+			pluginsOptions: {
+				entrypoints: ["/index.html"],
+			},
+			plugins: [
+				{
+					name: "test-plugin",
+					version: "0",
+					build: {
+						enableLoging: false,
+						buildConfig: () => ({
+							outdir: `${TEMP_DIR}/custom-build`,
+							files: {
+								"/index.html": "Hello World",
+							},
+						}),
+					},
+				},
+			],
+		};
+
+		const builder = await createBuilder(fmConfig, new PluginLoader(fmConfig));
+		const newConfig = await builder.createConfigs();
+		expect(newConfig.outdir).toBe(`${TEMP_DIR}/custom-build`);
+	});
 });
