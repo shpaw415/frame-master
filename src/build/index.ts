@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { cwd } from "node:process";
 import chalk from "chalk";
@@ -12,9 +12,7 @@ import { onVerbose, pluginRegex } from "../utils";
 type RequiredBuilOptions = Required<BuildOptionsPlugin>;
 
 export type BuilderProps = {
-	pluginBuildConfig: Array<RequiredBuilOptions["buildConfig"]>;
-	beforeBuilds?: Array<RequiredBuilOptions["beforeBuild"]>;
-	afterBuilds?: Array<RequiredBuilOptions["afterBuild"]>;
+	buildConfigs: Array<FrameMasterConfig["plugins"][number]["build"]>;
 	enableLogging?: boolean;
 	/**
 	 * Disable onLoad handler chaining for build plugins.
@@ -32,13 +30,19 @@ export type BuilderProps = {
 const DEFAULT_BUILD_DIR = ".frame-master/build";
 
 export class Builder {
-	private buildConfigFactory: BuilderProps["pluginBuildConfig"];
-	private staticBuildConfig: Partial<Bun.BuildConfig>;
-	private onBeforeBuildHooks: Exclude<BuilderProps["beforeBuilds"], undefined> =
-		[];
-	private onAfterBuildHooks: Exclude<BuilderProps["afterBuilds"], undefined> =
-		[];
+	//private buildConfigFactory: BuilderProps["pluginBuildConfig"];
+	//private staticBuildConfig: Partial<Bun.BuildConfig>;
+	//private onBeforeBuildHooks: Exclude<BuilderProps["beforeBuilds"], undefined> =
+	//	[];
+	//private onAfterBuildHooks: Exclude<BuilderProps["afterBuilds"], undefined> =
+	//	[];
 	private currentBuildConfig: Bun.BuildConfig | null = null;
+	private disableOnLoadChaining: boolean = false;
+	private baseEntrypoints: string[];
+
+	readonly isLogEnabled: boolean;
+	public outputs: Bun.BuildArtifact[] | null = null;
+	private _isBuilding = false;
 	private buildHistory: Array<{
 		timestamp: number;
 		duration: number;
@@ -46,44 +50,83 @@ export class Builder {
 		outputCount: number;
 		success: boolean;
 	}> = [];
-	private disableOnLoadChaining: boolean;
-	private baseEntrypoints: string[];
-
-	readonly isLogEnabled: boolean;
-	public outputs: Bun.BuildArtifact[] | null = null;
-	private _isBuilding = false;
 	private buildPromise: Promise<Bun.BuildOutput> | null = null;
 	private buildResolver: ((value: Bun.BuildOutput) => void) | null = null;
 
-	constructor(props: BuilderProps) {
+	public configs: Array<FrameMasterConfig["plugins"][number]["build"]>;
+	public outDir: string = DEFAULT_BUILD_DIR;
+
+	private constructor(props: BuilderProps) {
+		this.configs = props.buildConfigs;
+
 		this.isLogEnabled = props.enableLogging ?? true;
 		this.disableOnLoadChaining = props.disableOnLoadChaining ?? false;
 		this.baseEntrypoints = props.baseEntrypoints ?? [];
+	}
 
-		this.staticBuildConfig = props.pluginBuildConfig
-			.filter((c) => typeof c !== "function")
-			.reduce(
-				(prev, next) => this.mergeConfigSafely(prev as Bun.BuildConfig, next),
-				{} as Partial<Bun.BuildConfig>,
-			);
-		this.buildConfigFactory = props.pluginBuildConfig.filter(
-			(c) => typeof c === "function",
-		);
+	private async init() {
+		const outDir = (
+			await Promise.all(
+				this.configs.map(async (c) => {
+					const bc = c?.buildConfig;
+					if (!bc) return Promise.resolve(undefined);
+					if (typeof bc === "function") {
+						return (await bc(this)).outdir;
+					}
+					return bc.outdir;
+				}),
+			)
+		).filter((c) => c !== undefined);
 
-		this.onBeforeBuildHooks = props.beforeBuilds || [];
-		this.onAfterBuildHooks = props.afterBuilds || [];
-
-		if (!existsSync(join(cwd(), DEFAULT_BUILD_DIR))) {
-			mkdirSync(join(cwd(), DEFAULT_BUILD_DIR), { recursive: true });
+		if (outDir.length > 1) {
+			console.warn("Multiple output directories detected:", outDir);
 		}
-		if (
-			this.staticBuildConfig.outdir !== undefined &&
-			!existsSync(join(cwd(), this.staticBuildConfig.outdir))
-		) {
-			mkdirSync(join(cwd(), this.staticBuildConfig.outdir), {
-				recursive: true,
-			});
+
+		this.outDir = outDir.at(0) ?? DEFAULT_BUILD_DIR;
+
+		if (!existsSync(join(cwd(), this.outDir))) {
+			mkdirSync(join(cwd(), this.outDir), { recursive: true });
 		}
+
+		return this;
+	}
+
+	/**
+	 * Creates a Builder instance for Frame-Master plugin development.
+	 *
+	 * **Public API** - Use this to create a builder in your Frame-Master plugin's build hook.
+	 *
+	 * @param props - Builder configuration
+	 * @param props.pluginBuildConfig - Array of config factory functions that return Bun.BuildConfig
+	 * @param props.onBeforeBuild - Optional hooks executed before build starts
+	 * @param props.onAfterBuild - Optional hooks executed after build completes
+	 * @param props.enableLogging - Whether to enable build logging (default: true)
+	 *
+	 * @returns Builder instance ready to execute builds
+	 *
+	 * @example
+	 * // In your Frame-Master plugin
+	 * export default function myPlugin(): FrameMasterPlugin {
+	 *   return {
+	 *     name: "my-plugin",
+	 *     build: async () => {
+	 *       const builder = Builder.createBuilder({
+	 *         pluginBuildConfig: [
+	 *           async () => ({
+	 *             target: "browser",
+	 *             external: ["react"],
+	 *           })
+	 *         ]
+	 *       });
+	 *
+	 *       await builder.build("/src/client.ts");
+	 *     }
+	 *   };
+	 * }
+	 */
+	static createBuilder(props: BuilderProps): Promise<Builder> {
+		const builder = new Builder(props);
+		return builder.init();
 	}
 
 	/**
@@ -171,13 +214,11 @@ export class Builder {
 			this.buildResolver = resolve;
 		});
 		const startTime = performance.now();
-		this.clearBuildDir();
 
-		const buildConfig = await this.getBuildConfig();
+		const buildConfig = await this.createConfigs();
 		buildConfig.entrypoints = [
-			...this.baseEntrypoints,
-			...buildConfig.entrypoints,
-			...entrypoints,
+			...(buildConfig.entrypoints || []),
+			...(entrypoints || []),
 		];
 
 		this.log("🔨 Building with merged configuration:", {
@@ -188,7 +229,7 @@ export class Builder {
 		});
 
 		await Promise.all(
-			this.onBeforeBuildHooks.map((hook) => hook(buildConfig, this)),
+			this.getHooksByType("beforeBuild").map((hook) => hook(buildConfig, this)),
 		);
 		let res: Bun.BuildOutput = {
 			logs: [],
@@ -218,10 +259,14 @@ export class Builder {
 		});
 		if (res.success) {
 			await Promise.all(
-				this.onAfterBuildHooks.map((hook) => hook(buildConfig, res, this)),
+				this.getHooksByType("afterBuild").map((hook) =>
+					hook(buildConfig, res, this),
+				),
 			);
-		} else
+		} else {
 			console.log(chalk.red("✗ Build failed. Skipping after-build hooks."));
+			this.log(res);
+		}
 
 		this._isBuilding = false;
 		if (this.buildResolver) {
@@ -234,7 +279,7 @@ export class Builder {
 	/** Remove leftOver files from previous build */
 	public async cleanUpOutputDir(): Promise<void> {
 		const cwd = process.cwd();
-		const outDir = this.getConfig()?.outdir;
+		const outDir = this.outDir;
 		if (!outDir || !this.outputs) return Promise.resolve();
 		const filesInResult = this.outputs.map((output) => output.path);
 		const fileToRemove = Array.from(
@@ -351,44 +396,6 @@ export class Builder {
 	 */
 	public awaitBuildFinish(): null | Promise<Bun.BuildOutput> {
 		return this.buildPromise;
-	}
-
-	/**
-	 * Creates a Builder instance for Frame-Master plugin development.
-	 *
-	 * **Public API** - Use this to create a builder in your Frame-Master plugin's build hook.
-	 *
-	 * @param props - Builder configuration
-	 * @param props.pluginBuildConfig - Array of config factory functions that return Bun.BuildConfig
-	 * @param props.onBeforeBuild - Optional hooks executed before build starts
-	 * @param props.onAfterBuild - Optional hooks executed after build completes
-	 * @param props.enableLogging - Whether to enable build logging (default: true)
-	 *
-	 * @returns Builder instance ready to execute builds
-	 *
-	 * @example
-	 * // In your Frame-Master plugin
-	 * export default function myPlugin(): FrameMasterPlugin {
-	 *   return {
-	 *     name: "my-plugin",
-	 *     build: async () => {
-	 *       const builder = Builder.createBuilder({
-	 *         pluginBuildConfig: [
-	 *           async () => ({
-	 *             target: "browser",
-	 *             external: ["react"],
-	 *           })
-	 *         ]
-	 *       });
-	 *
-	 *       await builder.build("/src/client.ts");
-	 *     }
-	 *   };
-	 * }
-	 */
-	static async createBuilder(props: BuilderProps): Promise<Builder> {
-		const builder = new Builder(props);
-		return builder;
 	}
 
 	/**
@@ -513,6 +520,49 @@ export class Builder {
 	 * }
 	 */
 	getConfig(): Bun.BuildConfig | null {
+		return this.currentBuildConfig;
+	}
+	/**
+	 * Generates a fresh build configuration by merging all plugin configs, including dynamic ones.
+	 *
+	 * This is called internally by the build process to ensure the latest plugin configurations are used.
+	 *
+	 * **Public API** - Use this to get the most up-to-date merged configuration, including dynamic configs.
+	 *
+	 * @Note: This method is more expensive than `getConfig()` as it re-evaluates dynamic config factories, so it should be used when you need to ensure you have the latest configuration after plugins have had a chance to modify it.
+	 */
+	async createConfigs(): Promise<Bun.BuildConfig> {
+		const configs = this.configs
+			.map((c) => c?.buildConfig)
+			.filter((c) => c !== undefined);
+		const staticConfigs = configs
+			.filter((c) => typeof c !== "function")
+			.reduce((prev, next) => {
+				return this.mergeConfigSafely(prev, next as Bun.BuildConfig);
+			}, {} as Bun.BuildConfig) as Bun.BuildConfig;
+
+		this.currentBuildConfig = staticConfigs;
+
+		this.currentBuildConfig = (await Promise.all(
+			configs
+				.filter((c) => typeof c === "function")
+				.map((c) => {
+					const res = c(this);
+					if (res instanceof Promise) {
+						return res;
+					} else return Promise.resolve(res);
+				}),
+		).then((dynamic) =>
+			dynamic.reduce(
+				(prev, next) => this.mergeConfigSafely(prev, next),
+				staticConfigs,
+			),
+		)) as Bun.BuildConfig;
+
+		this.currentBuildConfig = this.mergeConfigSafely(this.currentBuildConfig, {
+			entrypoints: this.baseEntrypoints,
+		}) as Bun.BuildConfig;
+
 		return this.currentBuildConfig;
 	}
 
@@ -723,64 +773,26 @@ export class Builder {
 		return report;
 	}
 
-	private getBuildConfig(): Promise<Bun.BuildConfig> {
-		return Promise.all(
-			this.buildConfigFactory.map((factory) => (factory as Function)(this)),
-		)
-			.then((configs) =>
-				configs.reduce(
-					(prev, next) => this.mergeConfigSafely(prev as Bun.BuildConfig, next),
-					{
-						entrypoints: [],
-						outdir: DEFAULT_BUILD_DIR,
-						splitting: true,
-						throw: false,
-						minify: process.env.NODE_ENV === "production",
-						sourcemap: process.env.NODE_ENV !== "production",
-						target: "browser",
-						external: [],
-						define: {},
-						loader: {},
-						plugins: [],
-						publicPath: "./",
-					} satisfies Bun.BuildConfig,
-				),
-			)
-			.then((mergedConfig) => {
-				mergedConfig = this.mergeConfigSafely(
-					mergedConfig as Bun.BuildConfig,
-					this.staticBuildConfig,
-				);
-				this.currentBuildConfig = mergedConfig as Bun.BuildConfig;
-				return mergedConfig as Promise<Bun.BuildConfig>;
-			})
-			.then(
-				(res) =>
-					({
-						...res,
-						outdir: res.outdir || DEFAULT_BUILD_DIR,
-					}) as Bun.BuildConfig,
-			);
-	}
-
 	/**
 	 * @internal
 	 * Safely merges multiple Bun.BuildConfig objects with intelligent handling of arrays and objects.
 	 * Used internally by the build pipeline. Plugin developers should not call this directly.
 	 */
 	private mergeConfigSafely(
-		target: Bun.BuildConfig,
+		target: Partial<Bun.BuildConfig>,
 		source: Partial<Bun.BuildConfig>,
 	) {
-		for (const [key, sourceValue] of Object.entries(source)) {
-			const targetValue = target[key as keyof Bun.BuildConfig];
+		for (const [key, sourceValue] of Object.entries(source) as Array<
+			[keyof Bun.BuildConfig, unknown]
+		>) {
+			const targetValue = target[key];
 
 			// Skip if source value is undefined
 			if (sourceValue === undefined) continue;
 
 			// If target doesn't have this key, just assign it
 			if (targetValue === undefined) {
-				(target as any)[key] = sourceValue;
+				target[key] = sourceValue as never;
 				continue;
 			}
 
@@ -792,7 +804,7 @@ export class Builder {
 			) {
 				// Merge entrypoints, removing duplicates by path
 				const entrySet = new Set([...targetValue, ...sourceValue]);
-				(target as any)[key] = Array.from(entrySet);
+				target[key] = Array.from(entrySet);
 			} else if (
 				key === "plugins" &&
 				Array.isArray(targetValue) &&
@@ -802,11 +814,9 @@ export class Builder {
 				// unless chaining is disabled via config
 				const allPlugins = [...targetValue, ...sourceValue];
 				if (this.disableOnLoadChaining) {
-					(target as any)[key] = allPlugins;
+					target[key] = allPlugins;
 				} else {
-					(target as any)[key] = [
-						chainPlugins(allPlugins, { suffix: "build" }),
-					];
+					target[key] = [chainPlugins(allPlugins, { suffix: "build" })];
 				}
 			} else if (
 				key === "external" &&
@@ -815,16 +825,16 @@ export class Builder {
 			) {
 				// External modules should be deduplicated
 				const externalSet = new Set([...targetValue, ...sourceValue]);
-				(target as any)[key] = Array.from(externalSet);
+				target[key] = Array.from(externalSet);
 			} else if (
 				key === "define" &&
 				this.isPlainObject(targetValue) &&
 				this.isPlainObject(sourceValue)
 			) {
 				// Define should merge keys, with source overriding target
-				(target as any)[key] = {
-					...(targetValue as Record<string, any>),
-					...(sourceValue as Record<string, any>),
+				target[key] = {
+					...(targetValue as Record<string, never>),
+					...(sourceValue as Record<string, never>),
 				};
 			} else if (
 				key === "loader" &&
@@ -832,9 +842,9 @@ export class Builder {
 				this.isPlainObject(sourceValue)
 			) {
 				// Loader should merge keys, with source overriding target
-				(target as any)[key] = {
-					...(targetValue as Record<string, any>),
-					...(sourceValue as Record<string, any>),
+				target[key] = {
+					...(targetValue as Record<string, never>),
+					...(sourceValue as Record<string, never>),
 				};
 			} else if (Array.isArray(targetValue) && Array.isArray(sourceValue)) {
 				// Generic array merge - concatenate and deduplicate primitives
@@ -845,22 +855,22 @@ export class Builder {
 						merged.push(item);
 					}
 				}
-				(target as any)[key] = merged;
+				target[key] = merged as never;
 			} else if (
 				this.isPlainObject(targetValue) &&
 				this.isPlainObject(sourceValue)
 			) {
 				// Deep merge objects
-				(target as any)[key] = this.deepMerge(
-					targetValue as Record<string, any>,
-					sourceValue as Record<string, any>,
-				);
+				target[key] = this.deepMerge(
+					targetValue as Record<string, unknown>,
+					sourceValue as Record<string, unknown>,
+				) as never;
 			} else if (typeof targetValue === typeof sourceValue) {
 				// Same type, source overrides target (boolean, string, number)
 				this.log(
 					`ℹ️  Build config "${key}" overridden: ${targetValue} → ${sourceValue}`,
 				);
-				(target as any)[key] = sourceValue;
+				target[key] = sourceValue as never;
 			} else {
 				// Type mismatch - warn and use source value
 				console.warn(
@@ -868,7 +878,7 @@ export class Builder {
 						`Cannot merge ${typeof targetValue} with ${typeof sourceValue}. ` +
 						`Using plugin value: ${JSON.stringify(sourceValue)}`,
 				);
-				(target as any)[key] = sourceValue;
+				target[key] = sourceValue as never;
 			}
 		}
 		return target;
@@ -879,10 +889,10 @@ export class Builder {
 	 * Deep merges two plain objects recursively.
 	 * Used internally by mergeConfigSafely.
 	 */
-	private deepMerge(
-		target: Record<string, any>,
-		source: Record<string, any>,
-	): Record<string, any> {
+	private deepMerge<
+		S extends Record<string, unknown>,
+		T extends Record<string, unknown> = Record<string, unknown>,
+	>(target: T, source: S): T & S {
 		const result = { ...target };
 
 		for (const [key, sourceValue] of Object.entries(source)) {
@@ -891,38 +901,22 @@ export class Builder {
 			if (sourceValue === undefined) continue;
 
 			if (this.isPlainObject(targetValue) && this.isPlainObject(sourceValue)) {
-				result[key] = this.deepMerge(targetValue, sourceValue);
+				//@ts-expect-error
+				result[key] = this.deepMerge(
+					targetValue as Record<string, unknown>,
+					sourceValue as Record<string, unknown>,
+				) as T & S;
 			} else if (Array.isArray(targetValue) && Array.isArray(sourceValue)) {
 				// For nested arrays, concatenate
+				//@ts-expect-error
 				result[key] = [...targetValue, ...sourceValue];
 			} else {
+				//@ts-expect-error
 				result[key] = sourceValue;
 			}
 		}
 
-		return result;
-	}
-
-	private getAbsBuildDir(): string | null {
-		const buildDir = this.currentBuildConfig?.outdir ?? DEFAULT_BUILD_DIR;
-
-		const res = buildDir.startsWith("/")
-			? buildDir
-			: join(process.cwd(), buildDir);
-		return res;
-	}
-
-	/**
-	 * @internal
-	 * Clears and recreates the build output directory.
-	 * Called automatically by the build method.
-	 */
-	private clearBuildDir() {
-		const absoluteBuildDir = this.getAbsBuildDir();
-		if (!absoluteBuildDir) throw new Error("Build directory not configured.");
-
-		rmSync(absoluteBuildDir, { recursive: true, force: true });
-		mkdirSync(absoluteBuildDir, { recursive: true });
+		return result as T & S;
 	}
 
 	/**
@@ -938,6 +932,16 @@ export class Builder {
 			!(value instanceof RegExp) &&
 			Object.prototype.toString.call(value) === "[object Object]"
 		);
+	}
+
+	private getHooksByType<
+		T extends Exclude<keyof BuildOptionsPlugin, "buildConfig" | "enableLoging">,
+	>(type: T) {
+		const res = this.configs
+			.filter((c) => c !== undefined)
+			.map((c) => c[type])
+			.filter((h) => h !== undefined);
+		return res;
 	}
 
 	/**
@@ -999,29 +1003,14 @@ export async function createBuilder(
 	_pluginLoader: PluginLoader,
 ) {
 	const plugin = _pluginLoader.getPluginByName("build");
-	const configFactories = plugin
-		.map((plugin) => plugin.pluginParent.buildConfig)
-		.filter((p) => p !== undefined);
-	const beforeBuildHooks = plugin
-		.map((plugin) => plugin.pluginParent.beforeBuild)
-		.filter((p) => p !== undefined) as Exclude<
-		BuilderProps["beforeBuilds"],
-		undefined
-	>;
-	const afterBuildHooks = plugin
-		.map((plugin) => plugin.pluginParent.afterBuild)
-		.filter((p) => p !== undefined) as Exclude<
-		BuilderProps["afterBuilds"],
-		undefined
-	>;
 	const logIsEnabled = plugin.some((p) => p.pluginParent.enableLoging === true);
 
+	console.log(plugin);
+
 	return await Builder.createBuilder({
-		pluginBuildConfig: configFactories,
-		beforeBuilds: beforeBuildHooks,
-		afterBuilds: afterBuildHooks,
 		enableLogging: logIsEnabled,
 		disableOnLoadChaining: _config?.pluginsOptions?.disableOnLoadChaining,
+		buildConfigs: plugin.map((p) => p.pluginParent),
 		baseEntrypoints: _config?.pluginsOptions?.entrypoints,
 	});
 }

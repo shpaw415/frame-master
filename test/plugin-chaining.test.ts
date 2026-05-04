@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import type { BunPlugin } from "bun";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import type { BunPlugin } from "bun";
 import {
 	type ChainedOnLoadArgs,
 	chainPlugins,
