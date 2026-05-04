@@ -533,7 +533,13 @@ class IPCManager<ProcessType extends IPCProcessType = IPCProcessType> {
 			from: IPCProcessType,
 		) => Promise<ResponseData> | ResponseData,
 	) {
-		this.onMessageCallbacks.set(id, callback);
+		this.onMessageCallbacks.set(
+			id,
+			callback as (
+				message: unknown,
+				from: IPCProcessType,
+			) => Promise<unknown> | unknown,
+		);
 	}
 	/**
 	 * Dispatch a message to the appropriate process.
