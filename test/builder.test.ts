@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync } from "node:fs";
-import { Builder, createBuilder } from "../src/build";
+import { createBuilder } from "../src/build";
 import { PluginLoader } from "../src/plugins";
 import type { FrameMasterConfig } from "frame-master/server/type";
+import { join } from "node:path";
 
 const TEMP_DIR = ".test-temp";
 
@@ -111,7 +112,7 @@ describe("builder", () => {
 		expect(outEntrypoints.length >= 1).toBeTrue();
 
 		expect(
-			outEntrypoints.some((c) => c.path.endsWith("/index.html")),
+			outEntrypoints.some((c) => c.path.endsWith(join("/index.html"))),
 		).toBeTruthy();
 	});
 });
