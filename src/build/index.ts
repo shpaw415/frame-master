@@ -543,7 +543,7 @@ export class Builder {
 
 		this.currentBuildConfig = staticConfigs;
 
-		this.currentBuildConfig = (await Promise.all(
+		const mergedConfigs = (await Promise.all(
 			configs
 				.filter((c) => typeof c === "function")
 				.map((c) => {
@@ -559,15 +559,42 @@ export class Builder {
 			),
 		)) as Bun.BuildConfig;
 
-		this.currentBuildConfig = this.mergeConfigSafely(this.currentBuildConfig, {
+		this.currentBuildConfig = this.mergeConfigSafely(mergedConfigs, {
 			entrypoints: this.baseEntrypoints,
 		}) as Bun.BuildConfig;
+		this.currentBuildConfig = this.normalizeBuildPlugins(
+			this.currentBuildConfig,
+		);
 
 		if (this.currentBuildConfig.outdir === undefined) {
 			this.currentBuildConfig.outdir = this.outDir;
 		}
 
 		return this.currentBuildConfig;
+	}
+
+	private normalizeBuildPlugins<T extends Partial<Bun.BuildConfig>>(
+		config: T,
+	): T {
+		if (
+			this.disableOnLoadChaining ||
+			config.plugins === undefined ||
+			config.plugins.length === 0
+		) {
+			return config;
+		}
+
+		if (
+			config.plugins.length === 1 &&
+			config.plugins[0]?.name === "frame-master-chained-loader"
+		) {
+			return config;
+		}
+
+		return {
+			...config,
+			plugins: [chainPlugins(config.plugins, { suffix: "build" })],
+		};
 	}
 
 	/**
@@ -814,14 +841,9 @@ export class Builder {
 				Array.isArray(targetValue) &&
 				Array.isArray(sourceValue)
 			) {
-				// Plugins are chained using PluginProxy for onLoad handler chaining
-				// unless chaining is disabled via config
-				const allPlugins = [...targetValue, ...sourceValue];
-				if (this.disableOnLoadChaining) {
-					target[key] = allPlugins;
-				} else {
-					target[key] = [chainPlugins(allPlugins, { suffix: "build" })];
-				}
+				// Build plugins are normalized after all configs are merged so
+				// static and dynamic buildConfig sources behave the same.
+				target[key] = [...targetValue, ...sourceValue] as never;
 			} else if (
 				key === "external" &&
 				Array.isArray(targetValue) &&
@@ -1008,8 +1030,6 @@ export async function createBuilder(
 ) {
 	const plugin = _pluginLoader.getPluginByName("build");
 	const logIsEnabled = plugin.some((p) => p.pluginParent.enableLoging === true);
-
-	console.log(plugin);
 
 	return await Builder.createBuilder({
 		enableLogging: logIsEnabled,

@@ -1,14 +1,57 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { createBuilder } from "../src/build";
 import { PluginLoader } from "../src/plugins";
 import type { FrameMasterConfig } from "frame-master/server/type";
 import { join } from "node:path";
+import type { BunPlugin } from "bun";
 
 const TEMP_DIR = ".test-temp";
+const TEXT_ENTRYPOINT = join(TEMP_DIR, "entry.txt");
+
+function createTrackedTextPlugin(
+	name: string,
+	executionOrder: string[],
+): BunPlugin {
+	return {
+		name,
+		setup(build) {
+			build.onLoad({ filter: /\.txt$/ }, async (args) => {
+				executionOrder.push(`${name}:onLoad`);
+				const content =
+					args.__chainedContents ?? (await Bun.file(args.path).text());
+				return {
+					contents: `${content} [${name}]`,
+					loader: "text",
+				};
+			});
+
+			build.finally("text", ({ contents }) => {
+				executionOrder.push(`${name}:finally`);
+				return { contents: `${contents} [${name}:final]` };
+			});
+		},
+	};
+}
+
+function createFinallyOnlyTextPlugin(
+	name: string,
+	executionOrder: string[],
+): BunPlugin {
+	return {
+		name,
+		setup(build) {
+			build.finally("text", ({ contents }) => {
+				executionOrder.push(`${name}:finally`);
+				return { contents: `${contents} [${name}:final]` };
+			});
+		},
+	};
+}
 
 beforeEach(() => {
 	mkdirSync(TEMP_DIR, { recursive: true });
+	writeFileSync(TEXT_ENTRYPOINT, "builder input");
 });
 afterEach(() => {
 	rmSync(TEMP_DIR, { recursive: true, force: true });
@@ -71,6 +114,231 @@ describe("builder", () => {
 		await builder.build();
 
 		expect(calledPlugins.length).toBe(2);
+	});
+
+	test("should chain static build plugins with finally handlers", async () => {
+		const executionOrder: string[] = [];
+		const fmConfig: FrameMasterConfig = {
+			HTTPServer: {
+				port: 3000,
+			},
+			pluginsOptions: {
+				entrypoints: [TEXT_ENTRYPOINT],
+			},
+			plugins: [
+				{
+					name: "static-plugin",
+					version: "0",
+					build: {
+						buildConfig: {
+							outdir: `${TEMP_DIR}/build-static-finally`,
+							plugins: [
+								createTrackedTextPlugin("static-build-plugin", executionOrder),
+							],
+						},
+					},
+				},
+			],
+		};
+
+		const builder = await createBuilder(fmConfig, new PluginLoader(fmConfig));
+		const result = await builder.build();
+
+		expect(result.success).toBeTrue();
+		expect(executionOrder).toEqual([
+			"static-build-plugin:onLoad",
+			"static-build-plugin:finally",
+		]);
+	});
+
+	test("should chain dynamic build plugins with finally handlers", async () => {
+		const executionOrder: string[] = [];
+		const fmConfig: FrameMasterConfig = {
+			HTTPServer: {
+				port: 3000,
+			},
+			pluginsOptions: {
+				entrypoints: [TEXT_ENTRYPOINT],
+			},
+			plugins: [
+				{
+					name: "dynamic-plugin",
+					version: "0",
+					build: {
+						buildConfig: () => ({
+							outdir: `${TEMP_DIR}/build-dynamic-finally`,
+							plugins: [
+								createTrackedTextPlugin("dynamic-build-plugin", executionOrder),
+							],
+						}),
+					},
+				},
+			],
+		};
+
+		const builder = await createBuilder(fmConfig, new PluginLoader(fmConfig));
+		const result = await builder.build();
+
+		expect(result.success).toBeTrue();
+		expect(executionOrder).toEqual([
+			"dynamic-build-plugin:onLoad",
+			"dynamic-build-plugin:finally",
+		]);
+	});
+
+	test("should preserve plugin order when static and dynamic build plugins chain", async () => {
+		const executionOrder: string[] = [];
+		const fmConfig: FrameMasterConfig = {
+			HTTPServer: {
+				port: 3000,
+			},
+			pluginsOptions: {
+				entrypoints: [TEXT_ENTRYPOINT],
+			},
+			plugins: [
+				{
+					name: "static-plugin",
+					version: "0",
+					build: {
+						buildConfig: {
+							outdir: `${TEMP_DIR}/build-mixed-finally`,
+							plugins: [
+								createTrackedTextPlugin("static-build-plugin", executionOrder),
+							],
+						},
+					},
+				},
+				{
+					name: "dynamic-plugin",
+					version: "0",
+					build: {
+						buildConfig: () => ({
+							plugins: [
+								createTrackedTextPlugin("dynamic-build-plugin", executionOrder),
+							],
+						}),
+					},
+				},
+			],
+		};
+
+		const builder = await createBuilder(fmConfig, new PluginLoader(fmConfig));
+		const result = await builder.build();
+
+		expect(result.success).toBeTrue();
+		expect(executionOrder).toEqual([
+			"static-build-plugin:onLoad",
+			"dynamic-build-plugin:onLoad",
+			"static-build-plugin:finally",
+			"dynamic-build-plugin:finally",
+		]);
+	});
+
+	test("should chain finally hooks across multiple static build plugins", async () => {
+		const executionOrder: string[] = [];
+		const fmConfig: FrameMasterConfig = {
+			HTTPServer: {
+				port: 3000,
+			},
+			pluginsOptions: {
+				entrypoints: [TEXT_ENTRYPOINT],
+			},
+			plugins: [
+				{
+					name: "static-plugin-a",
+					version: "0",
+					build: {
+						buildConfig: {
+							outdir: `${TEMP_DIR}/build-static-finally-chain`,
+							plugins: [
+								createTrackedTextPlugin(
+									"static-build-plugin-a",
+									executionOrder,
+								),
+							],
+						},
+					},
+				},
+				{
+					name: "static-plugin-b",
+					version: "0",
+					build: {
+						buildConfig: {
+							plugins: [
+								createTrackedTextPlugin(
+									"static-build-plugin-b",
+									executionOrder,
+								),
+							],
+						},
+					},
+				},
+			],
+		};
+
+		const builder = await createBuilder(fmConfig, new PluginLoader(fmConfig));
+		const result = await builder.build();
+
+		expect(result.success).toBeTrue();
+		expect(executionOrder).toEqual([
+			"static-build-plugin-a:onLoad",
+			"static-build-plugin-b:onLoad",
+			"static-build-plugin-a:finally",
+			"static-build-plugin-b:finally",
+		]);
+	});
+
+	test("should chain finally-only build plugins after transformed output", async () => {
+		const executionOrder: string[] = [];
+		const fmConfig: FrameMasterConfig = {
+			HTTPServer: {
+				port: 3000,
+			},
+			pluginsOptions: {
+				entrypoints: [TEXT_ENTRYPOINT],
+			},
+			plugins: [
+				{
+					name: "producer-plugin",
+					version: "0",
+					build: {
+						buildConfig: {
+							outdir: `${TEMP_DIR}/build-finally-only-chain`,
+							plugins: [
+								createTrackedTextPlugin(
+									"producer-build-plugin",
+									executionOrder,
+								),
+							],
+						},
+					},
+				},
+				{
+					name: "finally-only-plugin",
+					version: "0",
+					build: {
+						buildConfig: {
+							plugins: [
+								createFinallyOnlyTextPlugin(
+									"final-pass-build-plugin",
+									executionOrder,
+								),
+							],
+						},
+					},
+				},
+			],
+		};
+
+		const builder = await createBuilder(fmConfig, new PluginLoader(fmConfig));
+		const result = await builder.build();
+
+		expect(result.success).toBeTrue();
+		expect(executionOrder).toEqual([
+			"producer-build-plugin:onLoad",
+			"producer-build-plugin:finally",
+			"final-pass-build-plugin:finally",
+		]);
 	});
 
 	test("should be able to access base entrypoints from FrameMasterConfig", async () => {
