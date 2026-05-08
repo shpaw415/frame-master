@@ -11,7 +11,7 @@ Frame-Master is a **plugin-first meta-framework for Bun.js** - not a web framewo
 - **Plugin Loader** ([src/plugins/plugin-loader.ts](src/plugins/plugin-loader.ts)) - Loads and sorts plugins by priority, validates requirements
 - **Request Manager** ([src/server/request-manager.ts](src/server/request-manager.ts)) - `masterRequest` class handles request lifecycle, cookies, context, response building
 - **Singleton Builder** ([src/build/index.ts](src/build/index.ts)) - All plugins contribute to ONE unified build via merged configs
-- **Plugin Chaining** ([src/plugins/plugin-chaining.ts](src/plugins/plugin-chaining.ts)) - Chains multiple `onLoad` handlers for same file pattern (enabled by default)
+- **Plugin Chaining** ([src/plugins/plugin-chaining.ts](src/plugins/plugin-chaining.ts)) - Chains multiple `onLoad` handlers for same file pattern and powers Frame-Master's build-plugin `finally` hook (enabled by default)
 
 ### Plugin Hook Lifecycle
 
@@ -81,8 +81,17 @@ Plugins contribute config that gets intelligently merged:
 
 - **Arrays** (`external`, `entrypoints`): Deduplicated and concatenated
 - **Objects** (`define`, `loader`): Deep merged
-- **Plugins array**: Concatenated (order preserved)
+- **Plugins array**: Order preserved, then normalized through build plugin chaining unless `pluginsOptions.disableOnLoadChaining` is true
 - **Primitives**: Last plugin wins (warning if conflict)
+
+### Build Plugin Chaining
+
+- Build `buildConfig.plugins` arrays from both static objects and dynamic functions use the same chaining path by default
+- Chained build plugins can read prior output through `args.__chainedContents` and `args.__chainedLoader`
+- Use `getChainableContent()` / `getChainableBinaryContent()` from [src/plugins/plugin-chaining.ts](src/plugins/plugin-chaining.ts) instead of re-reading the original file when a plugin may be chained
+- Frame-Master extends the build plugin API with `build.finally(loader, callback)` for post-processing after chained `onLoad` handlers finish
+- Disable chaining only via `pluginsOptions.disableOnLoadChaining` when a plugin requires Bun's raw first-match behavior
+- Full behavior and examples live in [docs/plugin-chaining.md](docs/plugin-chaining.md)
 
 ## Testing Conventions
 
@@ -123,5 +132,5 @@ import { onRoute } from "frame-master/utils"; // Route helper
 - Config file: `frame-master.config.ts` in project root
 - Build output: `.frame-master/build/` directory
 - Files marked `"server only"` (directive at top) run only on server
-- Plugin chaining allows multiple plugins to transform same file pattern sequentially
+- Plugin chaining applies to both runtime and build plugins; build plugin chaining is what enables `build.finally(...)`
 - Use `verboseLog()` from `frame-master/utils` for debug output (enabled via `-v` flag)

@@ -146,6 +146,8 @@ export type PluginOptions = {
  * ### Static Configuration (Object)
  * Merged once when `builder` is imported from "frame-master/build".
  * Use for configs that don't change at build time.
+ * Static configs participate in the same build plugin chaining flow as dynamic
+ * configs, so `plugins` entries can use chained `onLoad` and `finally` hooks.
  *
  * ```typescript
  * buildConfig: {
@@ -157,6 +159,7 @@ export type PluginOptions = {
  * ### Dynamic Configuration (Function)
  * Executed each time `builder.build()` is called.
  * Use for configs that depend on runtime state or builder properties.
+ * Dynamic configs use the same plugin chaining behavior as static configs.
  *
  * ```typescript
  * buildConfig: async (builder) => ({
@@ -192,8 +195,14 @@ export type PluginOptions = {
  * Frame-Master merges configs with smart strategies:
  * - **Arrays**: Deduplicated and concatenated (e.g., `external`, `entrypoints`)
  * - **Objects**: Deep merged (e.g., `define`, `loader`)
- * - **Plugins**: Concatenated to preserve order
+ * - **Plugins**: Concatenated to preserve order, then normalized through plugin chaining by default
  * - **Primitives**: Last plugin wins with warning
+ *
+ * Build plugin chaining is enabled by default. That means `Bun.BuildConfig.plugins`
+ * from both static and dynamic `buildConfig` sources are wrapped so multiple
+ * plugins can share chained `onLoad` transforms and Frame-Master's `finally`
+ * hook. Set `pluginsOptions.disableOnLoadChaining` in `FrameMasterConfig` to
+ * opt out.
  *
  * Provides control over the build process at different stages,
  * allowing plugins to customize build configuration and perform
@@ -206,6 +215,12 @@ export type BuildOptionsPlugin = {
 	 * Can be either:
 	 * - **Static object**: Merged once on import (for constant configs)
 	 * - **Dynamic function**: Called on each `builder.build()` (for runtime configs)
+	 *
+	 * In both cases, any `plugins` array in the returned `Bun.BuildConfig` is
+	 * normalized through Frame-Master's chaining proxy unless
+	 * `pluginsOptions.disableOnLoadChaining` is enabled. This gives static and
+	 * dynamic configs the same support for chained `onLoad` handlers,
+	 * `args.__chainedContents`, `args.__chainedLoader`, and `build.finally(...)`.
 	 *
 	 * The builder parameter in dynamic configs is the singleton Builder instance
 	 * shared across all plugins, providing access to methods like:
