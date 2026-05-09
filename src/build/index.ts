@@ -2,6 +2,12 @@ import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { cwd } from "node:process";
 import chalk from "chalk";
+import {
+	type BuildTraceBuildSummary,
+	type BuildTraceSession,
+	type BuildTraceSessionOptions,
+	BuildTraceSessionStore,
+} from "./debug-trace";
 import type { FrameMasterConfig } from "frame-master/server/type";
 import { type PluginLoader, pluginLoader } from "../plugins";
 import { chainPlugins } from "../plugins/plugin-chaining";
@@ -52,6 +58,7 @@ export class Builder {
 	}> = [];
 	private buildPromise: Promise<Bun.BuildOutput> | null = null;
 	private buildResolver: ((value: Bun.BuildOutput) => void) | null = null;
+	private debugSession: BuildTraceSessionStore | null = null;
 
 	public configs: Array<FrameMasterConfig["plugins"][number]["build"]>;
 	public outDir: string = DEFAULT_BUILD_DIR;
@@ -220,6 +227,7 @@ export class Builder {
 			...(buildConfig.entrypoints || []),
 			...(entrypoints || []),
 		];
+		this.debugSession?.startBuild(buildConfig.entrypoints ?? []);
 
 		this.log("🔨 Building with merged configuration:", {
 			entrypoints: buildConfig.entrypoints?.length || 0,
@@ -242,6 +250,11 @@ export class Builder {
 		} catch (e) {
 			console.error(e);
 			res.success = false;
+			this.debugSession?.completeBuild({
+				success: false,
+				outputCount: 0,
+				errors: [e instanceof Error ? e.message : String(e)],
+			});
 		}
 
 		const duration = performance.now() - startTime;
@@ -258,12 +271,21 @@ export class Builder {
 			success: res.success,
 		});
 		if (res.success) {
+			this.debugSession?.completeBuild({
+				success: true,
+				outputCount: res.outputs.length,
+			});
 			await Promise.all(
 				this.getHooksByType("afterBuild").map((hook) =>
 					hook(buildConfig, res, this),
 				),
 			);
 		} else {
+			this.debugSession?.completeBuild({
+				success: false,
+				outputCount: res.outputs.length,
+				errors: res.logs?.map((log) => log.message),
+			});
 			console.log(chalk.red("✗ Build failed. Skipping after-build hooks."));
 			this.log(res);
 		}
@@ -593,8 +615,44 @@ export class Builder {
 
 		return {
 			...config,
-			plugins: [chainPlugins(config.plugins, { suffix: "build" })],
+			plugins: [
+				chainPlugins(config.plugins, {
+					suffix: "build",
+					trace: this.debugSession,
+				}),
+			],
 		};
+	}
+
+	startDebugSession(options: Partial<BuildTraceSessionOptions> = {}) {
+		this.debugSession = new BuildTraceSessionStore({
+			watch: options.watch ?? false,
+			includeTextSnapshots: options.includeTextSnapshots ?? true,
+			maxBuilds: options.maxBuilds ?? 25,
+			saveTracePath: options.saveTracePath,
+		});
+		return this.debugSession.getSession();
+	}
+
+	stopDebugSession(): void {
+		this.debugSession = null;
+	}
+
+	getDebugSession(): BuildTraceSession | null {
+		return this.debugSession?.getSession() ?? null;
+	}
+
+	listDebugBuilds(): BuildTraceBuildSummary[] {
+		return this.debugSession?.listBuilds() ?? [];
+	}
+
+	exportDebugTrace(): string {
+		if (!this.debugSession) {
+			throw new Error(
+				"Debug session not started. Call startDebugSession() first.",
+			);
+		}
+		return this.debugSession.exportJSON();
 	}
 
 	/**

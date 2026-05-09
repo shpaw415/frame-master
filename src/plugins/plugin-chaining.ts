@@ -1,5 +1,6 @@
 import type { BunPlugin, OnLoadCallback, PluginBuilder } from "bun";
 import chalk from "chalk";
+import type { BuildTraceCollector } from "../build/debug-trace";
 import { isVerbose, verboseLog } from "../utils";
 
 type OnLoadArgs = Parameters<OnLoadCallback>[0];
@@ -83,10 +84,14 @@ export class PluginProxy {
 	private finallyHandlers: RegisteredFinally[] = [];
 	private suffix: string;
 	private formatedSuffix: string;
+	private trace: BuildTraceCollector | null;
 
-	constructor(opt: { suffix?: string } = {}) {
+	constructor(
+		opt: { suffix?: string; trace?: BuildTraceCollector | null } = {},
+	) {
 		this.suffix = opt.suffix ?? "";
 		this.formatedSuffix = this.suffix ? `:${this.suffix}` : "";
+		this.trace = opt.trace ?? null;
 	}
 
 	/**
@@ -215,16 +220,17 @@ export class PluginProxy {
 							namespace: namespace === "file" ? undefined : namespace,
 						},
 						async (args) => {
+							const tracedArgs = await self.attachTraceSource(args);
 							// Find all handlers whose filter matches this specific file
 							const matchingHandlers = handlers.filter((h) =>
-								h.filter.test(args.path),
+								h.filter.test(tracedArgs.path),
 							);
 
 							if (matchingHandlers.length === 0) {
 								return undefined;
 							}
 
-							return self.executeChainedOnLoad(args, matchingHandlers);
+							return self.executeChainedOnLoad(tracedArgs, matchingHandlers);
 						},
 					);
 				}
@@ -234,13 +240,14 @@ export class PluginProxy {
 				if (globalHandlers.length > 0 && handlersByNamespace.size === 0) {
 					const combinedFilter = self.createCombinedFilter(globalHandlers);
 					build.onLoad({ filter: combinedFilter }, async (args) => {
+						const tracedArgs = await self.attachTraceSource(args);
 						const matchingHandlers = globalHandlers.filter((h) =>
-							h.filter.test(args.path),
+							h.filter.test(tracedArgs.path),
 						);
 						if (matchingHandlers.length === 0) {
 							return undefined;
 						}
-						return self.executeChainedOnLoad(args, matchingHandlers);
+						return self.executeChainedOnLoad(tracedArgs, matchingHandlers);
 					});
 				}
 
@@ -492,6 +499,8 @@ export class PluginProxy {
 		originalArgs: OnLoadArgs & {
 			__chainedContents?: string | Uint8Array;
 			__chainedLoader?: Bun.Loader;
+			__traceSourceContents?: string | Uint8Array;
+			__traceSourceLoader?: Bun.Loader;
 		},
 		handlers: RegisteredOnLoad[],
 	): Promise<OnLoadResult> {
@@ -501,6 +510,19 @@ export class PluginProxy {
 		let accumulatedLoader: Bun.Loader | undefined =
 			originalArgs.__chainedLoader;
 		let lastResult: OnLoadResult;
+
+		if (this.trace) {
+			this.trace.record({
+				kind: "source-read",
+				path: originalArgs.path,
+				namespace: originalArgs.namespace,
+				contents:
+					originalArgs.__traceSourceContents ?? originalArgs.__chainedContents,
+				loader:
+					originalArgs.__traceSourceLoader ?? originalArgs.__chainedLoader,
+				triggeredAt: Date.now(),
+			});
+		}
 
 		if (handlers.length > 1) {
 			verboseLog(
@@ -532,6 +554,18 @@ export class PluginProxy {
 			};
 
 			try {
+				if (this.trace) {
+					this.trace.record({
+						kind: "transform-start",
+						path: originalArgs.path,
+						namespace: originalArgs.namespace,
+						pluginName: handler.pluginName,
+						order: i + 1,
+						contents: accumulatedContents,
+						loader: accumulatedLoader,
+						triggeredAt: Date.now(),
+					});
+				}
 				const startTime = performance.now();
 				const result = await handler.callback(chainedArgs);
 				const duration = performance.now() - startTime;
@@ -569,6 +603,21 @@ export class PluginProxy {
 						result.loader !== "object"
 					) {
 						accumulatedLoader = result.loader as Bun.Loader;
+					}
+					if (this.trace) {
+						this.trace.record({
+							kind: "transform-complete",
+							path: originalArgs.path,
+							namespace: originalArgs.namespace,
+							pluginName: handler.pluginName,
+							order: i + 1,
+							contents: accumulatedContents,
+							loader: accumulatedLoader,
+							durationMs: duration,
+							preventChaining:
+								"preventChaining" in result && result.preventChaining === true,
+							triggeredAt: Date.now(),
+						});
 					}
 					lastResult = result;
 
@@ -615,6 +664,18 @@ export class PluginProxy {
 
 				for (const handler of matchingFinallyHandlers) {
 					try {
+						if (this.trace) {
+							this.trace.record({
+								kind: "finally-start",
+								path: originalArgs.path,
+								namespace: originalArgs.namespace,
+								pluginName: handler.pluginName,
+								order: matchingFinallyHandlers.indexOf(handler) + 1,
+								contents: accumulatedContents,
+								loader: accumulatedLoader,
+								triggeredAt: Date.now(),
+							});
+						}
 						const startTime = performance.now();
 						const result = await handler.callback({
 							contents: accumulatedContents,
@@ -646,6 +707,19 @@ export class PluginProxy {
 								chalk.gray(`(${duration.toFixed(2)}ms)`),
 							);
 						}
+						if (this.trace) {
+							this.trace.record({
+								kind: "finally-complete",
+								path: originalArgs.path,
+								namespace: originalArgs.namespace,
+								pluginName: handler.pluginName,
+								order: matchingFinallyHandlers.indexOf(handler) + 1,
+								contents: accumulatedContents,
+								loader: accumulatedLoader,
+								durationMs: duration,
+								triggeredAt: Date.now(),
+							});
+						}
 					} catch (error) {
 						console.error(
 							`[PluginProxy] Error in finally handler from plugin "${handler.pluginName}" for loader ${accumulatedLoader}:`,
@@ -659,6 +733,16 @@ export class PluginProxy {
 
 		// Return the final accumulated result
 		if (lastResult && typeof lastResult === "object") {
+			if (this.trace) {
+				this.trace.record({
+					kind: "final-output",
+					path: originalArgs.path,
+					namespace: originalArgs.namespace,
+					contents: accumulatedContents,
+					loader: accumulatedLoader,
+					triggeredAt: Date.now(),
+				});
+			}
 			return {
 				...lastResult,
 				contents:
@@ -674,13 +758,104 @@ export class PluginProxy {
 
 		// Handle finally-only case (no onLoad handlers, but finally handlers ran)
 		if (accumulatedContents !== undefined && accumulatedLoader) {
+			if (this.trace) {
+				this.trace.record({
+					kind: "final-output",
+					path: originalArgs.path,
+					namespace: originalArgs.namespace,
+					contents: accumulatedContents,
+					loader: accumulatedLoader,
+					triggeredAt: Date.now(),
+				});
+			}
 			return {
 				contents: accumulatedContents,
 				loader: accumulatedLoader,
 			} as OnLoadResult;
 		}
 
+		if (this.trace && accumulatedContents !== undefined) {
+			this.trace.record({
+				kind: "final-output",
+				path: originalArgs.path,
+				namespace: originalArgs.namespace,
+				contents: accumulatedContents,
+				loader: accumulatedLoader,
+				triggeredAt: Date.now(),
+			});
+		}
+
 		return lastResult;
+	}
+
+	private async attachTraceSource(
+		args: OnLoadArgs & {
+			__traceSourceContents?: string | Uint8Array;
+			__traceSourceLoader?: Bun.Loader;
+		},
+	): Promise<
+		OnLoadArgs & {
+			__traceSourceContents?: string | Uint8Array;
+			__traceSourceLoader?: Bun.Loader;
+		}
+	> {
+		if (!this.trace) return args;
+		if (args.__traceSourceContents !== undefined) return args;
+
+		const inferredLoader = this.inferLoaderFromPath(args.path);
+		const isFileNamespace = !args.namespace || args.namespace === "file";
+		if (!isFileNamespace) {
+			return {
+				...args,
+				__traceSourceContents: undefined,
+				__traceSourceLoader: inferredLoader,
+			};
+		}
+
+		try {
+			const contents =
+				inferredLoader && this.isTextLoader(inferredLoader)
+					? await Bun.file(args.path).text()
+					: new Uint8Array(await Bun.file(args.path).arrayBuffer());
+			return {
+				...args,
+				__traceSourceContents: contents,
+				__traceSourceLoader: inferredLoader,
+			};
+		} catch {
+			return {
+				...args,
+				__traceSourceLoader: inferredLoader,
+			};
+		}
+	}
+
+	private inferLoaderFromPath(filePath: string): Bun.Loader | undefined {
+		const lowerPath = filePath.toLowerCase();
+		if (lowerPath.endsWith(".tsx")) return "tsx";
+		if (lowerPath.endsWith(".ts")) return "ts";
+		if (lowerPath.endsWith(".jsx")) return "jsx";
+		if (lowerPath.endsWith(".js")) return "js";
+		if (lowerPath.endsWith(".css")) return "css";
+		if (lowerPath.endsWith(".html")) return "html";
+		if (lowerPath.endsWith(".json")) return "json";
+		if (lowerPath.endsWith(".toml")) return "toml";
+		if (lowerPath.endsWith(".txt")) return "text";
+		return undefined;
+	}
+
+	private isTextLoader(loader: Bun.Loader): boolean {
+		return [
+			"js",
+			"jsx",
+			"ts",
+			"tsx",
+			"css",
+			"html",
+			"json",
+			"toml",
+			"text",
+		].includes(loader);
 	}
 
 	/**
@@ -779,7 +954,7 @@ export function createPluginProxy(): PluginProxy {
  */
 export function chainPlugins(
 	plugins: BunPlugin[],
-	opt?: { suffix?: string },
+	opt?: { suffix?: string; trace?: BuildTraceCollector | null },
 ): BunPlugin {
 	const proxy = new PluginProxy(opt);
 	proxy.addPlugins(plugins);
