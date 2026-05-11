@@ -182,6 +182,7 @@ type ActiveBuildContext = {
 	build: BuildTraceBuild;
 	filesByPath: Map<string, BuildTraceFile>;
 	pendingSteps: Map<string, BuildTraceStep>;
+	snapshotIdsByHash: Map<string, string>;
 	sequence: number;
 };
 
@@ -233,7 +234,7 @@ function normalizeSnapshot(
 	id: string,
 	contents?: string | Uint8Array,
 	loader?: Bun.Loader,
-	includeText = true,
+	includeText = false,
 ): BuildTraceSnapshot {
 	const kind = getContentKind(contents, loader);
 	return {
@@ -280,7 +281,7 @@ export class BuildTraceSessionStore implements BuildTraceCollector {
 			id: `trace-session-${Date.now()}`,
 			startedAt: Date.now(),
 			options: {
-				includeTextSnapshots: true,
+				includeTextSnapshots: false,
 				maxBuilds: 25,
 				...options,
 			},
@@ -308,6 +309,7 @@ export class BuildTraceSessionStore implements BuildTraceCollector {
 			build,
 			filesByPath: new Map(),
 			pendingSteps: new Map(),
+			snapshotIdsByHash: new Map(),
 			sequence: 0,
 		};
 		this.emit({
@@ -678,15 +680,23 @@ export class BuildTraceSessionStore implements BuildTraceCollector {
 	): string | undefined {
 		const activeBuild = this.activeBuild;
 		if (!activeBuild) return undefined;
+		const snapshotHash = hashContents(contents);
+		const existingSnapshotId = activeBuild.snapshotIdsByHash.get(snapshotHash);
+		if (existingSnapshotId) {
+			return existingSnapshotId;
+		}
+
 		const snapshotId = `${activeBuild.build.id}:snapshot:${
 			Object.keys(activeBuild.build.snapshots).length + 1
 		}`;
-		activeBuild.build.snapshots[snapshotId] = normalizeSnapshot(
+		const snapshot = normalizeSnapshot(
 			snapshotId,
 			contents,
 			loader,
-			this.session.options.includeTextSnapshots,
+			this.session.options.includeTextSnapshots ?? false,
 		);
+		activeBuild.build.snapshots[snapshotId] = snapshot;
+		activeBuild.snapshotIdsByHash.set(snapshot.hash, snapshotId);
 		return snapshotId;
 	}
 

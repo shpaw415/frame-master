@@ -628,7 +628,7 @@ export class Builder {
 	startDebugSession(options: Partial<BuildTraceSessionOptions> = {}) {
 		this.debugSession = new BuildTraceSessionStore({
 			watch: options.watch ?? false,
-			includeTextSnapshots: options.includeTextSnapshots ?? true,
+			includeTextSnapshots: options.includeTextSnapshots ?? false,
 			maxBuilds: options.maxBuilds ?? 25,
 			saveTracePath: options.saveTracePath,
 		});

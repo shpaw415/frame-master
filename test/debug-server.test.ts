@@ -40,7 +40,6 @@ describe("debug server trace saving", () => {
 		const incorrectJoinedPath = join(process.cwd(), savePath);
 
 		cleanupPaths.add(absoluteDir);
-		cleanupPaths.add(dirname(incorrectJoinedPath));
 
 		const server = new DebugBuildServer(createStubBuilder(), {
 			port: 0,

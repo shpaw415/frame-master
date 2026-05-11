@@ -1,4 +1,4 @@
-import type { WatchEventType } from "../../src/plugins/types";
+import type { WatchEventType } from "frame-master/plugin/types";
 import type {
 	BuildTraceBuild,
 	BuildTraceBuildSummary,
