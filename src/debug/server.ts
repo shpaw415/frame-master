@@ -1,14 +1,14 @@
-import { pluginLoader } from "../../src/plugins";
-import { createWatcher, type FileSystemWatcher } from "../../src/server/watch";
-import type { DebugBuildMessage, DebugRegistryEntry } from "./types";
+import { existsSync, mkdirSync } from "node:fs";
+import { dirname, join, normalize } from "node:path";
+import chalk from "chalk";
 import type { Builder } from "frame-master/build";
 import type {
 	BuildTraceBuild,
 	BuildTraceStoreEvent,
 } from "frame-master/build/debug-trace";
-import chalk from "chalk";
-import { dirname, join, normalize } from "node:path";
-import { existsSync, mkdirSync } from "node:fs";
+import { pluginLoader } from "../../src/plugins";
+import { createWatcher, type FileSystemWatcher } from "../../src/server/watch";
+import type { DebugBuildMessage, DebugRegistryEntry } from "./types";
 
 type DebugBuildOptions = {
 	port: number;

@@ -5,7 +5,6 @@ import type {
 	BuildTraceSession,
 	BuildTraceSnapshot,
 } from "../src/build/debug-trace";
-import type { DebugRegistryEntry } from "../src/debug/types";
 import {
 	applyDebugMessage,
 	createInitialDebugUIState,
@@ -17,7 +16,8 @@ import {
 	selectBuild,
 	storeSnapshot,
 	upsertBuild,
-} from "../bin/debug/src/state";
+} from "../src/debug/state";
+import type { DebugRegistryEntry } from "../src/debug/types";
 
 function buildSummary(id: string, sequence: number): BuildTraceBuildSummary {
 	return {

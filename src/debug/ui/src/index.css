@@ -92,18 +92,40 @@
 }
 
 @layer components {
-	.t-text   { color: var(--text); }
-	.t-muted  { color: var(--muted); }
-	.t-dim    { color: var(--dim); }
-	.t-faint  { color: var(--faint); }
-	.t-accent { color: var(--accent); }
-	.t-ok     { color: var(--ok); }
-	.t-err    { color: var(--err); }
-	.t-run    { color: var(--run); }
+	.t-text {
+		color: var(--text);
+	}
+	.t-muted {
+		color: var(--muted);
+	}
+	.t-dim {
+		color: var(--dim);
+	}
+	.t-faint {
+		color: var(--faint);
+	}
+	.t-accent {
+		color: var(--accent);
+	}
+	.t-ok {
+		color: var(--ok);
+	}
+	.t-err {
+		color: var(--err);
+	}
+	.t-run {
+		color: var(--run);
+	}
 
-	.t-surface  { background: var(--bg-surface); }
-	.t-selected { background: var(--bg-selected); }
-	.t-hover:hover { background: var(--bg-hover); }
+	.t-surface {
+		background: var(--bg-surface);
+	}
+	.t-selected {
+		background: var(--bg-selected);
+	}
+	.t-hover:hover {
+		background: var(--bg-hover);
+	}
 
 	.t-badge {
 		display: inline-flex;
@@ -114,9 +136,18 @@
 		font-weight: 500;
 		line-height: 1.6;
 	}
-	.t-badge-ok  { color: var(--ok);  background: var(--ok-subtle); }
-	.t-badge-err { color: var(--err); background: var(--err-subtle); }
-	.t-badge-run { color: var(--run); background: var(--run-subtle); }
+	.t-badge-ok {
+		color: var(--ok);
+		background: var(--ok-subtle);
+	}
+	.t-badge-err {
+		color: var(--err);
+		background: var(--err-subtle);
+	}
+	.t-badge-run {
+		color: var(--run);
+		background: var(--run-subtle);
+	}
 
 	.t-btn {
 		display: inline-flex;
@@ -129,7 +160,10 @@
 		font-size: 11px;
 		font-family: inherit;
 		cursor: pointer;
-		transition: border-color 0.12s, color 0.12s, background 0.12s;
+		transition:
+			border-color 0.12s,
+			color 0.12s,
+			background 0.12s;
 	}
 	.t-btn:hover {
 		border-color: var(--muted);
@@ -150,7 +184,9 @@
 		cursor: pointer;
 		transition: background 0.12s;
 	}
-	.t-btn-accent:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+	.t-btn-accent:hover {
+		background: color-mix(in srgb, var(--accent) 12%, transparent);
+	}
 
 	.t-section-label {
 		padding: 5px 12px;

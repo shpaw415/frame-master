@@ -1,10 +1,10 @@
+import type { WatchEventType } from "../../src/plugins/types";
 import type {
 	BuildTraceBuild,
 	BuildTraceBuildSummary,
 	BuildTraceSession,
 	BuildTraceSnapshot,
 } from "../build/debug-trace";
-import type { WatchEventType } from "../../src/plugins/types";
 
 export type DebugStreamStep = {
 	id: string;

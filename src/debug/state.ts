@@ -3,13 +3,13 @@ import type {
 	BuildTraceBuildSummary,
 	BuildTraceSession,
 	BuildTraceSnapshot,
-} from "../../../build/debug-trace";
+} from "../build/debug-trace";
 import type {
 	DebugBuildMessage,
 	DebugRegistryEntry,
 	DebugStreamFile,
 	DebugStreamStep,
-} from "../../../debug/types";
+} from "./types";
 
 export type DebugLiveFile = DebugStreamFile & {
 	steps: DebugStreamStep[];

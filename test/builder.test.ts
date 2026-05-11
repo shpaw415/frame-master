@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { createBuilder } from "../src/build";
-import { PluginLoader } from "../src/plugins";
-import type { BuildTraceSession } from "../src/build/debug-trace";
-import type { FrameMasterConfig } from "frame-master/server/type";
 import { join } from "node:path";
 import type { BunPlugin } from "bun";
+import type { FrameMasterConfig } from "frame-master/server/type";
+import { createBuilder } from "../src/build";
+import type { BuildTraceSession } from "../src/build/debug-trace";
+import { PluginLoader } from "../src/plugins";
 
 const TEMP_DIR = ".test-temp";
 const TEXT_ENTRYPOINT = join(TEMP_DIR, "entry.txt");

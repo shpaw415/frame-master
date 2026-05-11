@@ -8,16 +8,15 @@ import {
 } from "react";
 import type {
 	BuildTraceBuild,
-	BuildTraceBuildSummary,
 	BuildTraceBuildStatus,
+	BuildTraceBuildSummary,
 	BuildTraceSession,
 	BuildTraceSnapshot,
 } from "../../../build/debug-trace";
 import type {
-	DebugRegistryEntry,
 	DebugBuildMessage,
+	DebugRegistryEntry,
 } from "../../../debug/types";
-import MonacoDiff from "./MonacoDiff";
 import {
 	applyDebugMessage,
 	createInitialDebugUIState,
@@ -31,7 +30,8 @@ import {
 	setConnectionState,
 	storeSnapshot,
 	upsertBuild,
-} from "./state";
+} from "../../state";
+import MonacoDiff from "./MonacoDiff";
 
 // ── Left-panel tab registry ───────────────────────────────────────────────────
 // Add new entries here to extend the menu.

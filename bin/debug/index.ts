@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
 import { InitBuild } from "frame-master/server/init";
-import { ensureNodeEnv } from "../share";
 import { DebugBuildServer } from "../../src/debug/server";
+import { ensureNodeEnv } from "../share";
 
 const debugBuildCommand = new Command("build")
 	.description("Run an instrumented build and expose a debug trace server")
