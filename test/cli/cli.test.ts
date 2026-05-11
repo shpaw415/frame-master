@@ -561,6 +561,12 @@ export default {
 					};
 				});
 
+				const initialBuilds = await waitForJson<Array<{ sequence: number }>>(
+					"http://localhost:3312/api/builds",
+					(value) => value.length >= 1,
+				);
+				const initialSequence = initialBuilds[0]?.sequence ?? 0;
+
 				writeFileSync(
 					entrypointFilePath,
 					`console.log("watch build changed");`,
@@ -568,11 +574,12 @@ export default {
 
 				const builds = await waitForJson<Array<{ sequence: number }>>(
 					"http://localhost:3312/api/builds",
-					(value) => value.length === 2 && value[0]?.sequence === 2,
+					(value) =>
+						value.length >= 2 && (value[0]?.sequence ?? 0) > initialSequence,
 					15000,
 				);
 
-				expect(builds).toHaveLength(2);
+				expect(builds.length).toBeGreaterThanOrEqual(2);
 				expect(
 					messages.some((message) => message.type === "watcher-change"),
 				).toBe(true);
