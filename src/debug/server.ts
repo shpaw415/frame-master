@@ -304,6 +304,8 @@ export class DebugBuildServer {
 	}
 
 	private logStartup() {
+		console.log("Frame Master Debug Build");
+		console.log(`Debug UI: http://localhost:${this.options.port}`);
 		console.log(
 			"\n" + chalk.bold.cyan("┌─────────────────────────────────────────┐"),
 		);
@@ -362,6 +364,7 @@ export class DebugBuildServer {
 			durationMs: step.durationMs,
 			beforeSnapshotId: step.beforeSnapshotId,
 			afterSnapshotId: step.afterSnapshotId,
+			error: step.error,
 		};
 	}
 
@@ -485,5 +488,158 @@ export class DebugBuildServer {
 
 	private send(ws: Bun.ServerWebSocket<unknown>, message: DebugBuildMessage) {
 		ws.send(JSON.stringify(message));
+	}
+}
+
+// ── Trace-only viewer (no builder required) ───────────────────────────────────
+
+import type { BuildTraceSession } from "../../src/build/debug-trace";
+
+type TraceViewOptions = {
+	port: number;
+	tracePath: string;
+};
+
+export class DebugTraceViewServer {
+	private server: Bun.Server<undefined> | null = null;
+
+	constructor(private options: TraceViewOptions) {}
+
+	async start() {
+		const absoluteTracePath = this.options.tracePath.startsWith("/")
+			? this.options.tracePath
+			: join(process.cwd(), this.options.tracePath);
+
+		if (!existsSync(absoluteTracePath)) {
+			throw new Error(`Trace file not found: ${absoluteTracePath}`);
+		}
+
+		const session = JSON.parse(
+			await Bun.file(absoluteTracePath).text(),
+		) as BuildTraceSession;
+
+		const htmlEntrypoint = join(__dirname, "./ui/src/index.html");
+		const buildFiles = await this.prepareFrontendAssets([htmlEntrypoint]);
+
+		const htmlAsset = Bun.file(
+			buildFiles.find((a) => a.pathname === "/index.html")?.assetPath as string,
+		);
+
+		const routes = Object.assign(
+			{},
+			...buildFiles.map((asset) => ({
+				[asset.pathname]: Bun.file(asset.assetPath),
+			})),
+		);
+
+		const buildList = session.buildList.length
+			? session.buildList
+			: session.builds.map((b) => ({
+					id: b.id,
+					sequence: b.sequence,
+					status: b.status,
+					startedAt: b.startedAt,
+					completedAt: b.completedAt,
+					durationMs: b.durationMs,
+					entrypoints: b.entrypoints,
+					fileCount: b.fileCount,
+					stepCount: b.stepCount,
+					outputCount: b.outputCount,
+				}));
+
+		this.server = Bun.serve({
+			port: this.options.port,
+			development: false,
+			routes: {
+				"/": htmlAsset,
+				...routes,
+				// No WebSocket — view-only, no live rebuild
+				"/ws": () =>
+					new Response("Not available in view mode", { status: 404 }),
+				"/api/session": () => Response.json(session),
+				"/api/builds": () => Response.json(buildList),
+				"/api/export": () =>
+					new Response(JSON.stringify(session, null, 2), {
+						headers: { "Content-Type": "application/json; charset=utf-8" },
+					}),
+				"/api/registry": () => Response.json([]),
+			},
+			fetch: (req) => this.handleRequest(req, session),
+		});
+
+		this.logStartup(absoluteTracePath);
+	}
+
+	async stop() {
+		this.server?.stop();
+		this.server = null;
+	}
+
+	private handleRequest(req: Request, session: BuildTraceSession): Response {
+		const url = new URL(req.url);
+
+		const buildMatch = url.pathname.match(/^\/api\/builds\/([^/]+)$/);
+		if (buildMatch?.[1]) {
+			const build = session.builds.find((b) => b.id === buildMatch[1]) ?? null;
+			return Response.json(build);
+		}
+
+		const snapshotMatch = url.pathname.match(
+			/^\/api\/builds\/([^/]+)\/snapshots\/([^/]+)$/,
+		);
+		if (snapshotMatch?.[1] && snapshotMatch[2]) {
+			const build = session.builds.find((b) => b.id === snapshotMatch[1]);
+			const snapshot = build?.snapshots[snapshotMatch[2]] ?? null;
+			return Response.json(snapshot);
+		}
+
+		return new Response("Not found", { status: 404 });
+	}
+
+	private async prepareFrontendAssets(entrypoints: string[]) {
+		const assetsDir = join(process.cwd(), ".frame-master", "debug-ui");
+		mkdirIfNeeded(assetsDir);
+
+		const result = await Bun.build({
+			entrypoints,
+			outdir: assetsDir,
+			minify: true,
+			sourcemap: "none",
+			splitting: false,
+			target: "browser",
+		});
+		return result.outputs.map((out) => ({
+			pathname: normalize(out.path.split(assetsDir).at(1) as string),
+			assetPath: out.path,
+		}));
+	}
+
+	private logStartup(tracePath: string) {
+		console.log(
+			"\n" + chalk.bold.cyan("┌─────────────────────────────────────────┐"),
+		);
+		console.log(
+			chalk.bold.cyan("│") +
+				chalk.bold.white("  🐞 Frame Master Debug Trace Viewer   ") +
+				chalk.bold.cyan("│"),
+		);
+		console.log(chalk.bold.cyan("├─────────────────────────────────────────┤"));
+		console.log(
+			chalk.bold.cyan("│") +
+				"  " +
+				chalk.gray("UI:    ") +
+				chalk.bold.green(`http://localhost:${this.options.port}`.padEnd(30)) +
+				chalk.bold.cyan("│"),
+		);
+		console.log(
+			chalk.bold.cyan("│") +
+				"  " +
+				chalk.gray("Trace: ") +
+				chalk.bold.white(tracePath.slice(-30).padEnd(30)) +
+				chalk.bold.cyan("│"),
+		);
+		console.log(
+			chalk.bold.cyan("└─────────────────────────────────────────┘") + "\n",
+		);
 	}
 }

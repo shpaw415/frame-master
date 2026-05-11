@@ -8,6 +8,19 @@ export type BuildTraceStepKind =
 
 export type BuildTraceBuildStatus = "running" | "success" | "error";
 
+export interface BuildTraceStepError {
+	/** Error constructor name, e.g. "TypeError", "SyntaxError" */
+	name: string;
+	/** Human-readable error message */
+	message: string;
+	/** Full stack trace string, if available */
+	stack?: string;
+	/** Serialised cause chain, if available */
+	cause?: string;
+	/** Any extra own-properties found on the error object */
+	extra?: Record<string, string>;
+}
+
 export interface BuildTraceSnapshot {
 	id: string;
 	kind: TraceContentKind;
@@ -34,6 +47,7 @@ export interface BuildTraceStep {
 	afterSnapshotId?: string;
 	durationMs?: number;
 	preventChaining?: boolean;
+	error?: BuildTraceStepError;
 	startedAt: number;
 	completedAt?: number;
 }
@@ -124,6 +138,18 @@ export type BuildTraceEvent =
 	  })
 	| (TraceMutationBase & {
 			kind: "final-output";
+	  })
+	| (TraceMutationBase & {
+			kind: "transform-error";
+			pluginName: string;
+			order: number;
+			error: BuildTraceStepError;
+	  })
+	| (TraceMutationBase & {
+			kind: "finally-error";
+			pluginName: string;
+			order: number;
+			error: BuildTraceStepError;
 	  });
 
 export interface BuildTraceCollector {
@@ -410,6 +436,26 @@ export class BuildTraceSessionStore implements BuildTraceCollector {
 					completedAt: event.triggeredAt ?? Date.now(),
 				});
 				break;
+			case "transform-error":
+				this.errorStep(
+					file,
+					"onLoad",
+					event.pluginName,
+					event.order,
+					event.error,
+					event.triggeredAt ?? Date.now(),
+				);
+				break;
+			case "finally-error":
+				this.errorStep(
+					file,
+					"finally",
+					event.pluginName,
+					event.order,
+					event.error,
+					event.triggeredAt ?? Date.now(),
+				);
+				break;
 			case "final-output":
 				this.finishFile(file, event.contents, event.loader);
 				break;
@@ -567,6 +613,27 @@ export class BuildTraceSessionStore implements BuildTraceCollector {
 		file.finalSize = step.sizeAfter;
 		file.finalHash = step.hashAfter;
 		file.finalSnapshotId = step.afterSnapshotId;
+		activeBuild.pendingSteps.delete(key);
+		this.emitStep(file, step);
+	}
+
+	private errorStep(
+		file: BuildTraceFile,
+		kind: "onLoad" | "finally",
+		pluginName: string,
+		order: number,
+		error: BuildTraceStepError,
+		completedAt: number,
+	) {
+		const activeBuild = this.requireActiveBuild();
+		const key = this.stepKey(file.path, kind, pluginName, order);
+		const step = activeBuild.pendingSteps.get(key);
+		if (!step) return;
+
+		step.error = error;
+		step.durationMs = completedAt - step.startedAt;
+		step.completedAt = completedAt;
+
 		activeBuild.pendingSteps.delete(key);
 		this.emitStep(file, step);
 	}

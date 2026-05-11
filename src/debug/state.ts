@@ -213,6 +213,53 @@ export function applyDebugMessage(
 	}
 }
 
+export function loadTraceFile(
+	state: DebugUIState,
+	session: BuildTraceSession,
+): DebugUIState {
+	// Flatten all per-build snapshots into the global snapshot map
+	const snapshots: Record<string, BuildTraceSnapshot> = { ...state.snapshots };
+	const builds: Record<string, BuildTraceBuild> = { ...state.builds };
+
+	for (const build of session.builds) {
+		builds[build.id] = build;
+		for (const [snapshotId, snapshot] of Object.entries(build.snapshots)) {
+			snapshots[getSnapshotKey(build.id, snapshotId)] = snapshot;
+		}
+	}
+
+	const buildList = session.buildList.length
+		? sortBuildList(session.buildList)
+		: sortBuildList(session.builds.map((b) => cloneBuildSummaryFromBuild(b)));
+
+	return syncSelection({
+		...state,
+		session,
+		buildList,
+		builds,
+		snapshots,
+		// Imported traces have no live data
+		liveBuilds: {},
+	});
+}
+
+function cloneBuildSummaryFromBuild(
+	build: BuildTraceBuild,
+): BuildTraceBuildSummary {
+	return {
+		id: build.id,
+		sequence: build.sequence,
+		status: build.status,
+		startedAt: build.startedAt,
+		completedAt: build.completedAt,
+		durationMs: build.durationMs,
+		entrypoints: [...build.entrypoints],
+		fileCount: build.fileCount,
+		stepCount: build.stepCount,
+		outputCount: build.outputCount,
+	};
+}
+
 export function getSelectedBuild(state: DebugUIState): BuildLike | null {
 	if (!state.selectedBuildId) return null;
 	return (

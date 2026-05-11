@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
 import { InitBuild } from "frame-master/server/init";
-import { DebugBuildServer } from "../../src/debug/server";
+import { DebugBuildServer, DebugTraceViewServer } from "../../src/debug/server";
 import { ensureNodeEnv } from "../share";
 
 const debugBuildCommand = new Command("build")
@@ -56,6 +56,27 @@ const debugBuildCommand = new Command("build")
 
 export const debugCommand = new Command("debug")
 	.description("Debug Frame-Master internals")
-	.addCommand(debugBuildCommand);
+	.addCommand(debugBuildCommand)
+	.addCommand(
+		new Command("view")
+			.description(
+				"Open the debug UI to browse an existing debug-trace.json file without building",
+			)
+			.argument("<trace>", "Path to the debug-trace.json file to view")
+			.option("-p, --port <port>", "Port for the debug UI server", "3011")
+			.action(async (trace: string, options: { port: string }) => {
+				const server = new DebugTraceViewServer({
+					port: Number(options.port),
+					tracePath: trace,
+				});
+
+				await server.start();
+				process.on("SIGINT", async () => {
+					console.log("\nShutting down trace viewer...");
+					await server.stop();
+					process.exit(0);
+				});
+			}),
+	);
 
 export default debugCommand;

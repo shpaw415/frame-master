@@ -1,11 +1,52 @@
 import type { BunPlugin, OnLoadCallback, PluginBuilder } from "bun";
 import chalk from "chalk";
-import type { BuildTraceCollector } from "../build/debug-trace";
+import type {
+	BuildTraceCollector,
+	BuildTraceStepError,
+} from "../build/debug-trace";
 import { verboseLog } from "../utils";
 
 type OnLoadArgs = Parameters<OnLoadCallback>[0];
 type OnLoadResult = Awaited<ReturnType<OnLoadCallback>>;
 type OnLoadConstraints = Parameters<PluginBuilder["onLoad"]>[0];
+
+/**
+ * Extracts a rich, structured error descriptor from any thrown value.
+ */
+function serializeError(error: unknown): BuildTraceStepError {
+	if (error instanceof Error) {
+		const extra: Record<string, string> = {};
+		for (const key of Object.getOwnPropertyNames(error)) {
+			if (
+				key === "name" ||
+				key === "message" ||
+				key === "stack" ||
+				key === "cause"
+			)
+				continue;
+			const val = (error as unknown as Record<string, unknown>)[key];
+			if (val !== undefined) {
+				extra[key] = typeof val === "string" ? val : JSON.stringify(val);
+			}
+		}
+		return {
+			name: error.name || "Error",
+			message: error.message,
+			stack: error.stack,
+			cause:
+				error.cause != null
+					? error.cause instanceof Error
+						? `${error.cause.name}: ${error.cause.message}\n${error.cause.stack ?? ""}`
+						: String(error.cause)
+					: undefined,
+			extra: Object.keys(extra).length > 0 ? extra : undefined,
+		};
+	}
+	return {
+		name: "UnknownError",
+		message: String(error),
+	};
+}
 
 interface RegisteredOnLoad {
 	filter: RegExp;
@@ -640,6 +681,17 @@ export class PluginProxy {
 					}
 				}
 			} catch (error) {
+				if (this.trace) {
+					this.trace.record({
+						kind: "transform-error",
+						path: originalArgs.path,
+						namespace: originalArgs.namespace,
+						pluginName: handler.pluginName,
+						order: i + 1,
+						error: serializeError(error),
+						triggeredAt: Date.now(),
+					});
+				}
 				console.error(
 					`[PluginProxy] Error in onLoad handler from plugin "${handler.pluginName}" for file ${originalArgs.path}:`,
 					error,
@@ -725,6 +777,17 @@ export class PluginProxy {
 							});
 						}
 					} catch (error) {
+						if (this.trace) {
+							this.trace.record({
+								kind: "finally-error",
+								path: originalArgs.path,
+								namespace: originalArgs.namespace,
+								pluginName: handler.pluginName,
+								order: matchingFinallyHandlers.indexOf(handler) + 1,
+								error: serializeError(error),
+								triggeredAt: Date.now(),
+							});
+						}
 						console.error(
 							`[PluginProxy] Error in finally handler from plugin "${handler.pluginName}" for loader ${accumulatedLoader}:`,
 							error,

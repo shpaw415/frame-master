@@ -4,7 +4,10 @@ import type {
 	BuildTraceBuildSummary,
 	BuildTraceSession,
 	BuildTraceSnapshot,
+	BuildTraceStepError,
 } from "../build/debug-trace";
+
+export type { BuildTraceStepError };
 
 export type DebugStreamStep = {
 	id: string;
@@ -18,6 +21,7 @@ export type DebugStreamStep = {
 	durationMs?: number;
 	beforeSnapshotId?: string;
 	afterSnapshotId?: string;
+	error?: BuildTraceStepError;
 };
 
 export type DebugStreamFile = {

@@ -12,6 +12,7 @@ import type {
 	BuildTraceBuildSummary,
 	BuildTraceSession,
 	BuildTraceSnapshot,
+	BuildTraceStepError,
 } from "../../../build/debug-trace";
 import type {
 	DebugBuildMessage,
@@ -25,6 +26,7 @@ import {
 	getSelectedStep,
 	getSnapshotKey,
 	hydrateDebugUIState,
+	loadTraceFile,
 	selectBuild,
 	selectStep,
 	setConnectionState,
@@ -93,11 +95,95 @@ function statusBadge(status: BuildTraceBuildStatus) {
 	return "t-badge-run";
 }
 
+function StepErrorPanel({ error }: { error: BuildTraceStepError }) {
+	return (
+		<div className="flex flex-col h-full overflow-y-auto p-4 gap-4 font-mono text-xs">
+			{/* Error type + message */}
+			<div className="flex flex-col gap-1.5">
+				<div className="flex items-center gap-2">
+					<span className="t-badge t-badge-err shrink-0">{error.name}</span>
+					<span className="t-err font-semibold text-sm leading-snug break-all">
+						{error.message}
+					</span>
+				</div>
+			</div>
+
+			{/* Stack trace */}
+			{error.stack && (
+				<div className="flex flex-col gap-1">
+					<div className="t-section-label text-xs uppercase tracking-wider pb-1">
+						stack trace
+					</div>
+					<pre className="t-surface border rounded p-3 text-xs leading-relaxed t-dim overflow-x-auto whitespace-pre-wrap break-all">
+						{/* Strip the first line of the stack if it duplicates name+message */}
+						{error.stack.startsWith(`${error.name}: ${error.message}`)
+							? error.stack
+									.slice(`${error.name}: ${error.message}`.length)
+									.trimStart()
+							: error.stack}
+					</pre>
+				</div>
+			)}
+
+			{/* Cause chain */}
+			{error.cause && (
+				<div className="flex flex-col gap-1">
+					<div className="t-section-label text-xs uppercase tracking-wider pb-1">
+						caused by
+					</div>
+					<pre className="t-surface border rounded p-3 text-xs leading-relaxed t-dim overflow-x-auto whitespace-pre-wrap break-all">
+						{error.cause}
+					</pre>
+				</div>
+			)}
+
+			{/* Extra properties */}
+			{error.extra && Object.keys(error.extra).length > 0 && (
+				<div className="flex flex-col gap-1">
+					<div className="t-section-label text-xs uppercase tracking-wider pb-1">
+						extra
+					</div>
+					<div className="t-surface border rounded p-3 flex flex-col gap-1">
+						{Object.entries(error.extra).map(([k, v]) => (
+							<div key={k} className="flex gap-2">
+								<span className="t-faint shrink-0 w-24 truncate">{k}</span>
+								<span className="t-dim break-all">{v}</span>
+							</div>
+						))}
+					</div>
+				</div>
+			)}
+		</div>
+	);
+}
+
 export default function DebugApp() {
 	const [state, setState] = useState(createInitialDebugUIState);
 	const [theme, setTheme] = useState<"dark" | "light">("dark");
 	const [leftTab, setLeftTab] = useState<LeftTabKey>("builds");
 	const socketRef = useRef<WebSocket | null>(null);
+	const importFileRef = useRef<HTMLInputElement | null>(null);
+
+	function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+		const file = e.target.files?.[0];
+		if (!file) return;
+		const reader = new FileReader();
+		reader.onload = () => {
+			try {
+				const session = JSON.parse(
+					reader.result as string,
+				) as BuildTraceSession;
+				startTransition(() => {
+					setState((current) => loadTraceFile(current, session));
+				});
+			} catch {
+				// Invalid file — silently ignore
+			}
+		};
+		reader.readAsText(file);
+		// Reset so re-importing the same file triggers the event again
+		e.target.value = "";
+	}
 
 	useEffect(() => {
 		if (theme === "light") {
@@ -274,6 +360,21 @@ export default function DebugApp() {
 						>
 							export
 						</a>
+						<button
+							type="button"
+							onClick={() => importFileRef.current?.click()}
+							className="t-btn"
+							title="Import a debug-trace.json file"
+						>
+							import trace
+						</button>
+						<input
+							ref={importFileRef}
+							type="file"
+							accept=".json,application/json"
+							className="hidden"
+							onChange={handleImportFile}
+						/>
 						<button
 							type="button"
 							onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
@@ -458,9 +559,14 @@ export default function DebugApp() {
 												>
 													<div className="flex items-center justify-between gap-2">
 														<span
-															className={`text-xs font-medium ${isSelected ? "t-accent" : "t-muted"}`}
+															className={`text-xs font-medium ${step.error ? "t-err" : isSelected ? "t-accent" : "t-muted"}`}
 														>
 															{step.pluginName ?? "core"}
+															{step.error && (
+																<span className="ml-1 t-badge t-badge-err">
+																	{step.error.name}
+																</span>
+															)}
 														</span>
 														<span className="text-xs t-dim">
 															{formatDuration(step.durationMs)}
@@ -473,6 +579,14 @@ export default function DebugApp() {
 													<div className="mt-0.5 text-xs t-faint">
 														{step.sizeBefore}b → {step.sizeAfter}b
 													</div>
+													{step.error && (
+														<div
+															className="mt-1 text-xs t-err truncate"
+															title={step.error.message}
+														>
+															{step.error.message}
+														</div>
+													)}
 												</button>
 											);
 										})
@@ -553,6 +667,15 @@ export default function DebugApp() {
 												<span className="t-dim">{v}</span>
 											</div>
 										))}
+										{selectedStep.error && (
+											<div className="flex gap-2 mt-1">
+												<span className="t-faint w-10 shrink-0">error</span>
+												<span className="t-err break-all">
+													{selectedStep.error.name}:{" "}
+													{selectedStep.error.message}
+												</span>
+											</div>
+										)}
 									</div>
 								) : (
 									<span className="text-xs t-faint">no step selected</span>
@@ -645,13 +768,17 @@ export default function DebugApp() {
 
 					{/* Monaco diff — takes all remaining height */}
 					<div className="flex-1 overflow-hidden">
-						<MonacoDiff
-							language={selectedLanguage}
-							original={snapshotText(beforeSnapshot)}
-							modified={snapshotText(afterSnapshot)}
-							className="h-full"
-							theme={theme}
-						/>
+						{selectedStep?.error ? (
+							<StepErrorPanel error={selectedStep.error} />
+						) : (
+							<MonacoDiff
+								language={selectedLanguage}
+								original={snapshotText(beforeSnapshot)}
+								modified={snapshotText(afterSnapshot)}
+								className="h-full"
+								theme={theme}
+							/>
+						)}
 					</div>
 				</div>
 			</div>
