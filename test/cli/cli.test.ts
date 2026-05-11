@@ -371,11 +371,9 @@ describe("frame-master CLI", () => {
 			const projectPath = join(TEST_DIR, projectName);
 			mkdirSync(join(projectPath, "src"), { recursive: true });
 
-			const entrypointPath = join(projectPath, "src", "index.ts").replaceAll(
-				"\\",
-				"/",
-			);
-			writeFileSync(entrypointPath, `console.log("debug build");`);
+			const entrypointFilePath = join(projectPath, "src", "index.ts");
+			const entrypointConfigPath = "./src/index.ts";
+			writeFileSync(entrypointFilePath, `console.log("debug build");`);
 
 			writeFileSync(
 				join(projectPath, "frame-master.config.ts"),
@@ -390,7 +388,7 @@ export default {
       version: "1.0.0",
       build: {
         buildConfig: {
-          entrypoints: ["${entrypointPath}"],
+					entrypoints: ["${entrypointConfigPath}"],
           plugins: [
             {
               name: "append-debug-marker",
@@ -482,11 +480,9 @@ export default {
 			const projectPath = join(TEST_DIR, projectName);
 			mkdirSync(join(projectPath, "src"), { recursive: true });
 
-			const entrypointPath = join(projectPath, "src", "index.ts").replaceAll(
-				"\\",
-				"/",
-			);
-			writeFileSync(entrypointPath, `console.log("watch build");`);
+			const entrypointFilePath = join(projectPath, "src", "index.ts");
+			const entrypointConfigPath = "./src/index.ts";
+			writeFileSync(entrypointFilePath, `console.log("watch build");`);
 
 			writeFileSync(
 				join(projectPath, "frame-master.config.ts"),
@@ -501,7 +497,7 @@ export default {
       version: "1.0.0",
       build: {
         buildConfig: {
-          entrypoints: ["${entrypointPath}"],
+					entrypoints: ["${entrypointConfigPath}"],
           plugins: [
             {
               name: "append-watch-marker",
@@ -565,7 +561,10 @@ export default {
 					};
 				});
 
-				writeFileSync(entrypointPath, `console.log("watch build changed");`);
+				writeFileSync(
+					entrypointFilePath,
+					`console.log("watch build changed");`,
+				);
 
 				const builds = await waitForJson<Array<{ sequence: number }>>(
 					"http://localhost:3312/api/builds",
@@ -595,16 +594,11 @@ export default {
 			const projectPath = join(TEST_DIR, projectName);
 			mkdirSync(join(projectPath, "src"), { recursive: true });
 
-			const entrypointPath = join(projectPath, "src", "index.ts").replaceAll(
-				"\\",
-				"/",
-			);
-			const tracePath = join(projectPath, "artifacts", "trace.json").replaceAll(
-				"\\",
-				"/",
-			);
+			const entrypointFilePath = join(projectPath, "src", "index.ts");
+			const entrypointConfigPath = "./src/index.ts";
+			const tracePath = join(projectPath, "artifacts", "trace.json");
 
-			writeFileSync(entrypointPath, `console.log("save trace build");`);
+			writeFileSync(entrypointFilePath, `console.log("save trace build");`);
 			writeFileSync(
 				join(projectPath, "frame-master.config.ts"),
 				`
@@ -618,7 +612,7 @@ export default {
       version: "1.0.0",
       build: {
         buildConfig: {
-          entrypoints: ["${entrypointPath}"],
+					entrypoints: ["${entrypointConfigPath}"],
         },
       },
     },
