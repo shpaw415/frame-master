@@ -13,30 +13,6 @@ import { join } from "path";
 const TEST_DIR = join(tmpdir(), `frame-master-cli-test-${Date.now()}`);
 const CLI_PATH = join(__dirname, "..", "..", "bin", "index.ts");
 
-async function waitForOutput(
-	proc: { stdout: ReadableStream<Uint8Array> },
-	matcher: RegExp,
-	timeoutMs = 10000,
-) {
-	const reader = proc.stdout.getReader();
-	const decoder = new TextDecoder();
-	let output = "";
-	const startedAt = Date.now();
-
-	while (Date.now() - startedAt < timeoutMs) {
-		const { value, done } = await reader.read();
-		if (done) break;
-		output += decoder.decode(value);
-		if (matcher.test(output)) {
-			return output;
-		}
-	}
-
-	throw new Error(
-		`Timed out waiting for output matching ${matcher}:\n${output}`,
-	);
-}
-
 async function waitForJson<T>(
 	url: string,
 	assertion: (value: T) => boolean,
@@ -448,8 +424,6 @@ export default {
 			);
 
 			try {
-				await waitForOutput(proc, /Frame Master Debug Build|Debug UI:/);
-
 				const builds = await waitForJson<
 					Array<{ id: string; fileCount: number }>
 				>(
@@ -564,7 +538,6 @@ export default {
 			let ws: WebSocket | null = null;
 
 			try {
-				await waitForOutput(proc, /Frame Master Debug Build|Debug UI:/);
 				await waitForJson<Array<{ id: string }>>(
 					"http://localhost:3312/api/builds",
 					(value) => value.length === 1,
@@ -675,8 +648,6 @@ export default {
 			);
 
 			try {
-				await waitForOutput(proc, /Frame Master Debug Build|Debug UI:/);
-
 				await waitForJson<{ buildList: Array<{ id: string }> }>(
 					"http://localhost:3313/api/session",
 					(value) => value.buildList.length === 1,
