@@ -39,14 +39,14 @@ export class DebugBuildServer {
 		const buildFiles = await this.prepareFrontendAssets([HTMLEntrypoint]);
 
 		const htmlAsset = Bun.file(
-			buildFiles.find((asset) => asset.pathname === "/index.html")
+			buildFiles.find((asset) => asset.pathname === normalize("/index.html"))
 				?.assetPath as string,
 		);
 
 		const routes = Object.assign(
 			{},
 			...buildFiles.map((asset) => ({
-				[asset.pathname]: Bun.file(asset.assetPath),
+				[asset.pathname.replaceAll("\\", "/")]: Bun.file(asset.assetPath),
 			})),
 		);
 

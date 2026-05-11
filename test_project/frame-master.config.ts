@@ -11,7 +11,6 @@ export default {
 			build: {
 				buildConfig: {
 					entrypoints: ["./src/index.ts", "./src/admin.ts"],
-					outdir: ".frame-master/build",
 					splitting: true,
 					format: "esm",
 					plugins: [
