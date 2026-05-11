@@ -1,5 +1,13 @@
 import { existsSync, mkdirSync } from "node:fs";
-import { dirname, join, normalize } from "node:path";
+import {
+	basename,
+	dirname,
+	isAbsolute,
+	join,
+	normalize,
+	relative,
+	resolve,
+} from "node:path";
 import chalk from "chalk";
 import type { Builder } from "frame-master/build";
 import type {
@@ -38,15 +46,22 @@ export class DebugBuildServer {
 	async start(HTMLEntrypoint: string) {
 		const buildFiles = await this.prepareFrontendAssets([HTMLEntrypoint]);
 
-		const htmlAsset = Bun.file(
-			buildFiles.find((asset) => asset.pathname === normalize("/index.html"))
-				?.assetPath as string,
+		const htmlBuildAsset = buildFiles.find(
+			(asset) => asset.pathname === normalize("/index.html"),
 		);
+		if (!htmlBuildAsset) {
+			console.error("Debug UI build is missing /index.html");
+			process.exit(1);
+		}
+
+		const htmlAsset = Bun.file(htmlBuildAsset.assetPath);
 
 		const routes = Object.assign(
 			{},
 			...buildFiles.map((asset) => ({
-				[asset.pathname.replaceAll("\\", "/")]: Bun.file(asset.assetPath),
+				[normalize(asset.pathname).replaceAll("\\", "/")]: Bun.file(
+					asset.assetPath,
+				),
 			})),
 		);
 
@@ -269,18 +284,45 @@ export class DebugBuildServer {
 		const result = await this.builder.build();
 		if (this.options.saveTrace) {
 			const savePath = this.resolveTracePath();
-			mkdirIfNeeded(dirname(savePath));
-			await Bun.write(savePath, this.builder.exportDebugTrace());
-			this.broadcast({ type: "trace-saved", data: { path: savePath } });
+			const finalSavePath = this.shouldWriteTraceInsideRepo(savePath)
+				? join(this.getDebugTraceDirectory(), basename(savePath))
+				: savePath;
+			mkdirIfNeeded(dirname(finalSavePath));
+			await Bun.write(finalSavePath, this.builder.exportDebugTrace());
+			this.broadcast({ type: "trace-saved", data: { path: finalSavePath } });
 		}
 		return result;
 	}
 
 	private resolveTracePath() {
 		if (typeof this.options.saveTrace === "string") {
-			return join(process.cwd(), this.options.saveTrace);
+			return resolve(this.options.saveTrace);
 		}
 		return join(process.cwd(), ".frame-master", "debug-traces", "trace.json");
+	}
+
+	private getDebugTraceDirectory() {
+		return resolve(process.cwd(), ".frame-master", "debug-traces");
+	}
+
+	private isPathInsideDirectory(path: string, directory: string) {
+		const relativePath = relative(directory, path);
+		return (
+			relativePath === "" ||
+			(!relativePath.startsWith("..") && !isAbsolute(relativePath))
+		);
+	}
+
+	private shouldWriteTraceInsideRepo(savePath: string) {
+		if (!this.options.watch) {
+			return false;
+		}
+
+		const repositoryRoot = resolve(process.cwd());
+		return (
+			this.isPathInsideDirectory(savePath, repositoryRoot) &&
+			!this.isPathInsideDirectory(savePath, this.getDebugTraceDirectory())
+		);
 	}
 
 	private async prepareFrontendAssets(entrypoints: string[]) {
@@ -506,9 +548,9 @@ export class DebugTraceViewServer {
 	constructor(private options: TraceViewOptions) {}
 
 	async start() {
-		const absoluteTracePath = this.options.tracePath.startsWith("/")
-			? this.options.tracePath
-			: join(process.cwd(), this.options.tracePath);
+		const absoluteTracePath = isAbsolute(this.options.tracePath)
+			? resolve(this.options.tracePath)
+			: resolve(process.cwd(), this.options.tracePath);
 
 		if (!existsSync(absoluteTracePath)) {
 			throw new Error(`Trace file not found: ${absoluteTracePath}`);
@@ -521,14 +563,22 @@ export class DebugTraceViewServer {
 		const htmlEntrypoint = join(__dirname, "./ui/src/index.html");
 		const buildFiles = await this.prepareFrontendAssets([htmlEntrypoint]);
 
-		const htmlAsset = Bun.file(
-			buildFiles.find((a) => a.pathname === "/index.html")?.assetPath as string,
+		const htmlBuildAsset = buildFiles.find(
+			(asset) => asset.pathname === normalize("/index.html"),
 		);
+		if (!htmlBuildAsset) {
+			console.error("Debug trace viewer build is missing /index.html");
+			process.exit(1);
+		}
+
+		const htmlAsset = Bun.file(htmlBuildAsset.assetPath);
 
 		const routes = Object.assign(
 			{},
 			...buildFiles.map((asset) => ({
-				[asset.pathname]: Bun.file(asset.assetPath),
+				[normalize(asset.pathname).replaceAll("\\", "/")]: Bun.file(
+					asset.assetPath,
+				),
 			})),
 		);
 
