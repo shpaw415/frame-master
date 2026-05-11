@@ -1,4 +1,5 @@
-import { join } from "path";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import Paths from "../paths";
 import type { FrameMasterConfig } from "./type";
 
@@ -54,7 +55,7 @@ class ConfigManager {
 		}
 		if (this.mergedConfig != null) return this.mergedConfig;
 		const realFilePath = join(process.cwd(), Paths.configFile);
-		const filePath = realFilePath + (withSuffix ?? "");
+		const filePath = pathToFileURL(realFilePath).href + (withSuffix ?? "");
 		if (!(await Bun.file(realFilePath).exists()))
 			throw new ConfigFileNotFound(realFilePath);
 		try {
