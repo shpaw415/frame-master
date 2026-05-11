@@ -6,9 +6,6 @@ import type { Builder } from "../src/build";
 import { DebugBuildServer } from "../src/debug/server";
 
 const cleanupPaths = new Set<string>();
-type DebugBuildServerHarness = DebugBuildServer & {
-	runBuild(): Promise<unknown>;
-};
 
 afterEach(() => {
 	for (const path of [...cleanupPaths].reverse()) {
@@ -22,6 +19,15 @@ function createStubBuilder() {
 		build: async () => ({ success: true }),
 		exportDebugTrace: () => JSON.stringify({ buildList: [], builds: [] }),
 	} as unknown as Builder;
+}
+
+async function invokeRunBuild(server: DebugBuildServer) {
+	const runBuild = Reflect.get(server, "runBuild");
+	if (typeof runBuild !== "function") {
+		throw new TypeError("Expected DebugBuildServer.runBuild to be callable");
+	}
+
+	return await Reflect.apply(runBuild, server, []);
 }
 
 describe("debug server trace saving", () => {
@@ -42,7 +48,7 @@ describe("debug server trace saving", () => {
 			saveTrace: savePath,
 		});
 
-		await (server as unknown as DebugBuildServerHarness).runBuild();
+		await invokeRunBuild(server);
 
 		expect(existsSync(savePath)).toBe(true);
 		expect(existsSync(incorrectJoinedPath)).toBe(false);
@@ -71,7 +77,7 @@ describe("debug server trace saving", () => {
 			saveTrace: requestedSavePath,
 		});
 
-		await (server as unknown as DebugBuildServerHarness).runBuild();
+		await invokeRunBuild(server);
 
 		expect(existsSync(requestedSavePath)).toBe(false);
 		expect(existsSync(expectedSavePath)).toBe(true);
