@@ -34,3 +34,5 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .DS_Store
 *.code-workspace
 test-project
+test_project/.frame-master/build
+test_project/.frame-master/debug-ui
