@@ -1,0 +1,143 @@
+import { DiffEditor, type Monaco } from "@monaco-editor/react";
+
+const THEME_DARK = "fm-dark";
+const THEME_LIGHT = "fm-light";
+
+function registerThemes(monaco: Monaco) {
+	// One Dark Pro (dark)
+	monaco.editor.defineTheme(THEME_DARK, {
+		base: "vs-dark",
+		inherit: true,
+		rules: [
+			{ token: "", foreground: "abb2bf", background: "282c34" },
+			{ token: "comment", foreground: "5c6370", fontStyle: "italic" },
+			{ token: "comment.doc", foreground: "5c6370", fontStyle: "italic" },
+			{ token: "string", foreground: "98c379" },
+			{ token: "string.escape", foreground: "56b6c2" },
+			{ token: "keyword", foreground: "c678dd" },
+			{ token: "keyword.operator", foreground: "56b6c2" },
+			{ token: "number", foreground: "d19a66" },
+			{ token: "constant", foreground: "d19a66" },
+			{ token: "constant.language", foreground: "e5c07b" },
+			{ token: "type", foreground: "e5c07b" },
+			{ token: "entity.name.type", foreground: "e5c07b" },
+			{ token: "entity.name.function", foreground: "61afef" },
+			{ token: "support.function", foreground: "61afef" },
+			{ token: "variable", foreground: "e06c75" },
+			{ token: "variable.language", foreground: "e06c75" },
+			{ token: "punctuation", foreground: "abb2bf" },
+			{ token: "delimiter", foreground: "abb2bf" },
+			{ token: "tag", foreground: "e06c75" },
+			{ token: "attribute.name", foreground: "d19a66" },
+			{ token: "attribute.value", foreground: "98c379" },
+		],
+		colors: {
+			"editor.background": "#282c34",
+			"editor.foreground": "#abb2bf",
+			"editor.lineHighlightBackground": "#2c313c",
+			"editorGutter.background": "#282c34",
+			"editorLineNumber.foreground": "#4b5263",
+			"editorLineNumber.activeForeground": "#abb2bf",
+			"editorCursor.foreground": "#528bff",
+			"editorWhitespace.foreground": "#3b4048",
+			"editorIndentGuide.background": "#3b4048",
+			"editorIndentGuide.activeBackground": "#c678dd",
+			"diffEditor.insertedTextBackground": "#98c37922",
+			"diffEditor.removedTextBackground": "#e06c7522",
+			"diffEditor.insertedLineBackground": "#98c37911",
+			"diffEditor.removedLineBackground": "#e06c7511",
+			"diffEditor.border": "#3e4451",
+			"editorOverviewRuler.border": "#00000000",
+			"scrollbarSlider.background": "#4b526344",
+			"scrollbarSlider.hoverBackground": "#4b526366",
+			"scrollbarSlider.activeBackground": "#4b526388",
+			"minimap.background": "#282c34",
+		},
+	});
+
+	// One Dark Pro light adaptation
+	monaco.editor.defineTheme(THEME_LIGHT, {
+		base: "vs",
+		inherit: true,
+		rules: [
+			{ token: "", foreground: "383a42", background: "fafafa" },
+			{ token: "comment", foreground: "a0a1a7", fontStyle: "italic" },
+			{ token: "string", foreground: "50a14f" },
+			{ token: "string.escape", foreground: "0184bc" },
+			{ token: "keyword", foreground: "a626a4" },
+			{ token: "keyword.operator", foreground: "0184bc" },
+			{ token: "number", foreground: "986801" },
+			{ token: "constant", foreground: "986801" },
+			{ token: "constant.language", foreground: "c18401" },
+			{ token: "type", foreground: "c18401" },
+			{ token: "entity.name.type", foreground: "c18401" },
+			{ token: "entity.name.function", foreground: "4078f2" },
+			{ token: "support.function", foreground: "4078f2" },
+			{ token: "variable", foreground: "e45649" },
+			{ token: "variable.language", foreground: "e45649" },
+			{ token: "tag", foreground: "e45649" },
+			{ token: "attribute.name", foreground: "986801" },
+			{ token: "attribute.value", foreground: "50a14f" },
+		],
+		colors: {
+			"editor.background": "#fafafa",
+			"editor.foreground": "#383a42",
+			"editor.lineHighlightBackground": "#f0f0f0",
+			"editorGutter.background": "#fafafa",
+			"editorLineNumber.foreground": "#9d9d9f",
+			"editorLineNumber.activeForeground": "#383a42",
+			"editorCursor.foreground": "#526fff",
+			"diffEditor.insertedTextBackground": "#50a14f22",
+			"diffEditor.removedTextBackground": "#e4564922",
+			"diffEditor.insertedLineBackground": "#50a14f11",
+			"diffEditor.removedLineBackground": "#e4564911",
+			"diffEditor.border": "#d3d3d3",
+			"editorOverviewRuler.border": "#00000000",
+			"scrollbarSlider.background": "#9d9d9f44",
+			"scrollbarSlider.hoverBackground": "#9d9d9f66",
+			"scrollbarSlider.activeBackground": "#9d9d9f88",
+			"minimap.background": "#fafafa",
+		},
+	});
+}
+
+export default function MonacoDiff({
+	original,
+	modified,
+	language,
+	className,
+	theme,
+}: {
+	original: string;
+	modified: string;
+	language?: string;
+	className?: string;
+	theme?: "dark" | "light";
+}) {
+	return (
+		<div className={className ?? "h-105"} style={{ height: "100%" }}>
+			<DiffEditor
+				original={original}
+				modified={modified}
+				language={language}
+				theme={theme === "light" ? THEME_LIGHT : THEME_DARK}
+				height="100%"
+				options={{
+					readOnly: true,
+					renderSideBySide: false,
+					useInlineViewWhenSpaceIsLimited: true,
+					fontFamily: "'IBM Plex Mono', 'Fira Code', monospace",
+					fontLigatures: true,
+					fontSize: 15,
+					lineHeight: 20,
+					padding: { top: 14, bottom: 14 },
+					minimap: { enabled: false },
+					scrollBeyondLastLine: false,
+					wordWrap: "on",
+					diffWordWrap: "on",
+				}}
+				beforeMount={registerThemes}
+			/>
+		</div>
+	);
+}

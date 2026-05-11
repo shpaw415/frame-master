@@ -6,6 +6,7 @@ import { version } from "../package.json";
 import { getConfig, InitConfig } from "../src/server/config";
 import { buildCommand } from "./build";
 import type { CreateProjectProps } from "./create";
+import debugCommand from "./debug";
 import ExtendCli from "./extend-cli";
 import pluginCommand from "./plugin";
 import searchCommand from "./search";
@@ -110,6 +111,7 @@ program.addCommand(pluginCommand);
 program.addCommand(searchCommand);
 program.addCommand(testCommand);
 program.addCommand(buildCommand);
+program.addCommand(debugCommand);
 program.addCommand(ExtendCli);
 
 await program.parseAsync().catch((err) => {

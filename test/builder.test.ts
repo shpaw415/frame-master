@@ -1,10 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { createBuilder } from "../src/build";
-import { PluginLoader } from "../src/plugins";
-import type { FrameMasterConfig } from "frame-master/server/type";
 import { join } from "node:path";
 import type { BunPlugin } from "bun";
+import type { FrameMasterConfig } from "frame-master/server/type";
+import { createBuilder } from "../src/build";
+import {
+	BuildTraceSessionStore,
+	type BuildTraceSession,
+} from "../src/build/debug-trace";
+import { PluginLoader } from "../src/plugins";
 
 const TEMP_DIR = ".test-temp";
 const TEXT_ENTRYPOINT = join(TEMP_DIR, "entry.txt");
@@ -232,6 +236,215 @@ describe("builder", () => {
 			"static-build-plugin:finally",
 			"dynamic-build-plugin:finally",
 		]);
+	});
+
+	test("should record debug trace steps for chained text transforms", async () => {
+		const executionOrder: string[] = [];
+		const fmConfig: FrameMasterConfig = {
+			HTTPServer: {
+				port: 3000,
+			},
+			pluginsOptions: {
+				entrypoints: [TEXT_ENTRYPOINT],
+			},
+			plugins: [
+				{
+					name: "trace-plugin-a",
+					version: "0",
+					build: {
+						buildConfig: {
+							outdir: `${TEMP_DIR}/build-debug-trace`,
+							plugins: [createTrackedTextPlugin("trace-a", executionOrder)],
+						},
+					},
+				},
+				{
+					name: "trace-plugin-b",
+					version: "0",
+					build: {
+						buildConfig: {
+							plugins: [createTrackedTextPlugin("trace-b", executionOrder)],
+						},
+					},
+				},
+			],
+		};
+
+		const builder = await createBuilder(fmConfig, new PluginLoader(fmConfig));
+		builder.startDebugSession({ watch: true, includeTextSnapshots: true });
+
+		const result = await builder.build();
+
+		expect(result.success).toBeTrue();
+
+		const session = builder.getDebugSession() as BuildTraceSession;
+		const build = session.builds[0];
+		const file = build?.files[0];
+
+		expect(session.buildList).toHaveLength(1);
+		expect(build?.status).toBe("success");
+		expect(file?.steps.map((step) => [step.kind, step.pluginName])).toEqual([
+			["source", undefined],
+			["onLoad", "trace-a"],
+			["onLoad", "trace-b"],
+			["finally", "trace-a"],
+			["finally", "trace-b"],
+			["final-output", undefined],
+		]);
+		expect(file?.finalSnapshotId).toBeDefined();
+		expect(build?.snapshots[file?.finalSnapshotId as string]?.text).toContain(
+			"[trace-b:final]",
+		);
+	});
+
+	test("should disable text snapshots by default in debug sessions", async () => {
+		const executionOrder: string[] = [];
+		const fmConfig: FrameMasterConfig = {
+			HTTPServer: {
+				port: 3000,
+			},
+			pluginsOptions: {
+				entrypoints: [TEXT_ENTRYPOINT],
+			},
+			plugins: [
+				{
+					name: "trace-plugin-default-text-off",
+					version: "0",
+					build: {
+						buildConfig: {
+							outdir: `${TEMP_DIR}/build-debug-trace-default`,
+							plugins: [
+								createTrackedTextPlugin(
+									"trace-default-text-off",
+									executionOrder,
+								),
+							],
+						},
+					},
+				},
+			],
+		};
+
+		const builder = await createBuilder(fmConfig, new PluginLoader(fmConfig));
+		builder.startDebugSession({ watch: true });
+
+		const result = await builder.build();
+
+		expect(result.success).toBeTrue();
+
+		const session = builder.getDebugSession() as BuildTraceSession;
+		const build = session.builds[0];
+		const file = build?.files[0];
+
+		expect(session.options.includeTextSnapshots).toBe(false);
+		expect(file?.finalSnapshotId).toBeDefined();
+		expect(
+			build?.snapshots[file?.finalSnapshotId as string]?.text,
+		).toBeUndefined();
+	});
+
+	test("should deduplicate identical snapshots within a debug build", () => {
+		const store = new BuildTraceSessionStore({
+			watch: false,
+			includeTextSnapshots: true,
+		});
+
+		store.startBuild([TEXT_ENTRYPOINT]);
+		store.record({
+			kind: "source-read",
+			path: TEXT_ENTRYPOINT,
+			contents: "stable contents",
+			loader: "text",
+		});
+		store.record({
+			kind: "transform-start",
+			pluginName: "dedupe-plugin",
+			order: 1,
+			path: TEXT_ENTRYPOINT,
+			contents: "stable contents",
+			loader: "text",
+		});
+		store.record({
+			kind: "transform-complete",
+			pluginName: "dedupe-plugin",
+			order: 1,
+			path: TEXT_ENTRYPOINT,
+			contents: "stable contents",
+			loader: "text",
+			durationMs: 1,
+		});
+		store.record({
+			kind: "final-output",
+			path: TEXT_ENTRYPOINT,
+			contents: "stable contents",
+			loader: "text",
+		});
+
+		const build = store.completeBuild({ success: true, outputCount: 1 });
+		const file = build?.files[0];
+		const snapshotIds = new Set(
+			[
+				file?.initialSnapshotId,
+				file?.finalSnapshotId,
+				...(file?.steps.flatMap((step) => [
+					step.beforeSnapshotId,
+					step.afterSnapshotId,
+				]) ?? []),
+			].filter((snapshotId): snapshotId is string => Boolean(snapshotId)),
+		);
+
+		expect(build).not.toBeNull();
+		expect(Object.keys(build?.snapshots ?? {})).toHaveLength(1);
+		expect(snapshotIds.size).toBe(1);
+		expect(build?.snapshots[file?.finalSnapshotId as string]?.text).toBe(
+			"stable contents",
+		);
+	});
+
+	test("should keep a navigable debug build list across multiple builds", async () => {
+		const executionOrder: string[] = [];
+		const fmConfig: FrameMasterConfig = {
+			HTTPServer: {
+				port: 3000,
+			},
+			pluginsOptions: {
+				entrypoints: [TEXT_ENTRYPOINT],
+			},
+			plugins: [
+				{
+					name: "trace-plugin",
+					version: "0",
+					build: {
+						buildConfig: {
+							outdir: `${TEMP_DIR}/build-debug-watch`,
+							plugins: [createTrackedTextPlugin("trace-watch", executionOrder)],
+						},
+					},
+				},
+			],
+		};
+
+		const builder = await createBuilder(fmConfig, new PluginLoader(fmConfig));
+		builder.startDebugSession({ watch: true });
+
+		const first = await builder.build();
+		writeFileSync(TEXT_ENTRYPOINT, "builder input changed");
+		const second = await builder.build();
+
+		expect(first.success).toBeTrue();
+		expect(second.success).toBeTrue();
+
+		const buildList = builder.listDebugBuilds();
+		const session = builder.getDebugSession() as BuildTraceSession;
+
+		expect(buildList).toHaveLength(2);
+		expect(buildList[0]?.sequence).toBe(2);
+		expect(buildList[1]?.sequence).toBe(1);
+		expect(buildList[0]?.fileCount).toBeGreaterThan(0);
+		expect(session.builds).toHaveLength(2);
+		expect(
+			session.builds[1]?.files[0]?.steps.at(-1)?.afterSnapshotId,
+		).toBeDefined();
 	});
 
 	test("should chain finally hooks across multiple static build plugins", async () => {

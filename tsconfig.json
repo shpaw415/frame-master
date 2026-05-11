@@ -8,20 +8,17 @@
 		"jsx": "react-jsx",
 		"allowJs": true,
 		"types": ["bun"],
-
 		// Bundler mode
 		"moduleResolution": "bundler",
 		"allowImportingTsExtensions": true,
 		"verbatimModuleSyntax": true,
 		"noEmit": true,
-
 		// Best practices
 		"strict": true,
 		"skipLibCheck": true,
 		"noFallthroughCasesInSwitch": true,
 		"noUncheckedIndexedAccess": true,
 		"noImplicitOverride": true,
-
 		// Some stricter flags (disabled by default)
 		"noUnusedLocals": false,
 		"noUnusedParameters": false,
@@ -37,5 +34,5 @@
 			"frame-master/server/request": ["./src/server/request-manager.ts"]
 		}
 	},
-	"include": ["src", "bin", "config", "test"]
+	"include": ["src", "bin", "config", "test", "test_project"]
 }

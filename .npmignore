@@ -6,4 +6,5 @@ logo
 docs
 TODO.md
 .ai-context
-test-project
+test_project
+test.ts

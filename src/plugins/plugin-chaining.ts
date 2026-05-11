@@ -1,10 +1,52 @@
 import type { BunPlugin, OnLoadCallback, PluginBuilder } from "bun";
 import chalk from "chalk";
-import { isVerbose, verboseLog } from "../utils";
+import type {
+	BuildTraceCollector,
+	BuildTraceStepError,
+} from "../build/debug-trace";
+import { verboseLog } from "../utils";
 
 type OnLoadArgs = Parameters<OnLoadCallback>[0];
 type OnLoadResult = Awaited<ReturnType<OnLoadCallback>>;
 type OnLoadConstraints = Parameters<PluginBuilder["onLoad"]>[0];
+
+/**
+ * Extracts a rich, structured error descriptor from any thrown value.
+ */
+function serializeError(error: unknown): BuildTraceStepError {
+	if (error instanceof Error) {
+		const extra: Record<string, string> = {};
+		for (const key of Object.getOwnPropertyNames(error)) {
+			if (
+				key === "name" ||
+				key === "message" ||
+				key === "stack" ||
+				key === "cause"
+			)
+				continue;
+			const val = (error as unknown as Record<string, unknown>)[key];
+			if (val !== undefined) {
+				extra[key] = typeof val === "string" ? val : JSON.stringify(val);
+			}
+		}
+		return {
+			name: error.name || "Error",
+			message: error.message,
+			stack: error.stack,
+			cause:
+				error.cause != null
+					? error.cause instanceof Error
+						? `${error.cause.name}: ${error.cause.message}\n${error.cause.stack ?? ""}`
+						: String(error.cause)
+					: undefined,
+			extra: Object.keys(extra).length > 0 ? extra : undefined,
+		};
+	}
+	return {
+		name: "UnknownError",
+		message: String(error),
+	};
+}
 
 interface RegisteredOnLoad {
 	filter: RegExp;
@@ -83,10 +125,14 @@ export class PluginProxy {
 	private finallyHandlers: RegisteredFinally[] = [];
 	private suffix: string;
 	private formatedSuffix: string;
+	private trace: BuildTraceCollector | null;
 
-	constructor(opt: { suffix?: string } = {}) {
+	constructor(
+		opt: { suffix?: string; trace?: BuildTraceCollector | null } = {},
+	) {
 		this.suffix = opt.suffix ?? "";
 		this.formatedSuffix = this.suffix ? `:${this.suffix}` : "";
+		this.trace = opt.trace ?? null;
 	}
 
 	/**
@@ -215,16 +261,17 @@ export class PluginProxy {
 							namespace: namespace === "file" ? undefined : namespace,
 						},
 						async (args) => {
+							const tracedArgs = await self.attachTraceSource(args);
 							// Find all handlers whose filter matches this specific file
 							const matchingHandlers = handlers.filter((h) =>
-								h.filter.test(args.path),
+								h.filter.test(tracedArgs.path),
 							);
 
 							if (matchingHandlers.length === 0) {
 								return undefined;
 							}
 
-							return self.executeChainedOnLoad(args, matchingHandlers);
+							return self.executeChainedOnLoad(tracedArgs, matchingHandlers);
 						},
 					);
 				}
@@ -234,13 +281,14 @@ export class PluginProxy {
 				if (globalHandlers.length > 0 && handlersByNamespace.size === 0) {
 					const combinedFilter = self.createCombinedFilter(globalHandlers);
 					build.onLoad({ filter: combinedFilter }, async (args) => {
+						const tracedArgs = await self.attachTraceSource(args);
 						const matchingHandlers = globalHandlers.filter((h) =>
-							h.filter.test(args.path),
+							h.filter.test(tracedArgs.path),
 						);
 						if (matchingHandlers.length === 0) {
 							return undefined;
 						}
-						return self.executeChainedOnLoad(args, matchingHandlers);
+						return self.executeChainedOnLoad(tracedArgs, matchingHandlers);
 					});
 				}
 
@@ -301,7 +349,7 @@ export class PluginProxy {
 						...args,
 						__chainedContents: contents,
 						__chainedLoader: loader,
-					} as any,
+					},
 					[],
 				);
 			});
@@ -364,7 +412,7 @@ export class PluginProxy {
 	 */
 	private createCombinedFilter(handlers: RegisteredOnLoad[]): RegExp {
 		if (handlers.length === 1) {
-			return handlers[0]!.filter;
+			return handlers[0]?.filter as RegExp;
 		}
 
 		// Combine all filter patterns with alternation
@@ -413,7 +461,7 @@ export class PluginProxy {
 				otherCalls.push((build) => build.onStart(callback));
 				return proxyBuilder;
 			},
-			onBeforeParse(constraints: any, callback: any) {
+			onBeforeParse(constraints: never, callback: never) {
 				otherCalls.push((build) => {
 					if (
 						"onBeforeParse" in build &&
@@ -428,11 +476,11 @@ export class PluginProxy {
 			onEnd: ((callback: () => void) => {
 				otherCalls.push((build) => {
 					if ("onEnd" in build && typeof build.onEnd === "function") {
-						(build as any).onEnd(callback);
+						build.onEnd(callback);
 					}
 				});
 				return proxyBuilder;
-			}) as any,
+			}) as never,
 			// Frame-Master extension: finally handler for post-processing
 			finally(loader: Bun.Loader, callback: FinallyCallback) {
 				finallyCallbacks.push({
@@ -444,11 +492,11 @@ export class PluginProxy {
 			},
 			// Use a getter so config is accessed from the real build when available
 			get config() {
-				return realBuild?.config ?? ({} as any);
+				return realBuild?.config ?? ({} as PluginBuilder["config"]);
 			},
-			module: (() => proxyBuilder) as any,
+			module: () => proxyBuilder,
 			target: "browser" as const,
-			virtual: (() => proxyBuilder) as any,
+			virtual: () => proxyBuilder,
 		} as PluginBuilder;
 
 		// Run the plugin's setup to collect handlers
@@ -461,7 +509,9 @@ export class PluginProxy {
 				otherCalls.length > 0
 					? (build) => {
 							realBuild = build;
-							otherCalls.forEach((fn) => fn(build));
+							otherCalls.forEach((fn) => {
+								fn(build);
+							});
 						}
 					: null,
 		};
@@ -471,6 +521,7 @@ export class PluginProxy {
 	 * Groups handlers by their filter pattern.
 	 * Handlers with matching filters will be chained.
 	 */
+	/*
 	private groupHandlersByFilter(): Map<string, RegisteredOnLoad[]> {
 		const groups = new Map<string, RegisteredOnLoad[]>();
 
@@ -483,6 +534,7 @@ export class PluginProxy {
 
 		return groups;
 	}
+	*/
 
 	/**
 	 * Executes chained onLoad handlers for a single file.
@@ -492,6 +544,8 @@ export class PluginProxy {
 		originalArgs: OnLoadArgs & {
 			__chainedContents?: string | Uint8Array;
 			__chainedLoader?: Bun.Loader;
+			__traceSourceContents?: string | Uint8Array;
+			__traceSourceLoader?: Bun.Loader;
 		},
 		handlers: RegisteredOnLoad[],
 	): Promise<OnLoadResult> {
@@ -501,6 +555,19 @@ export class PluginProxy {
 		let accumulatedLoader: Bun.Loader | undefined =
 			originalArgs.__chainedLoader;
 		let lastResult: OnLoadResult;
+
+		if (this.trace) {
+			this.trace.record({
+				kind: "source-read",
+				path: originalArgs.path,
+				namespace: originalArgs.namespace,
+				contents:
+					originalArgs.__traceSourceContents ?? originalArgs.__chainedContents,
+				loader:
+					originalArgs.__traceSourceLoader ?? originalArgs.__chainedLoader,
+				triggeredAt: Date.now(),
+			});
+		}
 
 		if (handlers.length > 1) {
 			verboseLog(
@@ -532,6 +599,18 @@ export class PluginProxy {
 			};
 
 			try {
+				if (this.trace) {
+					this.trace.record({
+						kind: "transform-start",
+						path: originalArgs.path,
+						namespace: originalArgs.namespace,
+						pluginName: handler.pluginName,
+						order: i + 1,
+						contents: accumulatedContents,
+						loader: accumulatedLoader,
+						triggeredAt: Date.now(),
+					});
+				}
 				const startTime = performance.now();
 				const result = await handler.callback(chainedArgs);
 				const duration = performance.now() - startTime;
@@ -570,6 +649,21 @@ export class PluginProxy {
 					) {
 						accumulatedLoader = result.loader as Bun.Loader;
 					}
+					if (this.trace) {
+						this.trace.record({
+							kind: "transform-complete",
+							path: originalArgs.path,
+							namespace: originalArgs.namespace,
+							pluginName: handler.pluginName,
+							order: i + 1,
+							contents: accumulatedContents,
+							loader: accumulatedLoader,
+							durationMs: duration,
+							preventChaining:
+								"preventChaining" in result && result.preventChaining === true,
+							triggeredAt: Date.now(),
+						});
+					}
 					lastResult = result;
 
 					// Check for preventChaining flag to stop the chain early
@@ -587,6 +681,17 @@ export class PluginProxy {
 					}
 				}
 			} catch (error) {
+				if (this.trace) {
+					this.trace.record({
+						kind: "transform-error",
+						path: originalArgs.path,
+						namespace: originalArgs.namespace,
+						pluginName: handler.pluginName,
+						order: i + 1,
+						error: serializeError(error),
+						triggeredAt: Date.now(),
+					});
+				}
 				console.error(
 					`[PluginProxy] Error in onLoad handler from plugin "${handler.pluginName}" for file ${originalArgs.path}:`,
 					error,
@@ -615,6 +720,18 @@ export class PluginProxy {
 
 				for (const handler of matchingFinallyHandlers) {
 					try {
+						if (this.trace) {
+							this.trace.record({
+								kind: "finally-start",
+								path: originalArgs.path,
+								namespace: originalArgs.namespace,
+								pluginName: handler.pluginName,
+								order: matchingFinallyHandlers.indexOf(handler) + 1,
+								contents: accumulatedContents,
+								loader: accumulatedLoader,
+								triggeredAt: Date.now(),
+							});
+						}
 						const startTime = performance.now();
 						const result = await handler.callback({
 							contents: accumulatedContents,
@@ -646,7 +763,31 @@ export class PluginProxy {
 								chalk.gray(`(${duration.toFixed(2)}ms)`),
 							);
 						}
+						if (this.trace) {
+							this.trace.record({
+								kind: "finally-complete",
+								path: originalArgs.path,
+								namespace: originalArgs.namespace,
+								pluginName: handler.pluginName,
+								order: matchingFinallyHandlers.indexOf(handler) + 1,
+								contents: accumulatedContents,
+								loader: accumulatedLoader,
+								durationMs: duration,
+								triggeredAt: Date.now(),
+							});
+						}
 					} catch (error) {
+						if (this.trace) {
+							this.trace.record({
+								kind: "finally-error",
+								path: originalArgs.path,
+								namespace: originalArgs.namespace,
+								pluginName: handler.pluginName,
+								order: matchingFinallyHandlers.indexOf(handler) + 1,
+								error: serializeError(error),
+								triggeredAt: Date.now(),
+							});
+						}
 						console.error(
 							`[PluginProxy] Error in finally handler from plugin "${handler.pluginName}" for loader ${accumulatedLoader}:`,
 							error,
@@ -659,6 +800,16 @@ export class PluginProxy {
 
 		// Return the final accumulated result
 		if (lastResult && typeof lastResult === "object") {
+			if (this.trace) {
+				this.trace.record({
+					kind: "final-output",
+					path: originalArgs.path,
+					namespace: originalArgs.namespace,
+					contents: accumulatedContents,
+					loader: accumulatedLoader,
+					triggeredAt: Date.now(),
+				});
+			}
 			return {
 				...lastResult,
 				contents:
@@ -674,13 +825,104 @@ export class PluginProxy {
 
 		// Handle finally-only case (no onLoad handlers, but finally handlers ran)
 		if (accumulatedContents !== undefined && accumulatedLoader) {
+			if (this.trace) {
+				this.trace.record({
+					kind: "final-output",
+					path: originalArgs.path,
+					namespace: originalArgs.namespace,
+					contents: accumulatedContents,
+					loader: accumulatedLoader,
+					triggeredAt: Date.now(),
+				});
+			}
 			return {
 				contents: accumulatedContents,
 				loader: accumulatedLoader,
 			} as OnLoadResult;
 		}
 
+		if (this.trace && accumulatedContents !== undefined) {
+			this.trace.record({
+				kind: "final-output",
+				path: originalArgs.path,
+				namespace: originalArgs.namespace,
+				contents: accumulatedContents,
+				loader: accumulatedLoader,
+				triggeredAt: Date.now(),
+			});
+		}
+
 		return lastResult;
+	}
+
+	private async attachTraceSource(
+		args: OnLoadArgs & {
+			__traceSourceContents?: string | Uint8Array;
+			__traceSourceLoader?: Bun.Loader;
+		},
+	): Promise<
+		OnLoadArgs & {
+			__traceSourceContents?: string | Uint8Array;
+			__traceSourceLoader?: Bun.Loader;
+		}
+	> {
+		if (!this.trace) return args;
+		if (args.__traceSourceContents !== undefined) return args;
+
+		const inferredLoader = this.inferLoaderFromPath(args.path);
+		const isFileNamespace = !args.namespace || args.namespace === "file";
+		if (!isFileNamespace) {
+			return {
+				...args,
+				__traceSourceContents: undefined,
+				__traceSourceLoader: inferredLoader,
+			};
+		}
+
+		try {
+			const contents =
+				inferredLoader && this.isTextLoader(inferredLoader)
+					? await Bun.file(args.path).text()
+					: new Uint8Array(await Bun.file(args.path).arrayBuffer());
+			return {
+				...args,
+				__traceSourceContents: contents,
+				__traceSourceLoader: inferredLoader,
+			};
+		} catch {
+			return {
+				...args,
+				__traceSourceLoader: inferredLoader,
+			};
+		}
+	}
+
+	private inferLoaderFromPath(filePath: string): Bun.Loader | undefined {
+		const lowerPath = filePath.toLowerCase();
+		if (lowerPath.endsWith(".tsx")) return "tsx";
+		if (lowerPath.endsWith(".ts")) return "ts";
+		if (lowerPath.endsWith(".jsx")) return "jsx";
+		if (lowerPath.endsWith(".js")) return "js";
+		if (lowerPath.endsWith(".css")) return "css";
+		if (lowerPath.endsWith(".html")) return "html";
+		if (lowerPath.endsWith(".json")) return "json";
+		if (lowerPath.endsWith(".toml")) return "toml";
+		if (lowerPath.endsWith(".txt")) return "text";
+		return undefined;
+	}
+
+	private isTextLoader(loader: Bun.Loader): boolean {
+		return [
+			"js",
+			"jsx",
+			"ts",
+			"tsx",
+			"css",
+			"html",
+			"json",
+			"toml",
+			"text",
+		].includes(loader);
 	}
 
 	/**
@@ -779,7 +1021,7 @@ export function createPluginProxy(): PluginProxy {
  */
 export function chainPlugins(
 	plugins: BunPlugin[],
-	opt?: { suffix?: string },
+	opt?: { suffix?: string; trace?: BuildTraceCollector | null },
 ): BunPlugin {
 	const proxy = new PluginProxy(opt);
 	proxy.addPlugins(plugins);
@@ -866,7 +1108,7 @@ export async function getChainableContent(
 
 	try {
 		return await Bun.file(args.path).text();
-	} catch (error) {
+	} catch (_error) {
 		// File might not exist (virtual path in file namespace), return empty string
 		return "";
 	}
@@ -908,7 +1150,7 @@ export async function getChainableBinaryContent(
 
 	try {
 		return new Uint8Array(await Bun.file(args.path).arrayBuffer());
-	} catch (error) {
+	} catch (_error) {
 		// File might not exist (virtual path in file namespace), return empty array
 		return new Uint8Array(0);
 	}
