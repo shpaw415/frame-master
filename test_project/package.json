@@ -3,6 +3,7 @@
 	"type": "module",
 	"scripts": {
 		"frame-master": "bun run ../bin/index.ts",
-		"dev": "NODE_ENV=development bun frame-master debug build"
+		"dev": "NODE_ENV=development bun frame-master debug build",
+		"view": "NODE_ENV=development bun frame-master debug view"
 	}
 }

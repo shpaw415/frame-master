@@ -89,6 +89,12 @@ export default {
 										loader: "ts",
 									};
 								});
+
+								build.finally("ts", async ({ contents }) => {
+									return {
+										contents: (contents as string) + "\nconst __finally=true;",
+									};
+								});
 							},
 						},
 						{
