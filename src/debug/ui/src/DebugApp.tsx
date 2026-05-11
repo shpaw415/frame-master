@@ -65,7 +65,10 @@ function snapshotText(snapshot?: BuildTraceSnapshot | null) {
 	if (snapshot.kind === "empty") {
 		return "No content.";
 	}
-	return snapshot.text ?? "";
+	if (snapshot.text !== undefined) {
+		return snapshot.text;
+	}
+	return "Text snapshot unavailable for this trace.";
 }
 
 function inferLanguage(path?: string, loader?: Bun.Loader) {
@@ -276,8 +279,7 @@ export default function DebugApp() {
 		if (!state.selectedBuildId || !selectedStep) return;
 		const buildId = state.selectedBuildId;
 		const snapshotIds = [
-			selectedStep.beforeSnapshotId,
-			selectedStep.afterSnapshotId,
+			...new Set([selectedStep.beforeSnapshotId, selectedStep.afterSnapshotId]),
 		].filter((snapshotId): snapshotId is string => Boolean(snapshotId));
 		let cancelled = false;
 

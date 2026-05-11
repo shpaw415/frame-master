@@ -35,6 +35,7 @@ const debugBuildCommand = new Command("build")
 
 			builder.startDebugSession({
 				watch: options.watch,
+				includeTextSnapshots: true,
 				saveTracePath:
 					typeof options.saveTrace === "string" ? options.saveTrace : undefined,
 			});
