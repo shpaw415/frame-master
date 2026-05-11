@@ -3,7 +3,10 @@ import { join } from "node:path";
 import { cwd } from "node:process";
 import chalk from "chalk";
 import {
+	type BuildTraceBuild,
 	type BuildTraceBuildSummary,
+	type BuildTraceSnapshot,
+	type BuildTraceStoreEvent,
 	type BuildTraceSession,
 	type BuildTraceSessionOptions,
 	BuildTraceSessionStore,
@@ -14,8 +17,6 @@ import { chainPlugins } from "../plugins/plugin-chaining";
 import type { BuildOptionsPlugin } from "../plugins/types";
 import { getConfig } from "../server/config";
 import { onVerbose, pluginRegex } from "../utils";
-
-type RequiredBuilOptions = Required<BuildOptionsPlugin>;
 
 export type BuilderProps = {
 	buildConfigs: Array<FrameMasterConfig["plugins"][number]["build"]>;
@@ -642,8 +643,28 @@ export class Builder {
 		return this.debugSession?.getSession() ?? null;
 	}
 
+	getDebugBuild(buildId: string): BuildTraceBuild | null {
+		return this.debugSession?.getBuild(buildId) ?? null;
+	}
+
+	getDebugSnapshot(
+		buildId: string,
+		snapshotId: string,
+	): BuildTraceSnapshot | null {
+		return this.debugSession?.getSnapshot(buildId, snapshotId) ?? null;
+	}
+
 	listDebugBuilds(): BuildTraceBuildSummary[] {
 		return this.debugSession?.listBuilds() ?? [];
+	}
+
+	onDebugEvent(listener: (event: BuildTraceStoreEvent) => void): () => void {
+		if (!this.debugSession) {
+			throw new Error(
+				"Debug session not started. Call startDebugSession() first.",
+			);
+		}
+		return this.debugSession.subscribe(listener);
 	}
 
 	exportDebugTrace(): string {

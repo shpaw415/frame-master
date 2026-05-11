@@ -130,6 +130,28 @@ export interface BuildTraceCollector {
 	record(event: BuildTraceEvent): void;
 }
 
+export type BuildTraceStoreEvent =
+	| {
+			type: "build-started";
+			build: BuildTraceBuildSummary;
+	  }
+	| {
+			type: "build-completed";
+			build: BuildTraceBuildSummary;
+	  }
+	| {
+			type: "build-list-updated";
+			buildList: BuildTraceBuildSummary[];
+	  }
+	| {
+			type: "step-updated";
+			buildId: string;
+			file: BuildTraceFile;
+			step: BuildTraceStep;
+	  };
+
+type BuildTraceStoreListener = (event: BuildTraceStoreEvent) => void;
+
 type ActiveBuildContext = {
 	build: BuildTraceBuild;
 	filesByPath: Map<string, BuildTraceFile>;
@@ -225,6 +247,7 @@ export class BuildTraceSessionStore implements BuildTraceCollector {
 	private session: BuildTraceSession;
 	private activeBuild: ActiveBuildContext | null = null;
 	private buildCounter = 0;
+	private listeners = new Set<BuildTraceStoreListener>();
 
 	constructor(options: BuildTraceSessionOptions) {
 		this.session = {
@@ -261,6 +284,10 @@ export class BuildTraceSessionStore implements BuildTraceCollector {
 			pendingSteps: new Map(),
 			sequence: 0,
 		};
+		this.emit({
+			type: "build-started",
+			build: cloneBuildSummary(build),
+		});
 		return build;
 	}
 
@@ -305,6 +332,14 @@ export class BuildTraceSessionStore implements BuildTraceCollector {
 		this.session.buildList = this.session.builds
 			.map((entry) => cloneBuildSummary(entry))
 			.sort((left, right) => right.sequence - left.sequence);
+		this.emit({
+			type: "build-completed",
+			build: cloneBuildSummary(build),
+		});
+		this.emit({
+			type: "build-list-updated",
+			buildList: this.listBuilds(),
+		});
 
 		this.activeBuild = null;
 		return build;
@@ -392,6 +427,33 @@ export class BuildTraceSessionStore implements BuildTraceCollector {
 		}));
 	}
 
+	getBuild(buildId: string): BuildTraceBuild | null {
+		const activeBuild = this.activeBuild?.build;
+		if (activeBuild?.id === buildId) {
+			return structuredClone(activeBuild);
+		}
+		const build = this.session.builds.find((entry) => entry.id === buildId);
+		return build ? structuredClone(build) : null;
+	}
+
+	getSnapshot(buildId: string, snapshotId: string): BuildTraceSnapshot | null {
+		const activeBuild = this.activeBuild?.build;
+		if (activeBuild?.id === buildId) {
+			const activeSnapshot = activeBuild.snapshots[snapshotId];
+			return activeSnapshot ? structuredClone(activeSnapshot) : null;
+		}
+		const build = this.session.builds.find((entry) => entry.id === buildId);
+		const snapshot = build?.snapshots[snapshotId];
+		return snapshot ? structuredClone(snapshot) : null;
+	}
+
+	subscribe(listener: BuildTraceStoreListener): () => void {
+		this.listeners.add(listener);
+		return () => {
+			this.listeners.delete(listener);
+		};
+	}
+
 	exportJSON(): string {
 		return JSON.stringify(this.getSession(), null, 2);
 	}
@@ -447,9 +509,19 @@ export class BuildTraceSessionStore implements BuildTraceCollector {
 			startedAt: Date.now(),
 			completedAt: Date.now(),
 		});
+		const sourceStep = file.steps.at(-1);
+		if (sourceStep) {
+			this.emitStep(file, sourceStep);
+		}
 	}
 
-	private startStep(file: BuildTraceFile, step: BuildTraceStep) {
+	private startStep(
+		file: BuildTraceFile,
+		step: Omit<BuildTraceStep, "id" | "kind" | "pluginName"> & {
+			kind: "onLoad" | "finally";
+			pluginName: string;
+		},
+	) {
 		const activeBuild = this.requireActiveBuild();
 		const nextStep: BuildTraceStep = {
 			...step,
@@ -496,6 +568,7 @@ export class BuildTraceSessionStore implements BuildTraceCollector {
 		file.finalHash = step.hashAfter;
 		file.finalSnapshotId = step.afterSnapshotId;
 		activeBuild.pendingSteps.delete(key);
+		this.emitStep(file, step);
 	}
 
 	private finishFile(
@@ -526,6 +599,10 @@ export class BuildTraceSessionStore implements BuildTraceCollector {
 			startedAt: Date.now(),
 			completedAt: Date.now(),
 		});
+		const finalStep = file.steps.at(-1);
+		if (finalStep) {
+			this.emitStep(file, finalStep);
+		}
 	}
 
 	private createSnapshot(
@@ -560,5 +637,21 @@ export class BuildTraceSessionStore implements BuildTraceCollector {
 		order: number,
 	) {
 		return `${path}:${kind}:${pluginName}:${order}`;
+	}
+
+	private emit(event: BuildTraceStoreEvent) {
+		for (const listener of this.listeners) {
+			listener(event);
+		}
+	}
+
+	private emitStep(file: BuildTraceFile, step: BuildTraceStep) {
+		const activeBuild = this.requireActiveBuild();
+		this.emit({
+			type: "step-updated",
+			buildId: activeBuild.build.id,
+			file: structuredClone(file),
+			step: structuredClone(step),
+		});
 	}
 }

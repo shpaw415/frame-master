@@ -13,6 +13,59 @@ import { join } from "path";
 const TEST_DIR = join(tmpdir(), `frame-master-cli-test-${Date.now()}`);
 const CLI_PATH = join(__dirname, "..", "..", "bin", "index.ts");
 
+async function waitForOutput(
+	proc: { stdout: ReadableStream<Uint8Array> },
+	matcher: RegExp,
+	timeoutMs = 10000,
+) {
+	const reader = proc.stdout.getReader();
+	const decoder = new TextDecoder();
+	let output = "";
+	const startedAt = Date.now();
+
+	while (Date.now() - startedAt < timeoutMs) {
+		const { value, done } = await reader.read();
+		if (done) break;
+		output += decoder.decode(value);
+		if (matcher.test(output)) {
+			return output;
+		}
+	}
+
+	throw new Error(
+		`Timed out waiting for output matching ${matcher}:\n${output}`,
+	);
+}
+
+async function waitForJson<T>(
+	url: string,
+	assertion: (value: T) => boolean,
+	timeoutMs = 10000,
+) {
+	const startedAt = Date.now();
+	let lastValue: T | null = null;
+
+	while (Date.now() - startedAt < timeoutMs) {
+		try {
+			const response = await fetch(url);
+			if (response.ok) {
+				lastValue = (await response.json()) as T;
+				if (assertion(lastValue)) {
+					return lastValue;
+				}
+			}
+		} catch {
+			// Server may still be booting.
+		}
+
+		await new Promise((resolve) => setTimeout(resolve, 100));
+	}
+
+	throw new Error(
+		`Timed out waiting for JSON assertion at ${url}: ${JSON.stringify(lastValue)}`,
+	);
+}
+
 beforeAll(() => {
 	// Create test directory
 	mkdirSync(TEST_DIR, { recursive: true });
@@ -320,6 +373,329 @@ describe("frame-master CLI", () => {
 			expect(stderr).toContain("NODE_ENV");
 			expect(proc.exitCode).toBe(1);
 		}, 15000);
+	});
+
+	describe("debug build command", () => {
+		test("should display help for debug build command", async () => {
+			const proc = Bun.spawn(["bun", CLI_PATH, "debug", "build", "--help"], {
+				cwd: process.cwd(),
+				stdout: "pipe",
+			});
+
+			const output = await new Response(proc.stdout).text();
+			await proc.exited;
+
+			expect(output).toContain("instrumented build");
+			expect(output).toContain("--save-trace");
+			expect(proc.exitCode).toBe(0);
+		});
+
+		test("should start debug server and expose trace APIs", async () => {
+			const projectName = "test-debug-build-project";
+			const projectPath = join(TEST_DIR, projectName);
+			mkdirSync(join(projectPath, "src"), { recursive: true });
+
+			const entrypointPath = join(projectPath, "src", "index.ts").replaceAll(
+				"\\",
+				"/",
+			);
+			writeFileSync(entrypointPath, `console.log("debug build");`);
+
+			writeFileSync(
+				join(projectPath, "frame-master.config.ts"),
+				`
+import type { FrameMasterConfig } from "frame-master/server/type";
+
+export default {
+  HTTPServer: { port: 3055 },
+  plugins: [
+    {
+      name: "debug-trace-plugin",
+      version: "1.0.0",
+      build: {
+        buildConfig: {
+          entrypoints: ["${entrypointPath}"],
+          plugins: [
+            {
+              name: "append-debug-marker",
+              setup(build) {
+								build.onLoad({ filter: /[.]ts$/ }, async (args) => {
+                  const text = await Bun.file(args.path).text();
+                  return {
+										contents: text + "\\nconsole.log('trace marker');",
+                    loader: "ts",
+                  };
+                });
+              },
+            },
+          ],
+        },
+      },
+    },
+  ],
+} satisfies FrameMasterConfig;
+`,
+			);
+
+			const proc = Bun.spawn(
+				["bun", CLI_PATH, "debug", "build", "--no-watch", "--port", "3311"],
+				{
+					cwd: projectPath,
+					stdout: "pipe",
+					stderr: "pipe",
+					env: { ...process.env, NODE_ENV: "development" },
+				},
+			);
+
+			try {
+				await waitForOutput(proc, /Frame Master Debug Build|Debug UI:/);
+
+				const builds = await waitForJson<
+					Array<{ id: string; fileCount: number }>
+				>(
+					"http://localhost:3311/api/builds",
+					(value) => value.length === 1 && (value[0]?.fileCount ?? 0) > 0,
+				);
+				const session = await waitForJson<{ buildList: Array<{ id: string }> }>(
+					"http://localhost:3311/api/session",
+					(value) => value.buildList.length === 1,
+				);
+				const registry = await waitForJson<
+					Array<{ name: string; metrics: { interventions: number } }>
+				>("http://localhost:3311/api/registry", (value) =>
+					value.some(
+						(entry) =>
+							entry.name === "append-debug-marker" &&
+							entry.metrics.interventions > 0,
+					),
+				);
+				const firstBuild = builds[0];
+				if (!firstBuild) {
+					throw new Error("Expected first debug build summary");
+				}
+				const build = await waitForJson<{
+					files: Array<{ steps: Array<{ kind: string }> }>;
+				}>(
+					`http://localhost:3311/api/builds/${firstBuild.id}`,
+					(value) =>
+						value.files.length > 0 &&
+						(value.files[0]?.steps ?? []).some(
+							(step) => step.kind === "final-output",
+						),
+				);
+				const firstSessionBuild = session.buildList[0];
+				const firstFile = build.files[0];
+				if (!firstSessionBuild || !firstFile) {
+					throw new Error("Expected debug build details to be present");
+				}
+
+				expect(builds).toHaveLength(1);
+				expect(
+					registry.some((entry) => entry.name === "debug-trace-plugin"),
+				).toBe(true);
+				expect(firstSessionBuild.id).toBe(firstBuild.id);
+				expect(firstFile.steps.some((step) => step.kind === "onLoad")).toBe(
+					true,
+				);
+			} finally {
+				proc.kill();
+				await proc.exited;
+			}
+		}, 30000);
+
+		test("should stream rebuild updates and keep a navigable build list", async () => {
+			const projectName = "test-debug-build-watch";
+			const projectPath = join(TEST_DIR, projectName);
+			mkdirSync(join(projectPath, "src"), { recursive: true });
+
+			const entrypointPath = join(projectPath, "src", "index.ts").replaceAll(
+				"\\",
+				"/",
+			);
+			writeFileSync(entrypointPath, `console.log("watch build");`);
+
+			writeFileSync(
+				join(projectPath, "frame-master.config.ts"),
+				`
+import type { FrameMasterConfig } from "frame-master/server/type";
+
+export default {
+  HTTPServer: { port: 3056 },
+  plugins: [
+    {
+      name: "debug-watch-plugin",
+      version: "1.0.0",
+      build: {
+        buildConfig: {
+          entrypoints: ["${entrypointPath}"],
+          plugins: [
+            {
+              name: "append-watch-marker",
+              setup(build) {
+								build.onLoad({ filter: /[.]ts$/ }, async (args) => {
+                  const text = await Bun.file(args.path).text();
+                  return {
+										contents: text + "\\nconsole.log('watch marker');",
+                    loader: "ts",
+                  };
+                });
+              },
+            },
+          ],
+        },
+      },
+    },
+  ],
+} satisfies FrameMasterConfig;
+`,
+			);
+
+			const proc = Bun.spawn(
+				["bun", CLI_PATH, "debug", "build", "--port", "3312"],
+				{
+					cwd: projectPath,
+					stdout: "pipe",
+					stderr: "pipe",
+					env: { ...process.env, NODE_ENV: "development" },
+				},
+			);
+
+			const messages: Array<{ type: string }> = [];
+			let ws: WebSocket | null = null;
+
+			try {
+				await waitForOutput(proc, /Frame Master Debug Build|Debug UI:/);
+				await waitForJson<Array<{ id: string }>>(
+					"http://localhost:3312/api/builds",
+					(value) => value.length === 1,
+				);
+
+				ws = new WebSocket("ws://localhost:3312/ws");
+				ws.onmessage = (event) => {
+					messages.push(JSON.parse(event.data));
+				};
+
+				await new Promise((resolve, reject) => {
+					const timeout = setTimeout(
+						() => reject(new Error("WebSocket open timeout")),
+						5000,
+					);
+					const socket = ws;
+					if (!socket) {
+						clearTimeout(timeout);
+						reject(new Error("WebSocket was not created"));
+						return;
+					}
+					socket.onopen = () => {
+						clearTimeout(timeout);
+						resolve(undefined);
+					};
+				});
+
+				writeFileSync(entrypointPath, `console.log("watch build changed");`);
+
+				const builds = await waitForJson<Array<{ sequence: number }>>(
+					"http://localhost:3312/api/builds",
+					(value) => value.length === 2 && value[0]?.sequence === 2,
+					15000,
+				);
+
+				expect(builds).toHaveLength(2);
+				expect(
+					messages.some((message) => message.type === "watcher-change"),
+				).toBe(true);
+				expect(
+					messages.some((message) => message.type === "build-list-updated"),
+				).toBe(true);
+				expect(
+					messages.some((message) => message.type === "step-appended"),
+				).toBe(true);
+			} finally {
+				ws?.close();
+				proc.kill();
+				await proc.exited;
+			}
+		}, 45000);
+
+		test("should save the trace to disk when --save-trace is provided", async () => {
+			const projectName = "test-debug-build-save-trace";
+			const projectPath = join(TEST_DIR, projectName);
+			mkdirSync(join(projectPath, "src"), { recursive: true });
+
+			const entrypointPath = join(projectPath, "src", "index.ts").replaceAll(
+				"\\",
+				"/",
+			);
+			const tracePath = join(projectPath, "artifacts", "trace.json").replaceAll(
+				"\\",
+				"/",
+			);
+
+			writeFileSync(entrypointPath, `console.log("save trace build");`);
+			writeFileSync(
+				join(projectPath, "frame-master.config.ts"),
+				`
+import type { FrameMasterConfig } from "frame-master/server/type";
+
+export default {
+  HTTPServer: { port: 3057 },
+  plugins: [
+    {
+      name: "debug-save-plugin",
+      version: "1.0.0",
+      build: {
+        buildConfig: {
+          entrypoints: ["${entrypointPath}"],
+        },
+      },
+    },
+  ],
+} satisfies FrameMasterConfig;
+`,
+			);
+
+			const proc = Bun.spawn(
+				[
+					"bun",
+					CLI_PATH,
+					"debug",
+					"build",
+					"--no-watch",
+					"--port",
+					"3313",
+					"--save-trace",
+					"artifacts/trace.json",
+				],
+				{
+					cwd: projectPath,
+					stdout: "pipe",
+					stderr: "pipe",
+					env: { ...process.env, NODE_ENV: "development" },
+				},
+			);
+
+			try {
+				await waitForOutput(proc, /Frame Master Debug Build|Debug UI:/);
+
+				await waitForJson<{ buildList: Array<{ id: string }> }>(
+					"http://localhost:3313/api/session",
+					(value) => value.buildList.length === 1,
+				);
+
+				await waitForJson<Array<{ id: string }>>(
+					"http://localhost:3313/api/builds",
+					() => existsSync(tracePath),
+				);
+
+				const savedTrace = JSON.parse(await Bun.file(tracePath).text()) as {
+					buildList: Array<{ id: string }>;
+				};
+				expect(savedTrace.buildList).toHaveLength(1);
+			} finally {
+				proc.kill();
+				await proc.exited;
+			}
+		}, 30000);
 	});
 
 	describe("test command", () => {

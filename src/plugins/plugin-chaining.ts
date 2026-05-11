@@ -1,7 +1,7 @@
 import type { BunPlugin, OnLoadCallback, PluginBuilder } from "bun";
 import chalk from "chalk";
 import type { BuildTraceCollector } from "../build/debug-trace";
-import { isVerbose, verboseLog } from "../utils";
+import { verboseLog } from "../utils";
 
 type OnLoadArgs = Parameters<OnLoadCallback>[0];
 type OnLoadResult = Awaited<ReturnType<OnLoadCallback>>;
@@ -308,7 +308,7 @@ export class PluginProxy {
 						...args,
 						__chainedContents: contents,
 						__chainedLoader: loader,
-					} as any,
+					},
 					[],
 				);
 			});
@@ -371,7 +371,7 @@ export class PluginProxy {
 	 */
 	private createCombinedFilter(handlers: RegisteredOnLoad[]): RegExp {
 		if (handlers.length === 1) {
-			return handlers[0]!.filter;
+			return handlers[0]?.filter as RegExp;
 		}
 
 		// Combine all filter patterns with alternation
@@ -420,7 +420,7 @@ export class PluginProxy {
 				otherCalls.push((build) => build.onStart(callback));
 				return proxyBuilder;
 			},
-			onBeforeParse(constraints: any, callback: any) {
+			onBeforeParse(constraints: never, callback: never) {
 				otherCalls.push((build) => {
 					if (
 						"onBeforeParse" in build &&
@@ -435,11 +435,11 @@ export class PluginProxy {
 			onEnd: ((callback: () => void) => {
 				otherCalls.push((build) => {
 					if ("onEnd" in build && typeof build.onEnd === "function") {
-						(build as any).onEnd(callback);
+						build.onEnd(callback);
 					}
 				});
 				return proxyBuilder;
-			}) as any,
+			}) as never,
 			// Frame-Master extension: finally handler for post-processing
 			finally(loader: Bun.Loader, callback: FinallyCallback) {
 				finallyCallbacks.push({
@@ -451,11 +451,11 @@ export class PluginProxy {
 			},
 			// Use a getter so config is accessed from the real build when available
 			get config() {
-				return realBuild?.config ?? ({} as any);
+				return realBuild?.config ?? ({} as PluginBuilder["config"]);
 			},
-			module: (() => proxyBuilder) as any,
+			module: () => proxyBuilder,
 			target: "browser" as const,
-			virtual: (() => proxyBuilder) as any,
+			virtual: () => proxyBuilder,
 		} as PluginBuilder;
 
 		// Run the plugin's setup to collect handlers
@@ -468,7 +468,9 @@ export class PluginProxy {
 				otherCalls.length > 0
 					? (build) => {
 							realBuild = build;
-							otherCalls.forEach((fn) => fn(build));
+							otherCalls.forEach((fn) => {
+								fn(build);
+							});
 						}
 					: null,
 		};
@@ -478,6 +480,7 @@ export class PluginProxy {
 	 * Groups handlers by their filter pattern.
 	 * Handlers with matching filters will be chained.
 	 */
+	/*
 	private groupHandlersByFilter(): Map<string, RegisteredOnLoad[]> {
 		const groups = new Map<string, RegisteredOnLoad[]>();
 
@@ -490,6 +493,7 @@ export class PluginProxy {
 
 		return groups;
 	}
+	*/
 
 	/**
 	 * Executes chained onLoad handlers for a single file.
@@ -1041,7 +1045,7 @@ export async function getChainableContent(
 
 	try {
 		return await Bun.file(args.path).text();
-	} catch (error) {
+	} catch (_error) {
 		// File might not exist (virtual path in file namespace), return empty string
 		return "";
 	}
@@ -1083,7 +1087,7 @@ export async function getChainableBinaryContent(
 
 	try {
 		return new Uint8Array(await Bun.file(args.path).arrayBuffer());
-	} catch (error) {
+	} catch (_error) {
 		// File might not exist (virtual path in file namespace), return empty array
 		return new Uint8Array(0);
 	}

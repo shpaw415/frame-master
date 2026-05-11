@@ -1,0 +1,8 @@
+{
+	"name": "frame-master-debug-test",
+	"type": "module",
+	"scripts": {
+		"frame-master": "bun run ../bin/index.ts",
+		"dev": "NODE_ENV=development bun frame-master debug build"
+	}
+}

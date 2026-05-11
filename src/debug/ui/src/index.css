@@ -1,0 +1,165 @@
+@import "tailwindcss";
+
+@source "./*.tsx";
+@source "./*.ts";
+
+@theme {
+	--font-mono: "IBM Plex Mono", "Fira Code", ui-monospace, monospace;
+}
+
+:root {
+	--bg: #0d1117;
+	--bg-surface: #161b22;
+	--bg-hover: rgba(177, 186, 196, 0.08);
+	--bg-selected: #1b2a1e;
+	--border: #21262d;
+	--text: #e6edf3;
+	--muted: #8b949e;
+	--dim: #656d76;
+	--faint: #3d444d;
+	--accent: #3fb950;
+	--ok: #3fb950;
+	--ok-subtle: rgba(63, 185, 80, 0.15);
+	--err: #f85149;
+	--err-subtle: rgba(248, 81, 73, 0.15);
+	--run: #e3b341;
+	--run-subtle: rgba(227, 179, 65, 0.15);
+	--scrollbar-thumb: #30363d;
+}
+
+[data-theme="light"] {
+	--bg: #ffffff;
+	--bg-surface: #f6f8fa;
+	--bg-hover: rgba(31, 35, 40, 0.06);
+	--bg-selected: #dbeafe;
+	--border: #d0d7de;
+	--text: #1f2328;
+	--muted: #57606a;
+	--dim: #656d76;
+	--faint: #8c959f;
+	--accent: #0969da;
+	--ok: #1a7f37;
+	--ok-subtle: rgba(26, 127, 55, 0.15);
+	--err: #cf222e;
+	--err-subtle: rgba(207, 34, 46, 0.12);
+	--run: #9a6700;
+	--run-subtle: rgba(154, 103, 0, 0.12);
+	--scrollbar-thumb: #d0d7de;
+}
+
+@layer base {
+	html,
+	body {
+		height: 100%;
+		margin: 0;
+		background: var(--bg);
+		color: var(--text);
+		font-family: var(--font-mono);
+		font-size: 15px;
+		line-height: 1.5;
+	}
+
+	#frame-master-debug-root {
+		height: 100%;
+	}
+
+	*,
+	*::before,
+	*::after {
+		border-color: var(--border);
+		box-sizing: border-box;
+		scrollbar-width: thin;
+		scrollbar-color: var(--scrollbar-thumb) transparent;
+	}
+
+	::-webkit-scrollbar {
+		width: 4px;
+		height: 4px;
+	}
+
+	::-webkit-scrollbar-track {
+		background: transparent;
+	}
+
+	::-webkit-scrollbar-thumb {
+		background: var(--scrollbar-thumb);
+		border-radius: 2px;
+	}
+
+	::selection {
+		background: rgba(63, 185, 80, 0.2);
+	}
+}
+
+@layer components {
+	.t-text   { color: var(--text); }
+	.t-muted  { color: var(--muted); }
+	.t-dim    { color: var(--dim); }
+	.t-faint  { color: var(--faint); }
+	.t-accent { color: var(--accent); }
+	.t-ok     { color: var(--ok); }
+	.t-err    { color: var(--err); }
+	.t-run    { color: var(--run); }
+
+	.t-surface  { background: var(--bg-surface); }
+	.t-selected { background: var(--bg-selected); }
+	.t-hover:hover { background: var(--bg-hover); }
+
+	.t-badge {
+		display: inline-flex;
+		align-items: center;
+		padding: 1px 7px;
+		border-radius: 999px;
+		font-size: 11px;
+		font-weight: 500;
+		line-height: 1.6;
+	}
+	.t-badge-ok  { color: var(--ok);  background: var(--ok-subtle); }
+	.t-badge-err { color: var(--err); background: var(--err-subtle); }
+	.t-badge-run { color: var(--run); background: var(--run-subtle); }
+
+	.t-btn {
+		display: inline-flex;
+		align-items: center;
+		padding: 3px 10px;
+		border-radius: 6px;
+		border: 1px solid var(--border);
+		background: transparent;
+		color: var(--muted);
+		font-size: 11px;
+		font-family: inherit;
+		cursor: pointer;
+		transition: border-color 0.12s, color 0.12s, background 0.12s;
+	}
+	.t-btn:hover {
+		border-color: var(--muted);
+		color: var(--text);
+		background: var(--bg-hover);
+	}
+
+	.t-btn-accent {
+		display: inline-flex;
+		align-items: center;
+		padding: 3px 10px;
+		border-radius: 6px;
+		border: 1px solid var(--accent);
+		background: transparent;
+		color: var(--accent);
+		font-size: 11px;
+		font-family: inherit;
+		cursor: pointer;
+		transition: background 0.12s;
+	}
+	.t-btn-accent:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+
+	.t-section-label {
+		padding: 5px 12px;
+		background: var(--bg-surface);
+		color: var(--dim);
+		font-size: 11px;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		font-weight: 600;
+		flex-shrink: 0;
+	}
+}
