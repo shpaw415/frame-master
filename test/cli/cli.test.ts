@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "fs";
-import { tmpdir } from "os";
-import { join } from "path";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 /**
  * CLI Test Suite for Frame-Master
@@ -42,15 +43,42 @@ async function waitForJson<T>(
 	);
 }
 
+async function cleanupTestDir(directory: string) {
+	let lastError: unknown;
+
+	for (let attempt = 0; attempt < 10; attempt++) {
+		try {
+			await rm(directory, { recursive: true, force: true });
+			return;
+		} catch (error) {
+			lastError = error;
+			await Bun.sleep(250);
+		}
+	}
+
+	throw (
+		lastError ?? new Error(`Failed to clean up test directory: ${directory}`)
+	);
+}
+
+async function stopProcess(proc: {
+	kill: () => void;
+	exited: Promise<number>;
+}) {
+	proc.kill();
+	await proc.exited;
+	await Bun.sleep(250);
+}
+
 beforeAll(() => {
 	// Create test directory
 	mkdirSync(TEST_DIR, { recursive: true });
 });
 
-afterAll(() => {
+afterAll(async () => {
 	// Cleanup test directory
 	if (existsSync(TEST_DIR)) {
-		rmSync(TEST_DIR, { recursive: true, force: true });
+		await cleanupTestDir(TEST_DIR);
 	}
 });
 
@@ -470,8 +498,7 @@ export default {
 					true,
 				);
 			} finally {
-				proc.kill();
-				await proc.exited;
+				await stopProcess(proc);
 			}
 		}, 30000);
 
@@ -591,8 +618,7 @@ export default {
 				).toBe(true);
 			} finally {
 				ws?.close();
-				proc.kill();
-				await proc.exited;
+				await stopProcess(proc);
 			}
 		}, 45000);
 
@@ -664,8 +690,7 @@ export default {
 				};
 				expect(savedTrace.buildList).toHaveLength(1);
 			} finally {
-				proc.kill();
-				await proc.exited;
+				await stopProcess(proc);
 			}
 		}, 30000);
 	});
@@ -772,8 +797,7 @@ export default {
 			}
 
 			// Kill the process
-			proc.kill();
-			await proc.exited;
+			await stopProcess(proc);
 
 			// Verify output contains expected messages
 			expect(output).toMatch(/Test Server|GUI available|localhost:3001/);
