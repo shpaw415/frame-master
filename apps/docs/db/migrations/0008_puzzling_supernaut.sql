@@ -1,0 +1,21 @@
+CREATE TABLE `templates` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`name` text NOT NULL,
+	`icon` text DEFAULT '📁' NOT NULL,
+	`description` text NOT NULL,
+	`long_description` text,
+	`author` text NOT NULL,
+	`owner_id` text NOT NULL,
+	`category` text NOT NULL,
+	`tags` text NOT NULL,
+	`published` integer DEFAULT false NOT NULL,
+	`github_release_url` text NOT NULL,
+	`github_repo_url` text NOT NULL,
+	`default_version` text NOT NULL,
+	`installation` text,
+	`features` text,
+	`included_plugins` text DEFAULT '[]' NOT NULL,
+	`preview_url` text,
+	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
+	`updated_at` integer DEFAULT (unixepoch()) NOT NULL
+);

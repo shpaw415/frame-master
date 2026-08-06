@@ -1,0 +1,150 @@
+<title>init Command - Initialize Frame-Master in Existing Projects | CLI</title>
+
+# init Command
+
+Initialize Frame-Master in an existing project.
+
+## 📖 Usage
+
+Basic command syntax.
+
+```bash
+frame-master init [options]
+
+# Or with bunx
+bunx frame-master init
+```
+
+## ⚙️ Options
+
+- `-v, --verbose` — Enable detailed logging
+- `-h, --help` — Show help
+
+## 📦 What It Creates
+
+Files added to your project:
+
+- `frame-master.config.ts` — Main configuration file for settings including port, plugins, and build options
+- `bunfig.toml` — Bun configuration with JSX settings and module resolution for Frame-Master compatibility
+- `src/pages/` — Pages directory structure for route components
+
+## ⚙️ Generated Configuration
+
+Default configuration file content (created by `frame-master create my-app`).
+
+```text
+my-app/
+├── frame-master.config.ts
+├── .frame-master/
+│   ├── preload.ts
+│   ├── server.ts
+│   ├── frame-master-custom-type.d.ts
+│   └── build/
+├── bunfig.toml
+├── package.json
+└── tsconfig.json
+```
+
+### Generated Files
+
+```ts frame-master.config.ts
+import type { FrameMasterConfig } from "frame-master/server/types";
+
+export default {
+  HTTPServer: {
+    port: 3000,
+  },
+  plugins: [],
+} satisfies FrameMasterConfig;
+```
+
+```json package.json
+{
+  "name": "<project-name>",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "frame-master": "^2.1.1"
+  },
+  "scripts": {
+    "dev": "NODE_ENV=development bun --hot frame-master dev",
+    "start": "NODE_ENV=production bun frame-master start"
+  }
+}
+```
+
+```json tsconfig.json
+{
+  "compilerOptions": {
+    "lib": ["ESNext"],
+    "target": "ESNext",
+    "module": "Preserve",
+    "moduleDetection": "force",
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noPropertyAccessFromIndexSignature": false
+  },
+  "include": ["**/*", ".frame-master/frame-master-custom-type.d.ts"]
+}
+```
+
+```toml bunfig.toml
+preload = ["./.frame-master/preload.ts"]
+```
+
+```text .env
+WEB_TOKEN_SECRET=<TOKEN_SECRET>
+```
+
+## 🚀 Workflow
+
+Using init in an existing project.
+
+```bash
+# Navigate to your project
+cd my-existing-project
+
+# Add Frame-Master dependency
+bun add frame-master
+
+# Initialize Frame-Master
+frame-master init
+
+# Start development
+frame-master dev
+```
+
+> Tip: The init command will not overwrite existing files. If a config file already exists, it will skip that file.
+
+## 🤔 When to Use
+
+| Scenario                       | Command                  |
+| ------------------------------ | ------------------------ |
+| New project from scratch       | `frame-master create`    |
+| Add to existing React project  | `frame-master init`      |
+| Migrate from another framework | `frame-master init`      |
+| Start with template            | `frame-master create -t` |
+
+## Next Steps
+
+- [create](/docs/cli/create) — Create new project
+- [dev](/docs/cli/dev) — Development server
+- Configuration — Config options

@@ -1,0 +1,64 @@
+<title
+  children={
+    "dev Command - Development Server with Hot Reload | Frame-Master CLI"
+  }
+/>
+
+# dev Command
+
+Start the server. Alias for `start`—behavior is determined by `NODE_ENV`.
+
+## 📖 Usage
+
+Basic command syntax.
+
+```bash
+frame-master dev [options]
+
+# Or with bunx
+bunx frame-master dev
+```
+
+## ⚙️ Options
+
+- `-v, --verbose` — Enable detailed logging
+- `-h, --help` — Show help
+
+## 📌 Command Alias
+
+`dev` and `start` are aliases—they run the same server. The behavior (development vs production) is determined entirely by the `NODE_ENV` environment variable.
+
+| NODE_ENV (default development) | Behavior                                  |
+| ------------------------------ | ----------------------------------------- |
+| development                    | Hot reload, file watching, verbose errors |
+| production                     | Optimized, minified, no file watching     |
+
+## 🚀 Development Features
+
+Features enabled when `NODE_ENV=development`:
+
+- 🔥 Hot Reload — Automatically rebuilds and reloads pages when source files change; plugins with `watchFiles` hook get notified
+- ⚡ Fast Compilation — Uses Bun's native bundler; only changed files are recompiled
+- 🔌 Plugin Loading — All configured plugins are loaded and hooks are active during development
+- 📝 Error Overlay — Build/runtime errors printed with file locations
+
+## 💡 Example
+
+Starting the dev server.
+
+```bash
+# Basic usage
+frame-master dev
+
+# With verbose logging
+frame-master dev --verbose
+
+# Output:
+# ✓ Server started at http://localhost:3000
+```
+
+## Next Steps
+
+- [start](/docs/cli/start) — Production server
+- [build](/docs/cli/build) — Build for production
+- [test](/docs/cli/test) — Testing server

@@ -1,0 +1,151 @@
+<title>debug Command - Build Trace UI and Trace Viewer | Frame-Master CLI</title>
+
+# debug Command
+
+Inspect Frame-Master build internals through an instrumented debug UI or by loading a saved trace file.
+
+## 📖 Usage
+
+The `debug` command has two subcommands.
+
+```bash
+frame-master debug build [options]
+frame-master debug view <trace> [options]
+```
+
+## `debug build`
+
+Run a real build with tracing enabled and expose the debug UI over HTTP.
+
+```bash
+frame-master debug build
+```
+
+```text
+Frame Master Debug Build
+Debug UI: http://localhost:3011
+```
+
+### Options
+
+- `-p, --port <port>` — Port for the debug UI server. Default: `3011`
+- `--no-watch` — Disable automatic rebuilds while the server is running
+- `--save-trace [path]` — Save the current trace after each build to `.frame-master/debug-traces/trace.json` or to the provided path
+
+### What It Does
+
+When you run `frame-master debug build`, Frame-Master:
+
+1. Forces build mode with `BUILD_MODE=true`
+2. Initializes the project and loads plugins
+3. Starts a build debug session on the unified builder
+4. Wraps build-plugin execution so file transformations are traced
+5. Serves the debug UI and JSON endpoints on the selected port
+6. Watches the project and triggers rebuilds unless `--no-watch` is set
+
+### Useful Examples
+
+```bash
+# Start the debug UI on the default port with watch mode enabled
+frame-master debug build
+
+# Use a custom port
+frame-master debug build --port 4001
+
+# Capture one build only
+frame-master debug build --no-watch
+
+# Persist the exported trace to the default debug folder
+frame-master debug build --save-trace
+
+# Persist the exported trace to a custom file
+frame-master debug build --save-trace traces/homepage-build.json
+```
+
+### What You Can Inspect
+
+The debug UI is meant for build-level diagnosis:
+
+- Build history — each captured build, status, duration, entrypoints, and output counts
+- File pipeline — every traced file, loader transitions, and final loader/size
+- Plugin interventions — `onLoad` and `finally` steps with execution order and timings
+- Snapshots — before/after content snapshots for traced transformations
+- Plugin registry metrics — plugin priority, dependency constraints, loader coverage, and total intervention time
+
+### HTTP Endpoints
+
+The UI is backed by a small local server.
+
+- `/` — Debug UI
+- `/api/session` — Full debug session payload
+- `/api/builds` — Build summaries
+- `/api/builds/:id` — Full build details
+- `/api/builds/:id/snapshots/:snapshotId` — A single stored snapshot
+- `/api/export` — Export the current session as JSON
+- `/api/registry` — Aggregated plugin metrics and dependency info
+- `/ws` — Live update channel used by the UI in build mode
+
+## `debug view`
+
+Open the same UI against an existing exported trace without running a build.
+
+```bash
+frame-master debug view .frame-master/debug-traces/trace.json
+```
+
+### Arguments
+
+- `<trace>` — Path to a previously exported `debug-trace.json` or equivalent trace JSON file
+
+### Options
+
+- `-p, --port <port>` — Port for the trace viewer UI. Default: `3011`
+
+### When To Use It
+
+Use `debug view` when you already captured a trace and want to inspect it later, share it with a teammate, or compare builds without keeping the original project process running.
+
+```bash
+# Open a saved trace file
+frame-master debug view traces/homepage-build.json
+
+# Open it on a different port
+frame-master debug view traces/homepage-build.json --port 4010
+```
+
+In view mode, the UI is read-only:
+
+- No file watcher
+- No live rebuilds
+- No active WebSocket stream
+- `/api/export` returns the loaded trace file contents
+
+## Recommended Workflow
+
+```bash
+# 1. Capture a trace while reproducing the issue
+frame-master debug build --save-trace
+
+# 2. Stop the server once the trace is saved
+
+# 3. Re-open that trace later without rebuilding
+frame-master debug view .frame-master/debug-traces/trace.json
+```
+
+## When To Reach For It
+
+- A build plugin changes output unexpectedly
+- Chained loaders or `finally` hooks are hard to reason about
+- You need timing data for plugin interventions
+- You want a shareable JSON artifact of a problematic build
+
+## 📤 Exit Behavior
+
+- `Ctrl+C` stops the debug server or trace viewer cleanly
+- Missing trace files in `view` mode throw an error before the server starts
+
+## Next Steps
+
+- [build](/docs/cli/build) — Standard production build flow
+- [test](/docs/cli/test) — Inspect request lifecycle with the testing GUI
+- [Plugin Chaining](/docs/plugin-chaining) — Understand traced `onLoad` and `finally` behavior

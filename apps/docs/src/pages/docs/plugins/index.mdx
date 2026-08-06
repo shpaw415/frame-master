@@ -1,0 +1,98 @@
+<title>Plugin System Overview - Extend Frame-Master with Plugins</title>
+
+# Plugin System Overview
+
+Extend Frame-Master with powerful plugins for frontend frameworks, databases, authentication, and more.
+
+## 🏗️ How Plugins Work
+
+Plugins hook into Frame-Master's server lifecycle and request pipeline:
+
+```text
+Server Start → serverStart.main()
+Request      → before_request → request → after_request
+HTML         → html_rewrite()
+Build        → beforeBuild → afterBuild
+```
+
+## 🔌 What Plugins Can Do
+
+- ⚛️ Frontend Frameworks — React, Vue, Svelte SSR
+- 🔐 Auth & Sessions — OAuth, JWT, cookies
+- 🔄 Request Pipeline — Intercept and modify requests
+- 🎨 HTML Transform — Rewrite before sending
+- 🔨 Build Process — Custom configurations
+- 📡 WebSockets — Real-time communication
+
+## ⚡ Quick Example
+
+A minimal plugin structure:
+
+```ts
+import type { FrameMasterPlugin } from "frame-master/plugin/types";
+
+export function myPlugin(options = {}): FrameMasterPlugin {
+  return {
+    name: "my-plugin",
+    version: "1.0.0",
+    priority: 50, // Optional: lower = runs first
+
+    serverStart: {
+      main: async () => console.log("Plugin loaded!"),
+    },
+
+    router: {
+      before_request: async (master) => {
+        master.setContext({ startTime: Date.now() });
+      },
+      request: async (master) => {
+        // Handle or intercept requests
+      },
+      after_request: async (master) => {
+        // Modify response headers
+      },
+    },
+  };
+}
+```
+
+## 📦 Using Plugins
+
+Add plugins to your Frame-Master configuration:
+
+```ts
+import { defineConfig } from "frame-master";
+import reactSSR from "frame-master-plugin-react-ssr";
+import session from "frame-master-plugin-session";
+
+export default defineConfig({
+  plugins: [reactSSR(), session({ secret: process.env.SESSION_SECRET })],
+});
+```
+
+## 📋 Plugin Properties
+
+### Required
+
+- `name` (string, required) — Unique plugin identifier
+- `version` (string, required) — Semantic version
+
+### Hooks
+
+- `serverStart` — `{ main?, dev_main? }` (server initialization)
+- `router` — `{ before_request?, request?, after_request?, html_rewrite? }` (request processing)
+- `build` — `{ buildConfig?, beforeBuild?, afterBuild? }` (build customization)
+
+### Configuration
+
+- `priority` (number) — Execution order (lower = first; default undefined)
+- `requirement` — `{ frameMasterVersion?, bunVersion?, frameMasterPlugins? }` (dependencies)
+
+> Info: See the [Hooks Reference](/docs/plugins/hooks) for complete documentation on all available hooks.
+
+## 🎯 Next Steps
+
+- [Installing Plugins](/docs/plugins/installing) — Add plugins to your project
+- [Creating Plugins](/docs/plugins/creating) — Build your own plugins
+- [Plugin Lifecycle](/docs/plugins/lifecycle) — Execution flow & priority
+- [Plugin Hooks](/docs/plugins/hooks) — Complete hook reference

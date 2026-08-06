@@ -1,0 +1,106 @@
+<title>build Command - Production Build | Frame-Master CLI</title>
+
+# build Command
+
+Build your Frame-Master project for production deployment.
+
+## 📖 Usage
+
+Run the build command to create optimized production assets.
+
+```bash
+frame-master build
+```
+
+## 🔨 What It Does
+
+The build command performs a complete production build:
+
+1. Initialize server — loads configuration and initializes all plugins
+2. Merge build configs — collects and merges `buildConfig` from all plugins
+3. Trigger `serverStart` hook — executes all plugins' `serverStart` hooks
+4. Run `beforeBuild` hooks — executes all plugins' `beforeBuild` hooks in parallel
+5. Execute `Bun.build()` — bundles and optimizes all entrypoints
+6. Run `afterBuild` hooks — executes all plugins' `afterBuild` hooks
+7. Generate report — shows build summary with file sizes and statistics
+
+## 📊 Build Output
+
+Example output:
+
+```text
+┌─────────────────────────────────────────┐
+│  🔨 Starting Frame Master Build         │
+└─────────────────────────────────────────┘
+
+┌─────────────────────────────────────────┐
+│  ✅ Build Completed Successfully        │
+├─────────────────────────────────────────┤
+│  Duration: 245.32ms                     │
+│  Outputs:  12 files                     │
+└─────────────────────────────────────────┘
+
+📦 Build Summary:
+  Total Size: 156.42KB
+  Average Size: 13.04KB
+
+🔝 Largest Files:
+     45.23KB - build/client.js
+     32.15KB - build/vendor.js
+     28.67KB - build/styles.css
+```
+
+## 🔍 Verbose Mode
+
+Enable detailed logging for debugging build issues.
+
+```bash
+frame-master --verbose build
+```
+
+> Tip: Plugins can enable build logging by setting `build.enableLoging: true` in their configuration.
+
+## ⚙️ Build Configuration
+
+Configure the build through plugins.
+
+```ts frame-master.config.ts
+import { defineConfig } from "frame-master";
+
+export default defineConfig({
+  plugins: [
+    {
+      name: "my-build-config",
+      version: "1.0.0",
+      build: {
+        buildConfig: {
+          minify: true,
+          sourcemap: "external",
+          target: "browser",
+          external: ["react", "react-dom"],
+        },
+        beforeBuild: async (config, builder) => {
+          console.log("Preparing build...");
+        },
+        afterBuild: async (config, result, builder) => {
+          console.log(`Built ${result.outputs.length} files`);
+        },
+        enableLoging: true,
+      },
+    },
+  ],
+});
+```
+
+> Info: See the Build System documentation at /docs/core/build for detailed configuration options.
+
+## 📤 Exit Codes
+
+- `0` — Build successful
+- `1` — Build failed
+
+## Next Steps
+
+- [start Command](/docs/cli/start) — Run in production mode
+- [Build System](/docs/core/build) — Configure build process
+- [Build Hooks](/docs/plugins/hooks#build-hooks) — Customize with plugins

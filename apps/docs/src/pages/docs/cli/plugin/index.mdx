@@ -1,0 +1,178 @@
+<title>plugin Command - Manage Plugins | Frame-Master CLI</title>
+
+# plugin Command
+
+Manage Frame-Master plugins: list, inspect, validate, and create.
+
+## 📖 Overview
+
+The plugin command provides tools for managing your plugins.
+
+```bash
+frame-master plugin <subcommand>
+
+Subcommands:
+  list              List all installed plugins
+  info <name>       Show detailed plugin information
+  validate          Validate plugin configuration
+  create <name>     Create a new plugin template
+```
+
+## 📋 plugin list
+
+List all installed plugins in your project.
+
+```bash
+frame-master plugin list
+
+# With verbose output (shows features)
+frame-master --verbose plugin list
+```
+
+Example output:
+
+```text
+📦 Installed Plugins:
+
+1. frame-master-plugin-react-ssr v2.0.0
+   Priority: 10
+   Features: before_request, request, html_rewrite, serverStart
+
+2. frame-master-plugin-session v1.2.0
+   Priority: 5
+   Features: before_request, after_request
+
+3. my-custom-plugin v1.0.0
+
+Total: 3 plugins
+```
+
+## ℹ️ plugin info
+
+Show detailed information about a specific plugin.
+
+```bash
+frame-master plugin info <plugin-name>
+```
+
+Example:
+
+```bash
+frame-master plugin info frame-master-plugin-react-ssr
+```
+
+```text
+📋 Plugin Information:
+
+Name: frame-master-plugin-react-ssr
+Version: 2.0.0
+Priority: 10
+
+Features:
+  Router:
+    ✓ before_request
+    ✓ request
+    ✓ html_rewrite
+  Server Lifecycle:
+    ✓ main
+    ✓ dev_main
+  Build Lifecycle:
+    ✓ buildConfig (dynamic)
+    ✓ afterBuild
+
+Requirements:
+  Frame-Master: ^2.0.0
+  Bun: >=1.0.0
+```
+
+## ✅ plugin validate
+
+Validate your plugin configuration and check for issues.
+
+```bash
+frame-master plugin validate
+```
+
+What it checks:
+
+- Duplicate plugin names
+- Frame-Master version requirements
+- Bun runtime version requirements
+- Required plugin dependencies
+- Missing version fields (warning)
+- Conflicting priorities (warning)
+
+Example output (success):
+
+```text
+🔍 Validating configuration...
+
+✓ Configuration is valid!
+```
+
+Example output (errors):
+
+```text
+🔍 Validating configuration...
+
+✗ my-auth-plugin: requires plugin "frame-master-plugin-session" which is not installed
+⚠ my-plugin: missing version field (recommended)
+⚠ Multiple plugins share the same priority: plugin-a (50), plugin-b (50)
+
+Found 1 error
+Found 2 warnings
+```
+
+## 🔧 plugin create
+
+Create a new plugin from a template.
+
+```bash
+frame-master plugin create <name> [options]
+
+Options:
+  -d, --dir <directory>    Output directory (default: "./")
+```
+
+Example:
+
+```bash
+# Create in current directory
+frame-master plugin create my-awesome-plugin
+
+# Create in specific directory
+frame-master plugin create my-awesome-plugin --dir ./plugins
+```
+
+```text
+📦 Creating plugin "my-awesome-plugin"...
+
+✓ Plugin created successfully!
+
+Files created:
+  my-awesome-plugin/index.ts
+  my-awesome-plugin/package.json
+  my-awesome-plugin/README.md
+
+Next steps:
+  cd my-awesome-plugin
+  # Edit index.ts to implement your plugin
+  # Add to your frame-master.config.ts when ready to use
+```
+
+Generated structure:
+
+```text
+my-awesome-plugin/
+├── index.ts        # Plugin implementation
+├── package.json    # Package metadata
+└── README.md       # Documentation template
+```
+
+> Tip: Use the format `frame-master-plugin-[name]` for consistency when publishing to npm.
+
+## Next Steps
+
+- [Creating Plugins](/docs/plugins/creating) — Learn to build plugins
+- [Installing Plugins](/docs/plugins/installing) — Add plugins to your project
+- [Plugin Hooks](/docs/plugins/hooks) — All available hooks

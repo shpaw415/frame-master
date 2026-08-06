@@ -1,0 +1,48 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "frame-master-docs",
+	"pages_build_output_dir": ".frame-master/build",
+	"compatibility_date": "2026-02-17",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "frame-master",
+			"database_id": "1b7bd8bf-ffc2-418c-bb98-d1770690a835",
+			"migrations_dir": "db/migrations",
+			"remote": true
+		}
+	],
+	"kv_namespaces": [
+		{
+			"binding": "DYNAMIC_PAGE_KV",
+			"id": "ea676392b316481abd7641903c697d62"
+		}
+	],
+	"vars": {
+		"CLOUDFLARE_WORKER_AI_API_URL": "https://api.cloudflare.com/client/v4/accounts/c8cc5f2c14d0f092ec83040f56655cdd/ai/run/@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+		"CLOUDFLARE_WORKER_AI_ACCOUNT_ID": "c8cc5f2c14d0f092ec83040f56655cdd",
+		"GITHUB_APP_ID": "3311310",
+		"GITHUB_APP_SLUG": "frame-master-app",
+		"CLOUDFLARE_ACCOUNT_ID": "17b0a92da13df078f38bcd297ee71f81",
+		"CLOUDFLARE_DATABASE_ID": "1b7bd8bf-ffc2-418c-bb98-d1770690a835",
+		"PUBLIC_REDIRECT_URI": "https://frame-master.com/dashboard",
+		"BUN_VERSION": "1.3.13",
+		"SKIP_DEPENDENCY_INSTALL": "true"
+	},
+	"ai": {
+		"binding": "AI",
+		"remote": true
+	},
+	"secrets": {
+		"required": [
+			"AUTH_SECRET",
+			"GITHUB_APP_PRIVATE_KEY",
+			"GITHUB_WEBHOOK_SECRET",
+			"CLOUDFLARE_D1_TOKEN",
+			"CLOUDFLARE_WORKER_AI_API_KEY"
+		]
+	}
+}

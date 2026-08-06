@@ -1,0 +1,124 @@
+<title>Quickstart Guide - Get Started in 5 Minutes | Frame-Master</title>
+
+# Quickstart Guide
+
+Get up and running with Frame-Master in under 5 minutes.
+
+## 📋 Prerequisites
+
+- Bun v1.3.0 or higher: https://bun.sh
+- Basic knowledge of TypeScript/JavaScript
+- Understanding of web server concepts
+
+## ⚡ Installation
+
+Install Frame-Master globally to use the CLI:
+
+```bash
+bun add -g frame-master
+```
+
+> Tip: You can also run it without installing globally via `bunx frame-master`.
+
+## 🚀 Create Your First Project
+
+Initialize a new Frame-Master project:
+
+```bash
+bun frame-master create my-project
+
+# This creates frame-master.config.ts and .frame-master/ directory
+```
+
+This creates a minimal project structure:
+
+```text
+my-project/
+├── .frame-master/
+│   ├── build/
+│   ├── server.ts
+│   ├── preload.ts
+│   └── frame-master-custom-type.d.ts
+├── frame-master.config.ts  # Your configuration
+├── package.json
+└── tsconfig.json
+```
+
+## 🔧 Configure Your Framework
+
+Frame-Master is plugin-based. Configure your setup in `frame-master.config.ts`:
+
+```ts
+import type { FrameMasterConfig } from "frame-master/server/types";
+
+import myPlugin from "plugins/my-plugin";
+
+const config: FrameMasterConfig = {
+  HTTPServer: {
+    port: 3000,
+  },
+  plugins: [
+    // Add your plugins here
+    myPlugin({ enabled: true }),
+  ],
+};
+
+export default config;
+```
+
+Frame-Master's power comes from its plugin system. Choose from Community plugins or create your own to build your perfect stack.
+
+## 🔥 Start Development Server
+
+Start the development server with hot reload:
+
+```bash
+bun frame-master dev
+```
+
+Your server will start on `http://localhost:3000` (or your configured port).
+
+## 🔌 Add Plugins
+
+Extend Frame-Master with plugins. Install any plugin from npm:
+
+```bash
+bun add frame-master-plugin-react-ssr
+
+# or any other Frame-Master plugin
+```
+
+Then add it to your configuration:
+
+```ts
+import type { FrameMasterConfig } from "frame-master/server/types";
+
+import reactPlugin from "frame-master-plugin-react-ssr/plugin";
+
+const config: FrameMasterConfig = {
+  HTTPServer: { port: 3000 },
+  plugins: [
+    reactPlugin({
+      // Plugin-specific options
+    }),
+  ],
+};
+
+export default config;
+```
+
+Plugins can add frontend frameworks, databases, authentication, and more. Browse available plugins in the [Plugin Marketplace](/plugins).
+
+## 🎯 Next Steps
+
+- [Plugin System](/docs/plugins) — Learn how to create custom plugins
+- [Browse Plugins](/plugins) — Explore official and community plugins
+- [Configuration](/docs/configuration) — Understand Frame-Master configuration options
+- [Production](/docs/advanced/deployment) — Deploy and run in production mode
+
+## 💡 Need Help?
+
+Join our community and get help from the Frame-Master team and other developers:
+
+- GitHub: https://github.com/shpaw415/frame-master
+- Discord: https://discord.gg/framemaster

@@ -1,0 +1,236 @@
+---
+description: Project orientation for Frame Master / cloudflare-base
+alwaysApply: true
+---
+
+# cloudflare-base
+
+Orientation guide for AI coding agents working on this project.
+
+## Project Overview
+
+A React application deployed to **Cloudflare Pages**, orchestrated by the [Frame Master](https://github.com/shpaw415/frame-master) metaframework.
+
+**Stack:**
+- **Runtime / package manager:** Bun 1.3+
+- **UI:** React 19
+- **Styling:** Tailwind CSS 4
+- **Deployment target:** Cloudflare Pages
+- **Language:** TypeScript (strict mode)
+
+The framework is plugin-based. All build behavior — SSR, hydration, Tailwind compilation, image optimization, SEO, sitemap — is driven by plugins registered in `frame-master.config.ts`.
+
+---
+
+## Key Commands
+
+```bash
+bun dev              # Start dev server with HMR (http://localhost:3001)
+bun run build        # Production build → .frame-master/build
+bun run build:dev    # Dev-mode build  → .frame-master/build
+bun frame-master init  # First-time initialization (run once after clone)
+```
+
+---
+
+## Filesystem Routing
+
+Pages live in `src/pages/`. The filename/directory path maps directly to the URL route. No route registration is needed.
+
+| File | URL |
+|---|---|
+| `src/pages/index.tsx` | `/` |
+| `src/pages/about.tsx` | `/about` |
+| `src/pages/sub/index.tsx` | `/sub` |
+| `src/pages/sub/settings.tsx` | `/sub/settings` |
+
+**Rules:**
+- Every page file must `export default` a React component.
+- New page files are auto-detected — no changes to `frame-master.config.ts` required.
+- **Adding a new route during dev requires a manual restart of `bun dev`** to make it navigable. The file watcher handles code changes to existing routes, not new route discovery.
+- `bun run build` always picks up all routes automatically.
+
+---
+
+## Layouts
+
+Place a `layout.tsx` file in a page directory to wrap its pages with a shared UI shell (nav, footer, etc.).
+
+```
+src/pages/layout.tsx          ← root layout (outermost wrapper)
+  src/pages/index.tsx         ← rendered inside root layout
+  src/pages/sub/layout.tsx    ← rendered inside root layout
+    src/pages/sub/index.tsx   ← rendered inside both layouts (nested)
+```
+
+- The **root layout** (`src/pages/layout.tsx`) wraps all its sibling pages and all sub-directories.
+- A **sub-directory layout** wraps its own pages, but the parent layout **still wraps it** — layouts nest, they do not replace each other.
+- `layout.tsx` must accept and render `children`:
+
+```tsx
+export default function Layout({ children }: { children: React.JSX.Element }) {
+  return <div>{children}</div>;
+}
+```
+
+---
+
+## Core Files & Responsibilities
+
+| File | Purpose |
+|---|---|
+| `src/shell.tsx` | HTML document shell (`<html>`, `<head>`, `<body>`). Modify for global `<head>` changes (stylesheets, fonts, viewport). |
+| `src/client-wrapper.tsx` | Client-side only wrapper. Contains `RouterHost` for SPA navigation. **Never remove `RouterHost`** — it powers client-side routing. |
+| `src/common.ts` | Shared app-wide constants (e.g. `APP_DATA.projectName`). Referenced in `shell.tsx` for the page title. |
+| `site.config.ts` | SEO metadata, Open Graph, Twitter card, sitemap base URL. **Primary file to update when customizing a new project.** |
+| `frame-master.config.ts` | Plugin registration and configuration. Rarely needs changes unless adding/removing plugins or changing plugin options. |
+| `wrangler.jsonc` | Cloudflare Pages deployment config. Update the `name` field for each project. |
+
+---
+
+## Plugin Overview
+
+Plugins are registered in `frame-master.config.ts`. The following plugins are active:
+
+| Plugin | What it does |
+|---|---|
+| `ReactToHtml` | SSR/SSG: renders pages to HTML using `src/shell.tsx` as the document wrapper. `srcDir` points to the pages directory. |
+| `ApplyReact` (`style: "nextjs"`) | Client-side hydration and full SPA navigation. `RouterHost` in `client-wrapper.tsx` is the client router. |
+| `TailwindPlugin` | Compiles `static/tailwind.css` → `static/style.css` on build/dev. |
+| `imageOptimizer` | Converts originals in `images/` to WebP at configurable sizes (default: 320, 720, 1280) and writes results to `optimized/`. Sizes are set via the `sizes` array in `frame-master.config.ts`. Tracks state in `optimized/manifest.json`. |
+| `SVGLoader` | Allows importing `.svg` files as React components. |
+| `AssetsToBuild` | Copies `optimized/`, `static/favicon.ico`, `assets/`, and `robots.txt` into the build directory. |
+| `SEOPlugin` | Injects `<meta>` tags defined in `site.config.ts` into every page's `<head>`. |
+| `AutoSiteMap` | Generates `sitemap.xml` from the built HTML pages using `siteUrl` from `site.config.ts`. |
+| `ServeFromBuild` | Serves `.frame-master/build` during development. |
+
+---
+
+## Images
+
+Source images go in `images/`. The `imageOptimizer` plugin processes them into `optimized/` as WebP at responsive sizes.
+
+**Import:**
+```tsx
+import Logo from "@images/logo.png";
+```
+
+The `@images/*` path alias maps to `images/*` (defined in `tsconfig.json`). Types are provided by `frame-master-plugin-image-optimizer/types` (declared in `tsconfig.json` under `types`).
+
+**Usage:**
+```tsx
+<img src={Logo.src(720)} alt="Logo" />
+```
+
+`Logo.src(size)` returns the URL of the **exact** variant for that size. Valid sizes are whatever is configured in the `sizes` array of `imageOptimizer` in `frame-master.config.ts` (defaults: **320**, **720**, **1280**). You can add or replace those values there. Requesting a size not present in the manifest will fail at runtime.
+
+**Do not edit `optimized/` or `optimized/manifest.json` manually.** They are generated by the plugin.
+
+---
+
+## SVGs
+
+Place SVGs in `static/`. The `SVGLoader` plugin transforms them into importable React components:
+
+```tsx
+import Icon from "@static/icon.svg";
+
+export default function Page() {
+  return <Icon className="w-6 h-6" />;
+}
+```
+
+The `@static/*` alias maps to `static/*` (defined in `tsconfig.json`).
+
+---
+
+## Tailwind / Styling
+
+- **Edit:** `static/tailwind.css` — add custom CSS, `@import`, or Tailwind directives here. The entry point already contains `@import "tailwindcss"`.
+- **Do not edit:** `static/style.css` — this is the compiled output, automatically regenerated by `TailwindPlugin` on every build.
+
+---
+
+## SEO & Sitemap
+
+All SEO configuration lives in `site.config.ts`:
+
+```ts
+export default {
+  siteUrl: "https://yoursite.com",  // used by AutoSiteMap
+  SEO: {
+    title: "...",
+    description: "...",
+    keywords: [...],
+    openGraph: { ... },
+    twitter: { ... },
+    robots: "index, follow",
+    customTags: ['<meta name="..." content="...">'],
+  },
+} satisfies SiteConfigType;
+```
+
+Update `site.config.ts` when customizing a new project — this is the only file that needs to change for basic SEO and sitemap setup.
+
+---
+
+## Loading & Not-Found Pages
+
+### File resolution (per-route override)
+
+The `ApplyReact` plugin resolves `loading.tsx` and `404.tsx` by walking up from the current page's directory:
+
+1. **Same directory** as the page being rendered — e.g. `src/pages/sub/loading.tsx` for `/sub/*` routes.
+2. **Fallback** — `src/components/loading.tsx` and `src/components/404.tsx` are the global defaults used when no sibling file is found.
+
+This means you can drop a `loading.tsx` or `404.tsx` next to any group of pages to override the default for just that route segment.
+
+### Triggering the loading state
+
+Navigating between pages (client-side SPA transitions) automatically renders the nearest `loading.tsx` while the next page loads.
+
+### Triggering the not-found page
+
+Call `ThrowNotFound()` inside any page component to render the nearest `404.tsx`:
+
+```tsx
+import { ThrowNotFound } from "frame-master-plugin-apply-react/utils";
+
+export default function Page() {
+  const data = getData();
+  if (!data) ThrowNotFound();
+  // ...
+}
+```
+
+### Default components
+
+| File | Role |
+|---|---|
+| `src/components/loading.tsx` | Global loading fallback |
+| `src/components/404.tsx` | Global not-found fallback |
+
+---
+
+## Do Not Edit (Generated Paths)
+
+| Path | Generated by |
+|---|---|
+| `static/style.css` | `TailwindPlugin` |
+| `optimized/` | `imageOptimizer` |
+| `optimized/manifest.json` | `imageOptimizer` |
+| `.frame-master/` | Frame Master core (build output, type declarations, preload) |
+
+---
+
+## Deployment (Cloudflare Pages)
+
+1. Update `wrangler.jsonc` → set `name` to your project name.
+2. Update `site.config.ts` → set `siteUrl` to your production URL.
+3. Build output directory: `.frame-master/build`
+4. Build command: `bun run build`
+
+For Cloudflare Dashboard setup:
+- **Framework preset:** None / Custom
+- **Build command:** `bun run build`
+- **Build output directory:** `.frame-master/build`

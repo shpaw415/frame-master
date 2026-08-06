@@ -1,0 +1,223 @@
+<title>Project Structure - Understanding Frame-Master Architecture</title>
+
+# Project Structure
+
+Understand the anatomy of a Frame-Master project and how different directories and files work together to create your application.
+
+## Overview
+
+A typical Frame-Master project separates configuration, source code, and internals:
+
+```text
+my-frame-master-app/
+├── frame-master.config.ts       # Main configuration
+├── bunfig.toml                  # Bun configuration
+├── tsconfig.json                # TypeScript configuration
+├── package.json                 # Dependencies
+├── .frame-master/               # Framework internals (auto-generated)
+│   ├── build/                   # Build utilities
+│   ├── server.ts                # Server setup
+│   ├── preload.ts               # Runtime preloader
+│   └── frame-master-custom-type.d.ts
+└── src/                         # Your application code (plugin-dependent)
+```
+
+> Info: Frame-Master is minimal by design. The `src/` layout depends on the plugins you install. For example, `frame-master-plugin-react-to-html` adds file-based routing with `src/pages/`, while other plugins may differ.
+
+## Configuration Files
+
+### frame-master.config.ts
+
+The heart of your application: define server settings, plugins, and behavior.
+
+```ts
+import type { FrameMasterConfig } from "frame-master/server/type";
+
+const config: FrameMasterConfig = {
+  HTTPServer: {
+    port: 3000,
+    host: "localhost",
+  },
+  plugins: [
+    // Add plugins here to extend functionality
+    // Example: reactPlugin(), tailwindPlugin(), etc.
+  ],
+};
+
+export default config;
+```
+
+Key options:
+
+- `HTTPServer` — Server port, host, and HTTP settings
+- `plugins` — Array of plugin instances that extend functionality
+
+### bunfig.toml
+
+Configures Bun runtime behavior, module resolution, preloading, and build settings.
+
+```toml
+[install]
+# Configure package installation
+registry = "https://registry.npmjs.org/"
+
+[run]
+# Preload scripts before running
+preload = ["./.frame-master/preload.ts"]
+```
+
+### tsconfig.json
+
+TypeScript compiler options and path aliases.
+
+```json
+{
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "target": "ESNext",
+    "module": "Preserve",
+    "moduleDetection": "force",
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noPropertyAccessFromIndexSignature": false,
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["**/*", ".frame-master/frame-master-custom-type.d.ts"]
+}
+```
+
+### package.json
+
+Project metadata, dependencies, and scripts.
+
+```json
+{
+  "name": "frame-master-site",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "frame-master": "^1.0.1"
+  },
+  "scripts": {
+    "dev": "NODE_ENV=development bun --hot frame-master dev",
+    "start": "NODE_ENV=production bun frame-master start"
+  }
+}
+```
+
+## .frame-master Directory
+
+Auto-generated internals that power your application. You typically do not edit these manually.
+
+- `build/` — Build utilities and transpilation logic
+- `server.ts` — Initializes the HTTP server, loads plugins, handles requests
+- `preload.ts` — Runtime preloader (loaded via `bunfig.toml`)
+- `frame-master-custom-type.d.ts` — Type definitions for Frame-Master globals and plugin types
+
+## src Directory
+
+Your application source code lives here. The structure is defined by the plugins you install.
+
+> Warning: Frame-Master core does not prescribe a `src/` layout. The example below is for `frame-master-plugin-react-ssr` with file-based routing; other plugins may differ.
+
+### Example: React SSR plugin structure
+
+```text
+src/pages/
+├── index.tsx                   # / route
+├── layout.tsx                  # Root layout wrapper
+├── about/
+│   └── index.tsx               # /about route
+├── blog/
+│   ├── index.tsx               # /blog route
+│   ├── layout.tsx              # Blog layout wrapper
+│   └── [slug]/
+│       └── index.tsx           # /blog/:slug dynamic route
+└── api/
+    └── users.ts                # /api/users API endpoint
+```
+
+## Plugin-Added Directories
+
+Plugins may add their own directories:
+
+- 📁 `static/` — Public assets (e.g., React SSR plugin)
+- 📦 `.frame-master/build` — Compiled or bundled output from build plugins
+- ⚙️ Plugin-specific folders — Check each plugin’s docs for details
+
+> Info: See the [Plugin System documentation](/docs/plugins) to learn how plugins extend Frame-Master's functionality and structure.
+
+## Environment Variables
+
+Store sensitive configuration in `.env` files.
+
+> Warning:
+>
+> - Never commit `.env` files to version control
+> - Add `.env` to your `.gitignore`
+> - Use separate `.env` files per environment
+> - Document required variables in a `.env.example` file
+
+## Version Control
+
+Recommended `.gitignore` configuration:
+
+```text
+# Dependencies
+node_modules/
+
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Build output
+.frame-master/build
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+```
+
+## Best Practices
+
+- 📁 Follow plugin conventions; each plugin may define its own structure
+- 🔒 Protect sensitive data; never commit secrets and keep `.env` ignored
+- 📝 Document your structure in a README, especially with custom layouts
+- 🔄 Consider version controlling `.frame-master/` for debugging consistency
+
+## Next Steps
+
+- [Configuration](/docs/configuration) — Customize server setup and options
+- [Plugin System](/docs/plugins) — Understand and extend functionality with plugins
+- [CLI Commands](/docs/cli) — Master the CLI for dev, build, and production workflows

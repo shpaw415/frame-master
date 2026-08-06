@@ -1,0 +1,447 @@
+<title>Build System - Frame-Master Build Pipeline Documentation</title>
+
+# Build System
+
+Frame-Master uses a singleton builder that merges configurations from every plugin into one coordinated build pipeline.
+
+## 📦 Overview
+
+- Single shared `builder` instance that includes configs from all loaded plugins
+- beforeBuild/afterBuild lifecycle hooks for custom logic
+- Build analytics, history, and report generation
+- Concurrent build protection to prevent race conditions
+
+## 🚀 Using the Builder
+
+### Basic Usage
+
+```ts
+import { builder } from "frame-master/build";
+
+export function myPlugin(): FrameMasterPlugin {
+  return {
+    name: "my-plugin",
+    version: "1.0.0",
+    serverStart: {
+      main: async () => {
+        const result = await builder.build("/src/client.ts", "/src/entry.tsx");
+        if (result.success) {
+          console.log("Build successful!", result.outputs.length, "files");
+        } else {
+          console.error("Build failed:", result.logs);
+        }
+      },
+    },
+  };
+}
+```
+
+### Builder Methods
+
+- `builder.build(...entrypoints)` → run build with merged config
+- `builder.isBuilding()` → check if a build is in progress
+- `builder.awaitBuildFinish()` → wait for the current build, or `null` if idle
+- `builder.getConfig()` → current merged `BuildConfig`
+- `builder.analyzeBuild()` → size/kind stats for last build
+- `builder.generateReport("text" | "json")` → formatted report
+
+## ⚙️ Build Configuration
+
+### Static Configuration
+
+```ts
+export function myPlugin(): FrameMasterPlugin {
+  return {
+    name: "my-plugin",
+    version: "1.0.0",
+    build: {
+      buildConfig: {
+        external: ["react", "react-dom"],
+        target: "browser",
+        minify: true,
+        sourcemap: "external",
+        define: { "process.env.NODE_ENV": JSON.stringify("production") },
+      },
+    },
+  };
+}
+```
+
+### Dynamic Configuration
+
+```ts
+build: {
+  buildConfig: async () => {
+    const isDev = process.env.NODE_ENV !== "production";
+    return {
+      external: ["react", "react-dom"],
+      minify: !isDev,
+      sourcemap: isDev ? "inline" : "external",
+      define: {
+        "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV),
+        "__DEBUG__": isDev.toString(),
+        "__BUILD_TIME__": JSON.stringify(new Date().toISOString()),
+      },
+      plugins: [myCustomBunPlugin({ debug: isDev })],
+    };
+  },
+}
+```
+
+### Type-Safe Configuration
+
+```ts
+import { defineBuildConfig } from "frame-master/build";
+
+build: {
+  buildConfig: defineBuildConfig({
+    target: "browser",
+    external: ["react"],
+    minify: true,
+    splitting: true,
+  }),
+}
+```
+
+## 🔀 Configuration Merging
+
+- `entrypoints`, `external`: deduplicated + concatenated
+- `plugins`: concatenated (order preserved), then normalized through Frame-Master's build-plugin chaining by default
+- `define`, `loader`: deep merged (later wins)
+- primitives: last plugin wins (warns)
+
+Example merge:
+
+```ts
+// Plugin A
+buildConfig: { external: ["react"], define: { __A__: "true" } }
+
+// Plugin B
+buildConfig: { external: ["lodash"], define: { __B__: "true" } }
+
+// Result
+external: ["react", "lodash"]
+define: { __A__: "true", __B__: "true" }
+```
+
+### Build Plugin Chaining
+
+Frame-Master does more than append Bun plugins together. By default, all build plugins contributed through `buildConfig.plugins` are wrapped into one chained loader so multiple plugins can transform the same file in sequence.
+
+That means this:
+
+```ts
+// Plugin A
+buildConfig: {
+  plugins: [pluginA],
+}
+
+// Plugin B
+buildConfig: {
+  plugins: [pluginB],
+}
+```
+
+behaves like one ordered pipeline instead of Bun's normal "first matching onLoad wins" behavior.
+
+#### What gets chained
+
+- `onLoad` handlers are chained in registration order
+- Frame-Master's `build.finally(loader, callback)` hooks run after chained `onLoad` handlers for the matching loader
+- `onResolve`, `onStart`, `onEnd`, and `onBeforeParse` still pass through normally
+
+#### Why it matters
+
+If two plugins both match `.tsx` files, both can participate in the final output:
+
+```text
+source.tsx -> plugin A onLoad -> plugin B onLoad -> finally(html|js|css...) -> final bundled artifact
+```
+
+This is what enables composable transforms such as:
+
+- one plugin injecting imports
+- another plugin wrapping components or rewriting exports
+- a final post-processing step adjusting emitted HTML, CSS, or JS
+
+#### Reading prior chained output
+
+Inside a chained `onLoad`, do not assume you should always re-read the source file from disk. Earlier handlers may already have transformed it.
+
+Use the helper from the chaining API instead:
+
+```ts
+import { getChainableContent } from "frame-master/plugin";
+
+build.onLoad({ filter: /\.tsx$/ }, async (args) => {
+  const content = await getChainableContent(args);
+
+  return {
+    contents: `import "my-lib";\n${content}`,
+    loader: "tsx",
+  };
+});
+```
+
+Available chain-aware fields:
+
+- `args.__chainedContents` — content returned by the previous handler
+- `args.__chainedLoader` — loader returned by the previous handler
+
+For binary data, use `getChainableBinaryContent(args)` instead of `getChainableContent(args)`.
+
+#### Post-processing with `build.finally(...)`
+
+Frame-Master extends Bun's plugin API with a `finally` hook that runs after the chained `onLoad` pipeline for a loader has finished.
+
+```ts
+build: {
+  buildConfig: {
+    plugins: [
+      {
+        name: "html-minify-pass",
+        setup(build) {
+          build.finally("html", ({ contents }) => ({
+            contents:
+              typeof contents === "string"
+                ? contents.replace(/>\s+</g, "><")
+                : contents,
+          }));
+        },
+      },
+    ],
+  },
+}
+```
+
+Use `finally` when a transformation should happen after all `onLoad` handlers for that loader have already run.
+
+#### Disabling chaining
+
+Chaining is enabled by default. Disable it only if a plugin requires Bun's raw first-match loader behavior:
+
+```ts
+import { defineConfig } from "frame-master";
+
+export default defineConfig({
+  plugins: [
+    // ...
+  ],
+  pluginsOptions: {
+    disableOnLoadChaining: true,
+  },
+});
+```
+
+When disabled, build plugins no longer receive Frame-Master chaining features such as ordered `onLoad` composition, `args.__chainedContents`, `args.__chainedLoader`, or `build.finally(...)`.
+
+## 🪝 Lifecycle Hooks
+
+### beforeBuild
+
+```ts
+build: {
+  beforeBuild: async (config) => {
+    console.log("Starting build", config.entrypoints.length, "entries");
+    if (!config.outdir) throw new Error("Output directory not specified");
+    await Bun.write(
+      ".frame-master/build-info.json",
+      JSON.stringify({ timestamp: new Date().toISOString(), entrypoints: config.entrypoints, target: config.target })
+    );
+  },
+}
+```
+
+### afterBuild
+
+```ts
+build: {
+  afterBuild: async (config, result, builder) => {
+    if (!result.success) return;
+
+    const manifestPath = `${config.outdir}/manifest.json`;
+    await Bun.write(
+      manifestPath,
+      JSON.stringify({ files: result.outputs.map((o) => o.path), buildTime: new Date().toISOString() }, null, 2)
+    );
+
+    // Register custom files so cleanup keeps them
+    result.outputs.push({ path: manifestPath, kind: "asset", hash: "", loader: "file" } as Bun.BuildArtifact);
+
+    const analysis = builder.analyzeBuild();
+    if (analysis.totalSize > 1_000_000) console.warn("Bundle exceeds 1MB", analysis.totalSize);
+  },
+}
+```
+
+### enableLoging
+
+```ts
+build: {
+  enableLoging: process.env.NODE_ENV !== "production",
+}
+```
+
+## 📊 Build Analysis
+
+```ts
+const result = await builder.build("/src/client.ts");
+if (result.success) {
+  const analysis = builder.analyzeBuild();
+  console.log("Total size", analysis.totalSize);
+  console.log("Average size", analysis.averageSize);
+  console.log("Largest", analysis.largestFiles.slice(0, 5));
+  console.log("By kind", analysis.byKind);
+}
+```
+
+History and reports:
+
+```ts
+const history = builder.getBuildHistory();
+const successRate = history.filter((b) => b.success).length / history.length;
+builder.clearBuildHistory();
+
+const textReport = builder.generateReport("text");
+const jsonReport = builder.generateReport("json");
+```
+
+## 🔒 Concurrent Build Protection
+
+```ts
+if (builder.isBuilding()) await builder.awaitBuildFinish();
+await builder.build("/src/index.ts");
+```
+
+> Warning: The builder throws if you start a build while another is running—check first.
+
+## 🧹 Output Cleanup
+
+After each successful build, files not listed in `result.outputs` are deleted from `outdir`.
+
+Register custom files:
+
+```ts
+afterBuild: async (config, result) => {
+  if (!result.success) return;
+  const path = `${config.outdir}/my-custom-file.json`;
+  await Bun.write(path, JSON.stringify({ data: "value" }));
+  result.outputs.push({
+    path,
+    kind: "asset",
+    hash: "",
+    loader: "file",
+  } as Bun.BuildArtifact);
+};
+```
+
+## 🛠️ Helper Utilities
+
+```ts
+import Builder from "frame-master/build";
+
+// Build regex for Bun plugins
+const filter = Builder.pluginRegexMake({
+  path: ["src", "components"],
+  ext: ["ts", "tsx"],
+});
+
+// Return empty stubs for server-only modules
+build.onLoad({ filter: /\.server\.(ts|tsx)$/ }, async (args) => {
+  const mod = await import(args.path);
+  return Builder.returnEmptyFile("tsx", mod);
+});
+```
+
+## 💻 CLI Build Command
+
+```bash
+NODE_ENV=production frame-master build
+NODE_ENV=production frame-master build --verbose
+```
+
+Flow: sets env, initializes plugins, loads builder, runs build, prints summary.
+
+## 📝 Complete Example
+
+```ts
+import { builder, defineBuildConfig, Builder } from "frame-master/build";
+import type { FrameMasterPlugin } from "frame-master";
+
+export function myBuildPlugin(): FrameMasterPlugin {
+  return {
+    name: "my-build-plugin",
+    version: "1.0.0",
+    build: {
+      buildConfig: async () => {
+        const isDev = process.env.NODE_ENV !== "production";
+        return defineBuildConfig({
+          target: "browser",
+          external: ["react", "react-dom"],
+          minify: !isDev,
+          sourcemap: isDev ? "inline" : "external",
+          splitting: true,
+          define: {
+            "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV),
+            __VERSION__: JSON.stringify("1.0.0"),
+          },
+          plugins: [
+            {
+              name: "server-stub",
+              setup(build) {
+                build.onLoad({ filter: /\.server\.tsx?$/ }, async (args) => {
+                  const mod = await import(args.path);
+                  return Builder.returnEmptyFile("tsx", mod);
+                });
+              },
+            },
+          ],
+        });
+      },
+      beforeBuild: async (config) => {
+        console.log("🔨 Starting build...", config.entrypoints.length);
+        await Bun.write(
+          ".frame-master/build-time.txt",
+          new Date().toISOString(),
+        );
+      },
+      afterBuild: async (config, result, builder) => {
+        if (!result.success) return;
+        const analysis = builder.analyzeBuild();
+        await Bun.write(
+          `${config.outdir}/manifest.json`,
+          JSON.stringify(
+            {
+              buildTime: new Date().toISOString(),
+              files: analysis.artifacts.map((a) => ({
+                path: a.path,
+                size: a.size,
+                kind: a.kind,
+              })),
+              totalSize: analysis.totalSize,
+            },
+            null,
+            2,
+          ),
+        );
+      },
+      enableLoging: process.env.DEBUG_BUILD === "true",
+    },
+    serverStart: {
+      main: async () => {
+        if (process.env.NODE_ENV === "production") {
+          const result = await builder.build();
+          if (!result.success) throw new Error("Production build failed");
+        }
+      },
+    },
+  };
+}
+```
+
+## 🎯 Next Steps
+
+- [Plugin System](/docs/plugins)
+- [Plugin Hooks](/docs/plugins/hooks)
+- [CLI Reference](/docs/cli)
+- [Advanced Configuration](/docs/build-system)

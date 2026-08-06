@@ -1,0 +1,266 @@
+<title>Creating Plugins - Build Custom Frame-Master Extensions</title>
+
+# Creating Plugins
+
+Learn how to create custom Frame-Master plugins and contribute to the ecosystem.
+
+## 🚀 Quick Start
+
+Generate a plugin boilerplate using the Frame-Master CLI:
+
+```bash
+# Generate a new plugin
+frame-master plugin create my-custom-plugin
+
+# This creates:
+# frame-master-plugin-my-custom-plugin/
+#   ├── index.ts          # Plugin entry point
+#   ├── package.json      # Plugin metadata
+#   ├── README.md         # Documentation
+#   └── tsconfig.json     # TypeScript config
+```
+
+> Info: Use the format `frame-master-plugin-[name]` for consistency with the ecosystem.
+
+## 📦 Basic Plugin Structure
+
+Every plugin exports a factory that returns a `FrameMasterPlugin` object.
+
+```ts
+import type { FrameMasterPlugin } from "frame-master/plugin/types";
+
+export type MyPluginOptions = {
+  apiKey?: string;
+  debug?: boolean;
+};
+
+export function myPlugin(options: MyPluginOptions = {}): FrameMasterPlugin {
+  const config = {
+    apiKey: options.apiKey || process.env.API_KEY,
+    debug: options.debug ?? false,
+  };
+
+  return {
+    // Required fields
+    name: "my-custom-plugin",
+    version: "1.0.0",
+
+    // Optional: Execution priority (lower = runs first)
+    priority: 50,
+
+    // Server lifecycle hooks
+    serverStart: {
+      main: async () => {
+        /* runs on startup */
+      },
+      dev_main: async () => {
+        /* dev mode only */
+      },
+    },
+
+    // Request handling hooks
+    router: {
+      before_request: async (master) => {
+        /* init context */
+      },
+      request: async (master) => {
+        /* handle/intercept */
+      },
+      after_request: async (master) => {
+        /* modify response */
+      },
+      html_rewrite: {
+        /* transform HTML */
+      },
+    },
+
+    // Build hooks
+    build: {
+      buildConfig: async (builder) => ({
+        /* merge config */
+      }),
+      beforeBuild: async (config, builder) => {
+        /* pre-build */
+      },
+      afterBuild: async (config, result, builder) => {
+        /* post-build */
+      },
+    },
+
+    // WebSocket support
+    serverConfig: {
+      routes: {
+        /* ws upgrade routes */
+      },
+    },
+    websocket: { onOpen, onMessage, onClose },
+
+    // File watching (dev mode)
+    fileSystemWatchDir: ["src/"],
+    onFileSystemChange: async (event, path) => {
+      /* react */
+    },
+
+    // CLI extension
+    cli: (command) => command.command("my-cmd").action(() => {}),
+  };
+}
+
+export default myPlugin;
+```
+
+### Required Fields
+
+- `name` (string, required) — Unique identifier, ideally matches package name
+- `version` (string, required) — Semantic version (e.g., `1.0.0`), usually matches `package.json`
+
+> Tip: For detailed documentation on all hooks, see the [Plugin Hooks Reference](/docs/plugins/hooks).
+
+## 📋 Plugin Requirements
+
+Specify dependencies and version requirements:
+
+```ts
+requirement: {
+  // Minimum Frame-Master version
+  frameMasterVersion: "^2.0.0",
+
+  // Bun runtime version
+  bunVersion: ">=1.2.0",
+
+  // Required plugins
+  frameMasterPlugins: {
+    "frame-master-plugin-session": "^1.0.0",
+  },
+}
+```
+
+> Warning: Frame-Master validates requirements at startup. Missing dependencies prevent the server from starting.
+
+## 🔌 WebSocket Support
+
+Add real-time communication to your plugin:
+
+```ts
+serverConfig: {
+  routes: {
+    "/ws/my-plugin": (req, server) => {
+      return server.upgrade(req, {
+        data: { "my-plugin-ws": true },
+      });
+    },
+  },
+},
+
+websocket: {
+  onOpen: async (ws) => {
+    if (!ws.data["my-plugin-ws"]) return;
+    ws.send(JSON.stringify({ type: "connected" }));
+  },
+
+  onMessage: async (ws, message) => {
+    if (!ws.data["my-plugin-ws"]) return;
+    const data = JSON.parse(message.toString());
+    // Handle message...
+  },
+
+  onClose: async (ws) => {
+    if (!ws.data["my-plugin-ws"]) return;
+    // Cleanup...
+  },
+}
+```
+
+> Info: WebSocket handlers receive connections from all plugins. Use `ws.data` to identify your plugin's connections.
+
+## 💻 CLI Extension
+
+Add custom commands to the Frame-Master CLI:
+
+```ts
+cli: (command) => {
+  return command
+    .command("generate <type>")
+    .description("Generate project files")
+    .option("-o, --output <dir>", "Output directory", "./")
+    .action(async (type, options) => {
+      console.log(`Generating ${type} in ${options.output}`);
+      // Your generation logic
+    });
+};
+```
+
+> Info: Commands are available via `frame-master extended-cli <command>`. The CLI uses Commander.js.
+
+## 👁️ File Watching
+
+React to file changes in development mode:
+
+```ts
+// Directories to watch
+fileSystemWatchDir: ["src/styles/", "config/"],
+
+// Handle changes
+onFileSystemChange: async (eventType, filePath, absolutePath) => {
+  if (filePath.endsWith(".css")) {
+    await rebuildStyles();
+  }
+  if (filePath.includes("config/")) {
+    await reloadConfig();
+  }
+}
+```
+
+## 📦 Publishing Your Plugin
+
+### Package.json setup
+
+```json
+{
+  "name": "frame-master-plugin-my-plugin",
+  "version": "1.0.0",
+  "description": "Description of what your plugin does",
+  "main": "index.ts",
+  "type": "module",
+  "keywords": ["frame-master", "frame-master-plugin"],
+  "peerDependencies": {
+    "frame-master": "^2.0.0"
+  }
+}
+```
+
+### Publishing steps
+
+```bash
+# Update version
+npm version patch  # or minor, or major
+
+# Publish to npm
+npm publish
+
+# Tag release on GitHub
+
+```
+
+> Success checklist:
+>
+> - ✅ Clear README.md documentation
+> - ✅ TypeScript type definitions
+> - ✅ Example configuration
+> - ✅ Proper versioning (semver)
+
+## ✨ Best Practices
+
+- Provide sensible defaults for all options
+- Export TypeScript types for configuration
+- Handle errors gracefully; avoid crashing the server
+- Cache expensive operations
+- Document all configuration options
+- Use priority values appropriately (auth: 0-10, logging: 80-100)
+
+## 🎯 Next Steps
+
+- [Plugin Hooks Reference](/docs/plugins/hooks) — Complete reference for all available hooks
+- [Plugin Lifecycle](/docs/plugins/lifecycle) — Understand how plugins are executed
+- [Build System](/docs/core/build) — Customize the build process
+  Commander.js

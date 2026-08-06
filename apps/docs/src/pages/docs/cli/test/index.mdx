@@ -1,0 +1,75 @@
+<title>test Command - Testing Server with GUI | Frame-Master CLI</title>
+
+# test Command
+
+Start an interactive testing server with a web-based GUI for debugging requests.
+
+## 📖 Usage
+
+Start the test server with the web GUI.
+
+```bash
+frame-master test start
+```
+
+```text
+🧪 Frame-Master Test Server Started
+
+📊 GUI available at: http://localhost:3001
+
+Press Ctrl+C to stop
+```
+
+## ✨ Features
+
+The test server provides powerful debugging capabilities:
+
+- 🌐 Request Testing — Send custom HTTP requests with any method and headers
+- 📊 State Inspection — View request context and global values at each lifecycle stage
+- 📜 Console Capture — All console output is captured and displayed in the GUI
+- 📝 Request History — Track all requests with timing and response details
+
+## 🖥️ Web GUI
+
+The test GUI runs on port 3001 and provides an interactive interface.
+
+### Request Panel
+
+Send requests to your application and view the results:
+
+- Choose HTTP method (GET, POST, PUT, DELETE, etc.)
+- Enter the pathname to test
+- Add custom headers
+- View response status, headers, and body
+
+### State Snapshots
+
+Inspect the request state at each lifecycle stage:
+
+```text
+before_request: context, globalValues, responseSetted
+request:       context, globalValues, responseSetted
+after_request: context, globalValues, responseSetted
+```
+
+### Console Output
+
+All `console.log`, `console.error`, `console.warn`, and `console.info` calls are captured and displayed in real-time with timestamps.
+
+## 🎯 Use Cases
+
+- Debug plugin request/response behavior
+- Verify context values are set correctly
+- Test API routes without a frontend
+- Inspect response headers and status codes
+- Monitor console output during request processing
+
+## 🔌 Real-Time Updates
+
+> Info: The GUI connects to `ws://localhost:3001/ws` for real-time updates. Test results, console logs, and history are pushed automatically.
+
+## Next Steps
+
+- [dev Command](/docs/cli/dev) — Development server
+- [Plugin Hooks](/docs/plugins/hooks#router-hooks) — Request lifecycle
+- [plugin validate](/docs/cli/plugin#validate) — Validate configuration

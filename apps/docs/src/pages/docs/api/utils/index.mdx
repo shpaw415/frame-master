@@ -1,0 +1,165 @@
+<title>Runtime Utilities - Helper Functions API Reference | Frame-Master</title>
+
+# Runtime Utilities
+
+Utility functions and helpers provided by Frame-Master.
+
+## Import
+
+```ts
+import { onRoute, join, pluginRegex, directiveManager } from "frame-master";
+```
+
+## onRoute
+
+Route matching helper for request plugins.
+
+```ts
+function onRoute(
+  master: masterRequest,
+  routes: Record<
+    string,
+    RouteCallback | Partial<Record<MethodKeys, RouteCallback>>
+  >,
+): void | Promise<void>;
+
+type RouteCallback = (master: masterRequest) => void | Promise<void>;
+type MethodKeys =
+  | "POST"
+  | "GET"
+  | "DELETE"
+  | "PUT"
+  | "PATCH"
+  | "OPTIONS"
+  | "HEAD";
+```
+
+### Basic usage
+
+```ts
+import { onRoute } from "frame-master";
+import type { FrameMasterPlugin } from "frame-master";
+
+export default {
+  name: "my-api",
+  version: "1.0.0",
+  router: {
+    request: (master) =>
+      onRoute(master, {
+        "/api/health": (master) => {
+          master.setResponse(JSON.stringify({ status: "ok" }), {
+            headers: { "Content-Type": "application/json" },
+          });
+        },
+      }),
+  },
+} satisfies FrameMasterPlugin;
+```
+
+### Per-method handlers
+
+```ts
+onRoute(master, {
+  "/api/users": {
+    GET: async (master) => {
+      const users = await getUsers();
+      master.setResponse(JSON.stringify(users), {
+        headers: { "Content-Type": "application/json" },
+      });
+    },
+    POST: async (master) => {
+      const body = await master.request.json();
+      const user = await createUser(body);
+      master.setResponse(JSON.stringify(user), {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      });
+    },
+    DELETE: async (master) => {
+      // Delete logic
+    },
+  },
+});
+```
+
+## join
+
+Cross-platform path joining utility.
+
+```ts
+function join(...parts: string[]): string;
+```
+
+```ts
+import { join } from "frame-master";
+
+join("src", "pages", "index.tsx"); // "src/pages/index.tsx"
+join("/api", "/users"); // "/api/users"
+join("a/", "/b/", "/c"); // "a/b/c"
+```
+
+> Tip: Normalizes backslashes to forward slashes and handles leading/trailing slashes.
+
+## pluginRegex
+
+Create `RegExp` for Bun.build plugin file filters.
+
+```ts
+function pluginRegex(options: {
+  path: string[]; // Path segments to match
+  ext: string[]; // File extensions (without dots)
+}): RegExp;
+```
+
+### Usage
+
+```ts
+import { pluginRegex } from "frame-master";
+
+const filter = pluginRegex({
+  path: ["src", "components"],
+  ext: ["ts", "tsx"],
+});
+// Matches: src/components/Button.tsx
+// Not: src/pages/index.tsx
+
+const myPlugin: BunPlugin = {
+  name: "my-transform",
+  setup(build) {
+    build.onLoad({ filter }, async (args) => {
+      const text = await Bun.file(args.path).text();
+      return { contents: transformCode(text), loader: "tsx" };
+    });
+  },
+};
+```
+
+> Info: For files in the current directory, prefix path with `process.cwd()`.
+
+## directiveManager
+
+Manage file directives across plugins.
+
+```ts
+import { directiveManager } from "frame-master";
+import type { FrameMasterPlugin } from "frame-master";
+
+const hasUseClient = directiveManager.hasDirective(fileContent, "use-client");
+
+const myPlugin: FrameMasterPlugin = {
+  name: "my-plugin",
+  version: "1.0.0",
+  directives: [
+    {
+      name: "use-client",
+      regex: /^(?:\s*(?:\/\/.*?\n|\s)*)?['"]use[-\s]client['"];?/m,
+    },
+  ],
+};
+```
+
+## Next Steps
+
+- [Request Manager](/docs/api/request-manager) — Request handling API
+- [Plugin Types](/docs/api/plugin-types) — Plugin type definitions
+- [Creating Plugins](/docs/plugins/creating) — Plugin development

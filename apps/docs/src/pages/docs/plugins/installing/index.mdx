@@ -1,0 +1,253 @@
+<title>Installing Plugins - Add Features to Frame-Master Projects</title>
+
+# Installing Plugins
+
+Learn how to install, configure, and manage plugins in your Frame-Master project.
+
+## ⚡ Quick Install
+
+### Step 1: Install the package
+
+```bash
+# Using bun (recommended)
+bun add frame-master-plugin-react-ssr
+
+# Using npm
+npm install frame-master-plugin-react-ssr
+
+# Using yarn
+yarn add frame-master-plugin-react-ssr
+```
+
+### Step 2: Add to configuration
+
+```ts
+import { defineConfig } from "frame-master";
+import reactSSR from "frame-master-plugin-react-ssr";
+
+export default defineConfig({
+  plugins: [
+    reactSSR({
+      // Plugin options
+    }),
+  ],
+});
+```
+
+> Success: The plugin is now active. Restart your dev server to apply changes.
+
+## 🔍 Finding Plugins
+
+- 📦 NPM Registry — search for `frame-master-plugin` (`npm search frame-master-plugin`)
+- 🌐 Official Website — browse curated plugins on [frame-master.dev](/plugins)
+- 🔎 CLI Search (future) — `frame-master search [query]`
+- 📂 GitHub — community plugins: https://github.com/topics/frame-master-plugin
+
+## ⚙️ Configuring Plugins
+
+### Basic configuration
+
+```ts
+import { defineConfig } from "frame-master";
+import reactSSR from "frame-master-plugin-react-ssr";
+import session from "frame-master-plugin-session";
+import database from "frame-master-plugin-database";
+
+export default defineConfig({
+  plugins: [
+    // Plugin with default options
+    reactSSR(),
+
+    // Plugin with custom options
+    session({
+      secret: process.env.SESSION_SECRET,
+      maxAge: 86400, // 1 day
+      secure: process.env.NODE_ENV === "production",
+    }),
+
+    // Plugin with environment-specific config
+    database({
+      url: process.env.DATABASE_URL,
+      pool: {
+        min: 2,
+        max: 10,
+      },
+    }),
+  ],
+});
+```
+
+### Environment-based configuration
+
+```ts
+import { defineConfig } from "frame-master";
+import analytics from "frame-master-plugin-analytics";
+
+const isDev = process.env.NODE_ENV !== "production";
+
+export default defineConfig({
+  plugins: [
+    analytics({
+      // Disable in development
+      enabled: !isDev,
+      trackingId: process.env.ANALYTICS_ID,
+
+      // Different settings per environment
+      debug: isDev,
+      anonymizeIp: !isDev,
+    }),
+  ],
+});
+```
+
+### Conditional plugins
+
+```ts
+import { defineConfig } from "frame-master";
+import devTools from "frame-master-plugin-devtools";
+import sentry from "frame-master-plugin-sentry";
+
+const isDev = process.env.NODE_ENV !== "production";
+
+export default defineConfig({
+  plugins: [
+    // Only load in development
+    ...(isDev ? [devTools()] : []),
+
+    // Only load in production
+    ...(isDev
+      ? []
+      : [
+          sentry({
+            dsn: process.env.SENTRY_DSN,
+          }),
+        ]),
+  ],
+});
+```
+
+## 📋 Plugin Order & Priority
+
+> Info: Plugins are sorted by `priority` (lower runs first). Array order only breaks ties. Default priority is `undefined`, which runs after numbered priorities.
+
+```ts
+import { defineConfig } from "frame-master";
+import auth from "frame-master-plugin-auth"; // priority: 0
+import session from "frame-master-plugin-session"; // priority: 10
+import logging from "frame-master-plugin-logging"; // priority: undefined (run last)
+
+export default defineConfig({
+  plugins: [logging(), session(), auth()],
+  // Execution order: auth → session → logging
+});
+```
+
+See the [Plugin Lifecycle](/docs/plugins/hooks#lifecycle) for detailed execution flow.
+
+## 🔗 Plugin Dependencies
+
+> Warning: Frame-Master validates plugin dependencies at startup. Missing or incompatible dependencies stop the server.
+
+```ts
+import { defineConfig } from "frame-master";
+import session from "frame-master-plugin-session";
+import auth from "frame-master-plugin-auth"; // Requires session plugin
+
+export default defineConfig({
+  plugins: [
+    session({
+      secret: process.env.SESSION_SECRET,
+    }),
+    auth({
+      providers: ["github", "google"],
+    }),
+  ],
+});
+```
+
+Checking requirements: view docs or run `frame-master plugin info <plugin-name>`.
+
+## 📦 Managing Plugin Versions
+
+### Check for updates
+
+```bash
+# Check outdated packages
+bun outdated
+
+# Update a specific plugin
+bun update frame-master-plugin-react-ssr
+
+# Update all plugins
+bun update
+```
+
+### Version pinning
+
+```json
+{
+  "dependencies": {
+    // Exact version (most stable)
+    "frame-master-plugin-auth": "1.2.3",
+
+    // Patch updates only (recommended)
+    "frame-master-plugin-session": "~1.2.0",
+
+    // Minor updates (default with ^)
+    "frame-master-plugin-database": "^1.2.0"
+  }
+}
+```
+
+> Tip: Version strategy
+>
+> - Use exact versions for critical plugins (auth, database)
+> - Use ~ (patch) for stable plugins you trust
+> - Use ^ (minor) for actively developed plugins
+> - Always test after updating plugins
+
+## 🔧 Troubleshooting
+
+### Plugin not loading
+
+```bash
+# Verify installation
+bun pm ls | grep frame-master-plugin
+
+# Reinstall if needed
+bun remove frame-master-plugin-xyz && bun add frame-master-plugin-xyz
+```
+
+### Version conflicts
+
+```bash
+# Check peer dependencies
+bun pm ls --all
+
+# Force resolution (use with caution)
+bun install --force
+```
+
+### Debug mode
+
+```bash
+# Run with verbose output
+frame-master start --verbose
+```
+
+## 🗑️ Uninstalling Plugins
+
+```bash
+# 1. Remove from frame-master.config.ts first
+# 2. Uninstall the package
+bun remove frame-master-plugin-name
+```
+
+> Warning: Before removing a plugin, ensure no other plugins depend on it.
+
+## 🎯 Next Steps
+
+- [Creating Plugins](/docs/plugins/creating) — Build your own custom plugins
+- [Plugin Hooks](/docs/plugins/hooks) — Complete hook reference
+- [Browse Plugins](/plugins) — Discover community plugins
+  }

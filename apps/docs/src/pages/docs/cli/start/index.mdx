@@ -1,0 +1,109 @@
+<title>start Command - Production Server Deployment | Frame-Master CLI</title>
+
+# start Command
+
+Start the server. Alias for `dev`—behavior is determined by `NODE_ENV`.
+
+## 📖 Usage
+
+Basic command syntax.
+
+```bash
+frame-master start [options]
+
+# Or with bunx
+bunx frame-master start
+```
+
+## ⚙️ Options
+
+- `-v, --verbose` — Enable detailed logging
+- `-h, --help` — Show help
+
+## 📋 Prerequisites
+
+> Warning: Run `frame-master build` before starting the production server to compile optimized bundles.
+
+```bash
+# Build first
+frame-master build
+
+# Then start
+frame-master start
+```
+
+## 🌍 Environment
+
+Environment configuration for production.
+
+- `NODE_ENV` — Should be `"production"`
+
+```bash
+# Set environment variables
+export NODE_ENV=production
+export PORT=8080
+
+frame-master start
+```
+
+## 📌 Command Alias
+
+`dev` and `start` are aliases—they run the same server. The behavior (development vs production) is determined entirely by the `NODE_ENV` environment variable.
+
+| NODE_ENV (default development) | Behavior                                  |
+| ------------------------------ | ----------------------------------------- |
+| development                    | Hot reload, file watching, verbose errors |
+| production                     | Optimized, minified, no file watching     |
+
+## 🚀 Deployment
+
+Common deployment patterns.
+
+### Docker
+
+```text Dockerfile
+FROM oven/bun:latest
+
+WORKDIR /app
+COPY package.json bun.lockb ./
+ENV NODE_ENV=production
+RUN bun install --production
+
+COPY . .
+RUN bun run frame-master build
+
+EXPOSE 3000
+
+CMD ["bun", "run", "frame-master", "start"]
+```
+
+### Process Manager (PM2)
+
+```bash
+pm2 start "bunx frame-master start" --name my-app
+```
+
+### Systemd Service
+
+```toml /etc/systemd/system/myapp.service
+[Unit]
+Description=Frame-Master App
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/var/www/myapp
+Environment=NODE_ENV=production
+ExecStart=/home/<username>/.bun/bin/bun run frame-master start
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+## Next Steps
+
+- [build](/docs/cli/build) — Build for production
+- [dev](/docs/cli/dev) — Development server
+- [CLI Overview](/docs/cli) — All commands

@@ -1,0 +1,95 @@
+<title>CLI Commands Overview - Frame-Master Command Line Tools</title>
+
+# CLI Commands
+
+Complete reference for Frame-Master command-line interface tools.
+
+## 📦 Installation
+
+The CLI ships with Frame-Master.
+
+```bash
+# Install Frame-Master (includes CLI)
+
+
+# Verify installation
+bunx frame-master --version
+```
+
+## 📋 Commands Overview
+
+All available CLI commands at a glance.
+
+- `frame-master dev` — Start development server with hot reload
+- `frame-master start` — Start production server
+- `frame-master build` — Build project for production
+- `frame-master debug <cmd>` — Build tracing UI and trace viewer
+- `frame-master init` — Initialize in existing project
+- `frame-master create [name]` — Create new project
+- `frame-master plugin <cmd>` — Manage plugins
+- `frame-master test start` — Testing server with GUI
+- `frame-master extended-cli <cmd>` — Plugin custom commands
+
+## ⚙️ Global Options
+
+Options available for all commands.
+
+- `-v, --verbose` — Enable detailed logging
+- `-V, --version` — Show version number
+- `-h, --help` — Show help for command
+
+```bash
+# Enable verbose mode
+frame-master --verbose dev
+
+# Show help
+frame-master --help
+frame-master dev --help
+```
+
+## 🚀 Common Workflows
+
+Typical command sequences for different tasks.
+
+### New Project
+
+```bash
+frame-master create my-app
+cd my-app
+frame-master dev
+```
+
+### Existing Project
+
+```bash
+cd existing-project
+bun add frame-master
+frame-master init
+frame-master dev
+```
+
+### Production Deployment
+
+```bash
+frame-master build
+NODE_ENV=production frame-master start
+```
+
+### Create Plugin
+
+```bash
+frame-master plugin create my-plugin
+cd my-plugin
+# Edit index.ts...
+```
+
+## Next Steps (Command Reference)
+
+- [dev](/docs/cli/dev) — Development server
+- [start](/docs/cli/start) — Production server
+- [build](/docs/cli/build) — Build for production
+- [debug](/docs/cli/debug) — Build tracing and saved trace viewer
+- [create](/docs/cli/create) — Create new project
+- [init](/docs/cli/init) — Initialize project
+- [plugin](/docs/cli/plugin) — Plugin management
+  title="create"

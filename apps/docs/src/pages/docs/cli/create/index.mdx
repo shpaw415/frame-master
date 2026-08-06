@@ -1,0 +1,60 @@
+<title>create Command - Create New Frame-Master Projects | CLI</title>
+
+# create Command
+
+Create a new Frame-Master project with all necessary files and configuration.
+
+## 📖 Usage
+
+Basic command syntax.
+
+```bash
+frame-master create [name] [options]
+
+# Or with bunx
+bunx frame-master create my-app
+```
+
+## 📝 Arguments
+
+- `[name]` — Project name (optional, will prompt if not provided)
+
+## ⚙️ Options
+
+- `-t, --template` — Create from template (interactive selection)
+- `-v, --verbose` — Enable detailed logging
+- `-h, --help` — Show help
+
+## 🎯 Creation Modes
+
+If a project already exists in the directory, see the [init command](/docs/cli/init).
+
+### From Template
+
+Start with a pre-configured template.
+
+```bash
+frame-master create my-app --template <template-name>
+```
+
+> Info: Templates are pulled from npm or GitHub repositories configured in the template registry.
+>
+> Tip: Use interactive mode (no arguments) to select template and name or minimal project.
+
+## 🚀 After Creation
+
+Next steps after creating a project.
+
+```bash
+# Navigate to project
+cd my-app
+
+# Start development server
+bun dev
+```
+
+## Next Steps
+
+- [init](/docs/cli/init) — Init existing project
+- [dev](/docs/cli/dev) — Development server
+- Quick Start — Getting started guide
