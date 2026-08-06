@@ -1,0 +1,985 @@
+<title>Request Handling - masterRequest Class & Lifecycle | Frame-Master</title>
+
+# Request Handling
+
+Deep dive into Frame-Master's `masterRequest` class, lifecycle phases, and the chainable APIs for responses, context, cookies, globals, and HTML rewriting.
+
+## Overview
+
+`masterRequest` wraps every incoming HTTP request and moves through three phases: `before_request`, `request`, and `after_request`. Plugins get full control over request/response processing, context, cookies, headers, and HTML transforms.
+
+**Key capabilities**
+
+- Typed context sharing via generics
+- Encrypted or plain JSON cookies with automatic serialization
+- Global value injection for client-side access
+- Chainable response building + header helpers
+- HTML rewriting with Bun's `HTMLRewriter`
+- Request state tracking across all phases
+- Header manipulation in any phase
+
+## Response Building
+
+### Setting responses (request phase only)
+
+```ts
+import type { FrameMasterPlugin } from "frame-master/plugin/types";
+
+// For GlobalValues injection
+declare global {
+  var __API_STATUS__: "ready" | undefined;
+}
+
+export function apiPlugin(): FrameMasterPlugin {
+  return {
+    name: "api-plugin",
+    router: {
+      request: async (master) => {
+        // Skip if not API or already handled
+        if (
+          !master.URL.pathname.startsWith("/api") ||
+          master.isResponseSetted()
+        )
+          return;
+
+        if (master.URL.pathname === "/api/users") {
+          const users = [
+            { id: 1, name: "Alice" },
+            { id: 2, name: "Bob" },
+          ];
+
+          master
+            .setResponse(JSON.stringify(users), {
+              headers: { "Content-Type": "application/json" },
+            })
+            .preventGlobalValuesInjection() // No globals for API
+            .sendNow(); // Skip remaining request plugins
+        }
+
+        if (master.URL.pathname === "/api/status") {
+          master
+            .setGlobalValues({ __API_STATUS__: "ready" })
+            .setResponse("<h1>Ready</h1>", {
+              status: 200,
+              headers: { "Content-Type": "text/html" },
+            })
+            .sendNow();
+        }
+      },
+    },
+  };
+}
+```
+
+> Response rules: set responses only in `request`; once set, change only after `unsetResponse()`; `sendNow()` skips remaining request hooks but `after_request` still runs; headers can be added in any phase via `setHeader()`.
+
+### Header management
+
+```ts
+router: {
+  request: async (master) => {
+    master.setResponse("Hello World", {
+      headers: {
+        "X-Custom-Header": "value",
+        "Content-Type": "text/plain",
+      },
+    });
+
+    // Add headers separately (any phase)
+    master.setHeader("X-Request-ID", crypto.randomUUID());
+  },
+
+  after_request: async (master) => {
+    master
+      .setHeader("X-Frame-Options", "DENY")
+      .setHeader("X-Content-Type-Options", "nosniff")
+      .setHeader("X-XSS-Protection", "1; mode=block");
+  },
+}
+```
+
+### Response utilities
+
+```ts
+router: {
+  request: async (master) => {
+    if (master.isResponseSetted()) {
+      console.log("Response already handled by previous plugin");
+      return;
+    }
+
+    master.setResponse("Initial response");
+    master.unsetResponse();
+    master.setResponse("New response");
+  },
+}
+```
+
+## Context Management
+
+Context is a typed shared store for the whole request lifecycle.
+
+### Typed context
+
+```ts
+// Define your context type
+type MyAppContext = {
+  user?: { id: string; email: string; roles: string[] };
+  requestId: string;
+  startTime: number;
+  metadata: Record<string, unknown>;
+};
+
+export function authPlugin(): FrameMasterPlugin {
+  return {
+    name: "auth-plugin",
+    router: {
+      before_request: async (master) => {
+        const token = master.request.headers.get("Authorization");
+        if (token) {
+          const user = await validateToken(token);
+          master.setContext<MyAppContext>({
+            user,
+            requestId: crypto.randomUUID(),
+            startTime: Date.now(),
+            metadata: {},
+          });
+        }
+      },
+    },
+  };
+}
+
+export function loggingPlugin(): FrameMasterPlugin {
+  return {
+    name: "logging-plugin",
+    router: {
+      request: async (master) => {
+        const context = master.getContext<MyAppContext>();
+        if (context.user) {
+          console.log(`Request by user: ${context.user.email}`);
+          console.log(`Request ID: ${context.requestId}`);
+        }
+      },
+      after_request: async (master) => {
+        const context = master.getContext<MyAppContext>();
+        const duration = Date.now() - context.startTime;
+        console.log(`Request completed in ${duration}ms`);
+      },
+    },
+  };
+}
+
+async function validateToken(token: string) {
+  return {
+    id: "user-123",
+    email: "user@example.com",
+    roles: ["user", "admin"],
+  };
+}
+```
+
+### Context merging
+
+```ts
+router: {
+  before_request: async (master) => {
+    master.setContext({ requestId: "123" });
+    master.setContext({ userId: "user-456" });
+
+    const ctx = master.getContext();
+    console.log(ctx); // { requestId: "123", userId: "user-456" }
+
+    master.setContext({ requestId: "789" });
+    // Now: { requestId: "789", userId: "user-456" }
+  },
+}
+```
+
+## Cookie Management
+
+Built on the `@shpaw415/webtoken` library for encrypted JSON cookies.
+
+### Setting cookies
+
+```ts
+router: {
+  request: async (master) => {
+    master.setCookie(
+      "preferences",
+      { theme: "dark", language: "en", notifications: true },
+      {
+        maxAge: 60 * 60 * 24 * 30,
+        path: "/",
+        sameSite: "Lax",
+        httpOnly: true,
+      }
+    );
+
+    master.setCookie(
+      "session",
+      { userId: "user-123", email: "user@example.com", roles: ["admin", "user"] },
+      {
+        encrypted: true,
+        maxAge: 60 * 60 * 24 * 7,
+        secure: true,
+        httpOnly: true,
+        sameSite: "Strict",
+      },
+      { ttl: 60 * 60 * 24 * 7 }
+    );
+
+    master.setResponse("Cookie set successfully");
+  },
+}
+```
+
+> Cookies apply after `after_request` completes. Set them in any phase; they queue until final response.
+
+### Reading cookies
+
+```ts
+router: {
+  request: async (master) => {
+    const preferences = master.getCookie<{
+      theme: string;
+      language: string;
+      notifications: boolean;
+    }>("preferences", false);
+
+    if (preferences) {
+      console.log(`User theme: ${preferences.theme}`);
+    }
+
+    const session = master.getCookie<{
+      userId: string;
+      email: string;
+      roles: string[];
+    }>("session", true);
+
+    if (session) {
+      master.setContext({ user: session });
+    } else {
+      master.setResponse("Unauthorized", { status: 401 });
+    }
+  },
+}
+```
+
+### Deleting cookies
+
+```ts
+router: {
+  request: async (master) => {
+    master.deleteCookie("session", {
+      path: "/",
+      secure: true,
+      httpOnly: true,
+      sameSite: "Strict",
+    });
+
+    master.deleteCookie("preferences");
+
+    if (master.URL.pathname === "/logout") {
+      master
+        .deleteCookie("session", { path: "/", secure: true, httpOnly: true })
+        .setResponse("Logged out successfully", {
+          status: 302,
+          headers: { Location: "/login" },
+        });
+    }
+  },
+}
+```
+
+> Cookie caching: `getCookie()` parses once per request and caches the value for subsequent calls.
+
+## Global Values Injection
+
+Inject server-side values into `globalThis` for client access.
+
+```ts
+// 1. Declare global types
+declare global {
+  var __APP_CONFIG__: { apiUrl: string; features: string[] } | undefined;
+  var __USER_DATA__: { id: string; name: string } | undefined;
+  var __BUILD_INFO__: { version: string; buildTime: string } | undefined;
+}
+
+// 2. Inject values in plugin
+export function configPlugin(): FrameMasterPlugin {
+  return {
+    name: "config-plugin",
+    router: {
+      before_request: async (master) => {
+        master.setGlobalValues({
+          __APP_CONFIG__: {
+            apiUrl: process.env.API_URL || "http://localhost:3000",
+            features: ["auth", "payments", "notifications"],
+          },
+          __BUILD_INFO__: {
+            version: "1.0.0",
+            buildTime: new Date().toISOString(),
+          },
+        });
+
+        const session = master.getCookie("session", true);
+        if (session) {
+          master.setGlobalValues({
+            __USER_DATA__: { id: session.userId, name: session.name },
+          });
+        }
+      },
+    },
+  };
+}
+```
+
+> Serialization requirements: global values must be JSON-serializable; no functions, symbols, or circular references. Use typed declarations for TS safety.
+
+### Preventing global injection
+
+```ts
+router: {
+  request: async (master) => {
+    if (master.URL.pathname.startsWith("/api")) {
+      master.preventGlobalValuesInjection();
+      master.setResponse(JSON.stringify({ data: "response" }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    if (master.isGlobalValuesInjectionPrevented()) {
+      console.log("Global values will not be injected");
+    }
+  },
+}
+```
+
+> Performance tip: call `preventGlobalValuesInjection()` for non-HTML responses to avoid extra work.
+
+## HTML Rewriting Control
+
+Frame-Master uses Bun's `HTMLRewriter` to transform HTML responses.
+
+### HTML rewrite phase
+
+1. Inject global values as `<script>` tags
+2. Run plugin `html_rewrite` hooks
+3. Apply `HTMLRewriter` transforms
+
+```ts
+export function htmlTransformPlugin(): FrameMasterPlugin {
+  return {
+    name: "html-transform",
+    router: {
+      html_rewrite: {
+        initContext: (master) => ({
+          userId: master.getContext().userId,
+          timestamp: Date.now(),
+        }),
+
+        rewrite: async (rewriter, master, context) => {
+          rewriter.on("body", {
+            element(el) {
+              el.setAttribute("data-user", context.userId);
+              el.setAttribute("data-timestamp", context.timestamp.toString());
+            },
+          });
+
+          rewriter.on("head", {
+            element(el) {
+              el.append(
+                `
+                <script>
+                  console.log('User:', '${context.userId}');
+                  console.log('Page loaded at:', ${context.timestamp});
+                </script>
+              `,
+                { html: true },
+              );
+            },
+          });
+
+          rewriter.on("div.protected", {
+            element(el) {
+              if (!context.userId) {
+                el.setInnerContent("Please log in to view this content");
+              }
+            },
+          });
+        },
+      },
+    },
+  };
+}
+```
+
+### Preventing HTML rewrite
+
+```ts
+router: {
+  request: async (master) => {
+    if (master.URL.searchParams.get("raw") === "true") {
+      master.preventRewrite();
+    }
+
+    if (master.URL.pathname.startsWith("/docs/api")) {
+      master.preventGlobalValuesInjection().preventRewrite();
+    }
+
+    if (master.isRewritePrevented()) {
+      console.log("HTML rewriting is disabled for this request");
+    }
+  },
+}
+```
+
+> When to prevent rewriting: raw HTML that must stay untouched, email templates/static HTML, performance-critical responses without caching, third-party HTML.
+
+## Request State Management
+
+Every request flows through three states.
+
+### Request states
+
+```ts
+// State 1: before_request
+before_request: async (master) => {
+  console.log("State:", master.currentState); // "before_request"
+  master.setContext({ requestId: crypto.randomUUID() });
+  master.setGlobalValues({ __REQUEST_ID__: "123" });
+  // master.setResponse(...) // ❌ not allowed here
+};
+
+// State 2: request
+request: async (master) => {
+  console.log("State:", master.currentState); // "request"
+  master.setResponse("Hello World");
+  master.sendNow();
+};
+
+// State 3: after_request
+after_request: async (master) => {
+  console.log("State:", master.currentState); // "after_request"
+  master.setHeader("X-Response-Time", Date.now().toString());
+  const response = master.response;
+  console.log("Status:", response?.status);
+  // master.setResponse(...) // ❌ not allowed
+};
+```
+
+### State transition flow
+
+```ts
+export function stateAwarePlugin(): FrameMasterPlugin {
+  return {
+    name: "state-aware",
+    router: {
+      before_request: async (master) => {
+        console.log("🔵 Phase 1: Preparing request");
+        master.setContext({ phase: "before_request" });
+      },
+
+      request: async (master) => {
+        console.log("🟢 Phase 2: Handling request");
+        const ctx = master.getContext();
+        console.log("Previous phase:", ctx.phase);
+
+        if (!master.isResponseSetted()) {
+          master.setResponse("Response from plugin");
+        }
+      },
+
+      after_request: async (master) => {
+        console.log("🟡 Phase 3: Finalizing request");
+        const response = master.response;
+        console.log("Final status:", response?.status);
+        master.setHeader("X-Plugin", "state-aware");
+      },
+    },
+  };
+}
+```
+
+## Practical Examples
+
+### Authentication middleware
+
+```ts
+type AuthContext = {
+  user?: { id: string; email: string; roles: string[] };
+  isAuthenticated: boolean;
+};
+
+export function authMiddleware(): FrameMasterPlugin {
+  return {
+    name: "auth-middleware",
+    router: {
+      before_request: async (master) => {
+        const session = master.getCookie<{
+          userId: string;
+          email: string;
+          roles: string[];
+          expiresAt: number;
+        }>("session", true);
+
+        if (session && session.expiresAt > Date.now()) {
+          master.setContext<AuthContext>({
+            user: {
+              id: session.userId,
+              email: session.email,
+              roles: session.roles,
+            },
+            isAuthenticated: true,
+          });
+
+          master.setGlobalValues({
+            __USER__: {
+              id: session.userId,
+              email: session.email,
+            },
+          });
+        } else {
+          master.setContext<AuthContext>({ isAuthenticated: false });
+        }
+      },
+
+      request: async (master) => {
+        const ctx = master.getContext<AuthContext>();
+        const pathname = master.URL.pathname;
+
+        const protectedRoutes = ["/dashboard", "/profile", "/settings"];
+        const isProtected = protectedRoutes.some((route) =>
+          pathname.startsWith(route),
+        );
+
+        if (isProtected && !ctx.isAuthenticated) {
+          master
+            .setResponse("Redirecting to login...", {
+              status: 302,
+              headers: {
+                Location: `/login?redirect=${encodeURIComponent(pathname)}`,
+              },
+            })
+            .sendNow();
+          return;
+        }
+
+        if (pathname.startsWith("/admin")) {
+          if (!ctx.user?.roles.includes("admin")) {
+            master.setResponse("Forbidden", { status: 403 }).sendNow();
+          }
+        }
+      },
+    },
+  };
+}
+```
+
+### API route handler
+
+```ts
+export function apiRouterPlugin(): FrameMasterPlugin {
+  return {
+    name: "api-router",
+    router: {
+      request: async (master) => {
+        const { pathname } = master.URL;
+        if (!pathname.startsWith("/api")) return;
+
+        let body: any;
+        if (["POST", "PUT", "PATCH"].includes(master.request.method)) {
+          try {
+            body = await master.request.json();
+          } catch (e) {
+            master
+              .setResponse(JSON.stringify({ error: "Invalid JSON" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+              })
+              .sendNow();
+            return;
+          }
+        }
+
+        switch (true) {
+          case pathname === "/api/users" && master.request.method === "GET": {
+            const users = await getUsers();
+            master
+              .setResponse(JSON.stringify({ data: users }), {
+                headers: { "Content-Type": "application/json" },
+              })
+              .sendNow();
+            break;
+          }
+
+          case pathname === "/api/users" && master.request.method === "POST": {
+            const newUser = await createUser(body);
+            master
+              .setResponse(JSON.stringify({ data: newUser }), {
+                status: 201,
+                headers: { "Content-Type": "application/json" },
+              })
+              .sendNow();
+            break;
+          }
+
+          case pathname.match(/^\/api\/users\/([^/]+)$/)?.length! > 0 &&
+            master.request.method === "GET": {
+            const userId = pathname.split("/").pop();
+            const user = await getUser(userId!);
+
+            if (!user) {
+              master
+                .setResponse(JSON.stringify({ error: "User not found" }), {
+                  status: 404,
+                  headers: { "Content-Type": "application/json" },
+                })
+                .sendNow();
+            } else {
+              master
+                .setResponse(JSON.stringify({ data: user }), {
+                  headers: { "Content-Type": "application/json" },
+                })
+                .sendNow();
+            }
+            break;
+          }
+
+          default: {
+            master
+              .setResponse(JSON.stringify({ error: "Route not found" }), {
+                status: 404,
+                headers: { "Content-Type": "application/json" },
+              })
+              .sendNow();
+          }
+        }
+
+        master.preventGlobalValuesInjection().preventRewrite();
+      },
+    },
+  };
+}
+
+async function getUsers() {
+  return [
+    { id: "1", name: "Alice" },
+    { id: "2", name: "Bob" },
+  ];
+}
+
+async function createUser(data: any) {
+  return { id: crypto.randomUUID(), ...data };
+}
+
+async function getUser(id: string) {
+  const users = await getUsers();
+  return users.find((u) => u.id === id);
+}
+```
+
+### Request logging
+
+```ts
+type LogContext = {
+  requestId: string;
+  startTime: number;
+  userAgent: string;
+  ip: string;
+};
+
+export function loggingPlugin(): FrameMasterPlugin {
+  return {
+    name: "request-logger",
+    router: {
+      before_request: async (master) => {
+        const requestId = crypto.randomUUID();
+        const startTime = Date.now();
+
+        master.setContext<LogContext>({
+          requestId,
+          startTime,
+          userAgent: master.request.headers.get("User-Agent") || "unknown",
+          ip:
+            master.serverInstance.requestIP(master.request)?.address ||
+            "unknown",
+        });
+
+        console.log(
+          `[${requestId}] ${master.request.method} ${master.URL.pathname}`,
+        );
+      },
+
+      after_request: async (master) => {
+        const ctx = master.getContext<LogContext>();
+        const duration = Date.now() - ctx.startTime;
+        const status = master.response?.status || 0;
+
+        console.log(`[${ctx.requestId}] ${status} - ${duration}ms`);
+        master.setHeader("X-Request-ID", ctx.requestId);
+
+        if (status >= 400) {
+          console.error(`[${ctx.requestId}] Error Response:`, {
+            method: master.request.method,
+            path: master.URL.pathname,
+            status,
+            duration: `${duration}ms`,
+            userAgent: ctx.userAgent,
+            ip: ctx.ip,
+          });
+        }
+
+        if (duration > 1000) {
+          console.warn(`[${ctx.requestId}] Slow request: ${duration}ms`);
+        }
+      },
+    },
+  };
+}
+```
+
+## Best Practices
+
+### Plugin ordering
+
+```ts
+const config: FrameMasterConfig = {
+  plugins: [
+    loggingPlugin(), // 1. Track requests
+    authPlugin(), // 2. Authenticate
+    rateLimitPlugin(), // 3. Rate limit
+    corsPlugin(), // 4. CORS
+    apiRouter(), // 5. API routes
+    pageRouter(), // 6. Page routes
+  ],
+};
+
+// Flow:
+// before_request: logging → auth → rateLimit → cors → api → page
+// request: logging → auth → rateLimit → cors → api → page (stops at first sendNow())
+// after_request: logging → auth → rateLimit → cors → api → page
+```
+
+### Error handling
+
+```ts
+export function safePlugin(): FrameMasterPlugin {
+  return {
+    name: "safe-plugin",
+    router: {
+      request: async (master) => {
+        try {
+          const data = await fetchExternalAPI();
+          master.setResponse(JSON.stringify(data));
+        } catch (error) {
+          console.error("External API error:", error);
+          master.setResponse(
+            JSON.stringify({
+              error: "Service temporarily unavailable",
+              requestId: master.getContext().requestId,
+            }),
+            {
+              status: 503,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
+      },
+    },
+  };
+}
+
+async function fetchExternalAPI() {
+  throw new Error("API down");
+}
+```
+
+### Performance tips
+
+- Call `preventGlobalValuesInjection()` for non-HTML responses
+- Call `preventRewrite()` when HTML rewriting is unnecessary
+- `getCookie()` caches values per request
+- Use `sendNow()` to skip unnecessary plugins
+- Keep context minimal; store only what is needed
+- Avoid heavy work in `before_request`; defer to `request`
+
+### Type safety
+
+```ts
+// Context types
+type AppContext = {
+  requestId: string;
+  user?: User;
+  session?: SessionData;
+};
+
+// Cookie types
+type SessionCookie = { userId: string; expiresAt: number; roles: string[] };
+type PreferencesCookie = { theme: "light" | "dark"; language: string };
+
+export function typedPlugin(): FrameMasterPlugin {
+  return {
+    name: "typed-plugin",
+    router: {
+      before_request: async (master) => {
+        master.setContext<AppContext>({ requestId: crypto.randomUUID() });
+      },
+
+      request: async (master) => {
+        const session = master.getCookie<SessionCookie>("session", true);
+        const prefs = master.getCookie<PreferencesCookie>("prefs");
+        const ctx = master.getContext<AppContext>();
+
+        if (session && session.expiresAt > Date.now()) {
+          ctx.session = session;
+        }
+      },
+    },
+  };
+}
+```
+
+## Advanced Topics
+
+### Conditional HTML rewriting
+
+```ts
+export function conditionalRewritePlugin(): FrameMasterPlugin {
+  return {
+    name: "conditional-rewrite",
+    router: {
+      request: async (master) => {
+        const skipRewrite =
+          master.URL.searchParams.get("raw") === "true" ||
+          master.request.headers.get("X-Skip-Transform") === "true" ||
+          master.URL.pathname.includes("/embed");
+
+        if (skipRewrite) {
+          master.preventRewrite();
+        }
+      },
+
+      html_rewrite: {
+        rewrite: async (rewriter, master, context) => {
+          const ctx = master.getContext<{ user?: any }>();
+
+          if (ctx.user?.roles.includes("admin")) {
+            rewriter.on("body", {
+              element(el) {
+                el.prepend('<div class="admin-toolbar">Admin Mode</div>', {
+                  html: true,
+                });
+              },
+            });
+          }
+
+          const features = master.getCookie("features");
+          if (features?.betaUI) {
+            rewriter.on('link[href="/styles.css"]', {
+              element(el) {
+                el.setAttribute("href", "/styles-beta.css");
+              },
+            });
+          }
+        },
+      },
+    },
+  };
+}
+```
+
+### Multi-plugin coordination
+
+```ts
+export function dataProviderPlugin(): FrameMasterPlugin {
+  return {
+    name: "data-provider",
+    router: {
+      before_request: async (master) => {
+        const config = await loadConfig();
+        master.setContext({ sharedConfig: config });
+      },
+    },
+  };
+}
+
+export function dataConsumerPlugin(): FrameMasterPlugin {
+  return {
+    name: "data-consumer",
+    router: {
+      request: async (master) => {
+        const ctx = master.getContext<{ sharedConfig?: any }>();
+        if (ctx.sharedConfig) {
+          console.log("Using config:", ctx.sharedConfig);
+        }
+      },
+    },
+  };
+}
+
+export function fallbackPlugin(): FrameMasterPlugin {
+  return {
+    name: "fallback",
+    router: {
+      request: async (master) => {
+        if (!master.isResponseSetted()) {
+          master.setResponse("Default fallback response");
+        }
+      },
+    },
+  };
+}
+
+async function loadConfig() {
+  return { apiUrl: "https://api.example.com" };
+}
+```
+
+### Streaming responses
+
+```ts
+export function streamingPlugin(): FrameMasterPlugin {
+  return {
+    name: "streaming",
+    router: {
+      request: async (master) => {
+        if (master.URL.pathname === "/stream") {
+          const stream = new ReadableStream({
+            async start(controller) {
+              for (let i = 0; i < 10; i++) {
+                await new Promise((resolve) => setTimeout(resolve, 100));
+                controller.enqueue(new TextEncoder().encode(`Chunk ${i}\n`));
+              }
+              controller.close();
+            },
+          });
+
+          master
+            .setResponse(stream, {
+              headers: {
+                "Content-Type": "text/plain",
+                "Transfer-Encoding": "chunked",
+              },
+            })
+            .sendNow();
+        }
+      },
+    },
+  };
+}
+```
+
+## Troubleshooting
+
+- **ResponseAlreadySetError** — Response already set. Check `isResponseSetted()` or call `unsetResponse()` first.
+- **Cannot set response in [phase]** — `setResponse()` was called outside `request`. Move response logic into the `request` hook.
+- **Cookies not persisting** — Cookie options differ between set/read. Ensure matching `path`/`domain`/flags.
+- **Global values not appearing** — Values not serializable or `preventGlobalValuesInjection()` was used. Also ensure the response is HTML.
+
+## Next Steps
+
+- [Plugin Development](/docs/plugins) — Create custom plugins
+- [Configuration](/docs/configuration) — Explore config options
+- [HTTP Server](/docs/http-server) — Understand the server pipeline

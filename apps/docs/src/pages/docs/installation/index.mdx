@@ -1,0 +1,107 @@
+<title>Installation Guide - Frame-Master Documentation</title>
+
+# Installation
+
+Get Frame-Master up and running in minutes. This guide covers installation methods, system requirements, and initial project setup.
+
+## Prerequisites
+
+Before installing Frame-Master, ensure you have the following:
+
+- **Bun.js (≥ 1.3.0)** — Frame-Master runs on Bun. Install with `curl -fsSL https://bun.sh/install | bash`; verify with `bun --version`. Docs: https://bun.sh/docs/installation
+
+## Installation Methods
+
+### Global Installation (recommended)
+
+```bash
+bun add -g frame-master
+```
+
+Use the `frame-master` command from any directory.
+
+### Project-Specific Installation
+
+```bash
+bun add frame-master
+```
+
+Keeps Frame-Master versioned with your project. Run commands with `bun frame-master`.
+
+### Run Without Installing
+
+```bash
+bunx frame-master create my-app
+```
+
+Good for trying Frame-Master or one-off commands; `bunx` downloads and executes the latest version on demand.
+
+## Verify Installation
+
+```bash
+# Check Frame-Master version
+frame-master --version
+
+# View available commands
+frame-master --help
+```
+
+> Success: Seeing the version number and help menu confirms Frame-Master is ready.
+
+## Create Your First Project
+
+You have two options:
+
+### Option 1: Create a New Project (recommended)
+
+Use the `create` command in a new directory:
+
+```bash
+# Create a new project
+bun frame-master create my-app
+
+# Navigate to your project
+cd my-app
+
+# Start development server
+bun frame-master dev
+```
+
+What `create` does:
+
+- Creates a project directory
+- Generates `frame-master.config.ts`
+- Sets up `.frame-master/` internals
+- Configures TypeScript
+- Installs required dependencies
+
+### Option 2: Initialize in an Existing Project
+
+Add Frame-Master to an existing directory:
+
+```bash
+# In your existing project directory
+bun frame-master init
+
+# Start development server
+bun frame-master dev
+```
+
+Use this when:
+
+- Migrating an existing project
+- You already created the target directory
+- Adding Frame-Master to a monorepo package
+
+## Troubleshooting
+
+- **Port already in use** — Another process uses port 3000. Stop it or change the port in `frame-master.config.ts`.
+- **Module not found errors** — Run `bun install`. If issues persist, remove `node_modules` and `bun.lockb`, then rerun `bun install`.
+- **TypeScript errors** — Confirm your `tsconfig.json` matches the defaults created by `frame-master init`.
+
+## Next Steps
+
+- [Quickstart Guide](/docs/start) — Build your first Frame-Master app
+- [Plugin System](/docs/plugins) — Use and create plugins
+- [Configuration](/docs/configuration) — Explore configuration options
+- [Project Structure](/docs/project-structure) — Understand the project anatomy

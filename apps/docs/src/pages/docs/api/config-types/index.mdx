@@ -1,0 +1,109 @@
+<title>Configuration Types - TypeScript API Reference | Frame-Master</title>
+
+# Configuration Types
+
+TypeScript type reference for Frame-Master configuration.
+
+## FrameMasterConfig
+
+Main configuration type for Frame-Master.
+
+```ts
+type FrameMasterConfig = {
+  /**
+   * HTTP server config - Bun.Serve options
+   */
+  HTTPServer: Omit<
+    Bun.Serve.Options<undefined, string> & {
+      static?: {} | undefined;
+    },
+    "fetch"
+  >;
+  /**
+   * Frame-Master Plugins to load
+   */
+  plugins: FrameMasterPlugin<any>[];
+  /**
+   * Plugin options
+   */
+  pluginsOptions?: Partial<{
+    disableHttpServerOptionsConflictWarning?: boolean;
+  }>;
+};
+```
+
+### HTTPServer
+
+Bun server configuration options. All Bun.Serve options except `fetch` (handled by Frame-Master).
+
+```ts frame-master.config.ts
+import type { FrameMasterConfig } from "frame-master";
+
+export default {
+  HTTPServer: {
+    port: 3000,
+    hostname: "0.0.0.0",
+    development: process.env.NODE_ENV !== "production",
+    maxRequestBodySize: 1024 * 1024 * 10, // 10MB
+  },
+  plugins: [],
+} satisfies FrameMasterConfig;
+```
+
+### plugins
+
+Array of plugins to load.
+
+```ts frame-master.config.ts
+import type { FrameMasterConfig } from "frame-master";
+import myPlugin from "./plugins/my-plugin";
+
+export default {
+  plugins: [
+    myPlugin(),
+    {
+      name: "inline-plugin",
+      version: "1.0.0",
+      serverStart: {
+        main: () => console.log("Server started!"),
+      },
+    },
+  ],
+} satisfies FrameMasterConfig;
+```
+
+## Type-safe Configuration
+
+Using TypeScript for configuration validation.
+
+```ts frame-master.config.ts
+import type { FrameMasterConfig } from "frame-master";
+
+// Use 'satisfies' for full TypeScript autocomplete and validation
+export default {
+  HTTPServer: {
+    port: 3000,
+  },
+  plugins: [],
+} satisfies FrameMasterConfig;
+```
+
+> Tip: Use `satisfies FrameMasterConfig` for full IDE support and type checking.
+
+## Global Types
+
+Global type declarations.
+
+```ts globals
+declare global {
+  var __PROCESS_ENV__: Record<string, string>;
+}
+```
+
+`__PROCESS_ENV__` is injected client-side containing `NODE_ENV` and all environment variables prefixed with `PUBLIC_`.
+
+## Next Steps
+
+- [Plugin Types](/docs/api/plugin-types) — Plugin type definitions
+- [Request Manager](/docs/api/request-manager) — Request handling API
+- [Configuration](/docs/core/configuration) — Configuration guide

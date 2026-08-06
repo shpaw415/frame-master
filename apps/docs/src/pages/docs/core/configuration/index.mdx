@@ -1,0 +1,192 @@
+<title>Configuration Guide - Frame-Master HTTP Server & Plugin Settings</title>
+
+# Configuration
+
+Configure your app through `frame-master.config.ts`. Export a `FrameMasterConfig` object to control the HTTP server and plugins.
+
+## Overview
+
+```ts
+import type { FrameMasterConfig } from "frame-master/server/types";
+
+const config: FrameMasterConfig = {
+  HTTPServer: {
+    port: 3000,
+    hostname: "localhost",
+  },
+  plugins: [],
+  pluginsOptions: {
+    disableHttpServerOptionsConflictWarning: false,
+  },
+};
+
+export default config;
+```
+
+> Tip: Use the `FrameMasterConfig` type for autocomplete and validation.
+
+## HTTPServer Configuration
+
+Frame-Master wraps `Bun.serve()`. Most `Bun.serve` options are available.
+
+```ts
+const config: FrameMasterConfig = {
+  HTTPServer: {
+    // see Bun.serve options
+  },
+  plugins: [],
+};
+```
+
+Docs: https://bun.com/reference/bun/serve
+
+## Plugins Configuration
+
+```ts
+import ReactSSRPlugin from "frame-master-plugin-react-ssr/plugin";
+import TailwindPlugin from "frame-master-plugin-tailwind";
+import SessionPlugin from "frame-master-plugin-session/plugin";
+
+const config: FrameMasterConfig = {
+  HTTPServer: { port: 3000 },
+  plugins: [
+    ReactSSRPlugin({
+      pathToShellFile: ".frame-master/shell.tsx",
+      pathToClientWrapper: ".frame-master/client-wrapper.tsx",
+      pathToBuildDir: ".frame-master/build",
+    }),
+    TailwindPlugin({
+      inputFile: "static/index.css",
+      outputFile: "static/tailwind.css",
+    }),
+    SessionPlugin({ framework: "react", strategy: "cookie" }),
+  ],
+};
+```
+
+> Plugin order matters unless a plugin sets priority. Check dependencies in plugin docs.
+
+## Environment-Specific Configuration
+
+```ts
+const isDev = process.env.NODE_ENV === "development";
+const isProd = process.env.NODE_ENV === "production";
+
+const config: FrameMasterConfig = {
+  HTTPServer: {
+    port: parseInt(process.env.PORT || "3000"),
+    hostname: process.env.HOST || "localhost",
+    development: isDev,
+    ...(isProd && {
+      tls: {
+        key: Bun.file(process.env.TLS_KEY_PATH!),
+        cert: Bun.file(process.env.TLS_CERT_PATH!),
+      },
+    }),
+  },
+  plugins: [...(isDev ? [DevToolsPlugin()] : [])],
+};
+```
+
+Best practices:
+
+- Separate `.env.development` and `.env.production`
+- Provide defaults with fallbacks
+- Validate required env vars at startup
+- Document variables in `.env.example`
+
+### Validation Snippet
+
+```ts
+const requiredEnv = ["DATABASE_URL", "API_KEY"];
+for (const key of requiredEnv) {
+  if (!process.env[key]) throw new Error(`Missing env var: ${key}`);
+}
+
+const port = parseInt(process.env.PORT || "3000");
+if (!Number.isInteger(port) || port < 1 || port > 65535) {
+  throw new Error(`Invalid port: ${process.env.PORT}`);
+}
+
+const config: FrameMasterConfig = { HTTPServer: { port }, plugins: [] };
+export default config;
+```
+
+## Complete Example
+
+```ts
+import type { FrameMasterConfig } from "frame-master/server/types";
+import ReactSSRPlugin from "frame-master-plugin-react-ssr/plugin";
+import TailwindPlugin from "frame-master-plugin-tailwind";
+import SessionPlugin from "frame-master-plugin-session/plugin";
+import { readFileSync } from "fs";
+
+const isDev = process.env.NODE_ENV === "development";
+const isProd = process.env.NODE_ENV === "production";
+
+const config: FrameMasterConfig = {
+  HTTPServer: {
+    port: parseInt(process.env.PORT || "3000"),
+    hostname: process.env.HOST || "localhost",
+    development: isDev,
+    maxRequestBodySize: 1024 * 1024 * 50,
+    ...(isProd && {
+      tls: {
+        key: readFileSync(process.env.TLS_KEY_PATH!),
+        cert: readFileSync(process.env.TLS_CERT_PATH!),
+      },
+    }),
+    websocket: {
+      maxPayloadLength: 16 * 1024 * 1024,
+      idleTimeout: 120,
+      perMessageDeflate: true,
+    },
+    error(error: Error) {
+      console.error("[Server Error]", error);
+      if (isDev) {
+        return new Response(
+          JSON.stringify({ error: error.message, stack: error.stack }),
+          {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+      return new Response("Internal Server Error", {
+        status: 500,
+        headers: { "Content-Type": "text/plain" },
+      });
+    },
+  },
+  plugins: [
+    ReactSSRPlugin({
+      pathToShellFile: ".frame-master/shell.tsx",
+      pathToClientWrapper: ".frame-master/client-wrapper.tsx",
+      pathToBuildDir: ".frame-master/build",
+      pathToPagesDir: "src/pages",
+    }),
+    TailwindPlugin({
+      inputFile: "static/index.css",
+      outputFile: "static/tailwind.css",
+    }),
+    SessionPlugin({ framework: "react", strategy: "cookie" }),
+  ],
+  pluginsOptions: {
+    disableHttpServerOptionsConflictWarning: false,
+  },
+};
+
+export default config;
+```
+
+## Best Practices
+
+- Use environment variables for secrets and environment-specific values
+- Keep the config minimal; add options only when needed
+- Validate config early to fail fast
+- Document custom options for your team
+
+## Next Steps
+
+- [HTTP Server](/docs/http-server)
+- [Plugin System](/docs/plugins)

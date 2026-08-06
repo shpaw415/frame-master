@@ -1,0 +1,297 @@
+
+
+<title>Global Plugin Context - Shared Type-Safe Plugin State</title>
+
+# Global Plugin Context
+
+Frame-Master exposes a global plugin context store so plugins can publish state once and let other plugins read or extend it later.
+
+This is useful when one plugin owns a shared capability such as:
+
+- a database connection pool
+- auth configuration
+- a cache client
+- feature flags computed from config
+
+The store is namespaced by plugin name and can be used with full type safety through module augmentation.
+
+## Overview
+
+There are two parts to the feature:
+
+1. `createContext` on a plugin initializes that plugin's global context during startup.
+2. Helper functions from `frame-master/plugin` let any plugin read, set, merge, check, or delete entries in the store.
+
+Core types:
+
+- `GlobalPluginContextMap` → extend this interface to declare context shapes
+- `PluginGlobalContext<"plugin-name">` → resolves to the declared context type for that plugin
+- `PluginContext` → the whole global store object
+
+## Define a Typed Context
+
+Extend `GlobalPluginContextMap` from `frame-master/plugin/types` using module augmentation.
+
+```ts
+declare module "frame-master/plugin/types" {
+	interface GlobalPluginContextMap {
+		"auth-plugin": {
+			issuer: string;
+			tokenCache: Map<string, string>;
+			enabled: boolean;
+		};
+	}
+}
+```
+
+After that, any access to `"auth-plugin"` through the helper APIs becomes type-safe.
+
+## Initialize Context With `createContext`
+
+Use the plugin's `createContext` hook to seed its namespace.
+
+```ts
+import type { FrameMasterPlugin } from "frame-master/plugin/types";
+
+declare module "frame-master/plugin/types" {
+	interface GlobalPluginContextMap {
+		"auth-plugin": {
+			issuer: string;
+			tokenCache: Map<string, string>;
+			enabled: boolean;
+		};
+	}
+}
+
+export function AuthPlugin(): FrameMasterPlugin {
+	return {
+		name: "auth-plugin",
+		version: "1.0.0",
+		priority: 10,
+		createContext: (config) => {
+			return {
+				issuer: `http://${config.HTTPServer.hostname}:${config.HTTPServer.port}`,
+				tokenCache: new Map<string, string>(),
+				enabled: true,
+			};
+		},
+	};
+}
+```
+
+### Lifecycle
+
+`createContext` runs after config, plugin loader, and builder initialization.
+
+It is also rerun when Frame-Master reinitializes its runtime, including config reload flows. Internally, returned object values are merged into the existing namespace for that plugin.
+
+That means object-shaped context is preserved and updated shallowly:
+
+```ts
+// previous context
+{ count: 1, source: "startup" }
+
+// returned later from createContext or mergeGlobalPluginContext
+{ reloaded: true }
+
+// final stored value
+{ count: 1, source: "startup", reloaded: true }
+```
+
+If the current value or new value is not a plain object, the old value is replaced instead of merged.
+
+## Read Context From Another Plugin
+
+Import the helpers from `frame-master/plugin`.
+
+```ts
+import {
+	getGlobalPluginContext,
+	setGlobalPluginContext,
+} from "frame-master/plugin";
+import type { FrameMasterPlugin } from "frame-master/plugin/types";
+
+declare module "frame-master/plugin/types" {
+	interface GlobalPluginContextMap {
+		"auth-plugin": {
+			issuer: string;
+			tokenCache: Map<string, string>;
+			enabled: boolean;
+		};
+		"audit-plugin": {
+			lastSeenIssuer: string;
+		};
+	}
+}
+
+export function AuditPlugin(): FrameMasterPlugin {
+	return {
+		name: "audit-plugin",
+		version: "1.0.0",
+		priority: 20,
+		serverReady: () => {
+			const authContext = getGlobalPluginContext("auth-plugin");
+
+			if (!authContext?.enabled) return;
+
+			setGlobalPluginContext("audit-plugin", {
+				lastSeenIssuer: authContext.issuer,
+			});
+		},
+	};
+}
+```
+
+Because `GlobalPluginContextMap` was extended, `authContext` is inferred as:
+
+```ts
+{
+	issuer: string;
+	tokenCache: Map<string, string>;
+	enabled: boolean;
+} | undefined
+```
+
+Without module augmentation, the per-plugin lookup falls back to `unknown`.
+
+## Available Helper APIs
+
+The helpers are exported from `frame-master/plugin`.
+
+### `getGlobalPluginContext`
+
+```ts
+import { getGlobalPluginContext } from "frame-master/plugin";
+
+const allContext = getGlobalPluginContext();
+const authContext = getGlobalPluginContext("auth-plugin");
+```
+
+- `getGlobalPluginContext()` returns the entire store as `PluginContext`
+- `getGlobalPluginContext("plugin-name")` returns that plugin's context or `undefined`
+
+### `hasGlobalPluginContext`
+
+```ts
+import { hasGlobalPluginContext } from "frame-master/plugin";
+
+if (hasGlobalPluginContext("auth-plugin")) {
+	// namespace exists in the store
+}
+```
+
+### `setGlobalPluginContext`
+
+Replaces the stored value for a plugin namespace.
+
+```ts
+import { setGlobalPluginContext } from "frame-master/plugin";
+
+setGlobalPluginContext("auth-plugin", {
+	issuer: "https://example.com",
+	tokenCache: new Map(),
+	enabled: true,
+});
+```
+
+### `mergeGlobalPluginContext`
+
+Shallow-merges object values. If either side is not a plain object, it replaces the value.
+
+```ts
+import { mergeGlobalPluginContext } from "frame-master/plugin";
+
+mergeGlobalPluginContext("auth-plugin", {
+	enabled: false,
+});
+```
+
+### `deleteGlobalPluginContext`
+
+Deletes a namespace and returns `true` when deletion succeeds.
+
+```ts
+import { deleteGlobalPluginContext } from "frame-master/plugin";
+
+deleteGlobalPluginContext("auth-plugin");
+```
+
+## Recommended Pattern For Plugin Authors
+
+Use this structure when you want other plugins to consume your context safely:
+
+1. Declare your plugin's namespace in `GlobalPluginContextMap`.
+2. Use your exact plugin `name` as the namespace key.
+3. Initialize stable shared resources in `createContext`.
+4. Read the value from other plugins with `getGlobalPluginContext("your-plugin")`.
+5. Use `mergeGlobalPluginContext` for incremental object updates.
+
+Example namespace alignment:
+
+```ts
+declare module "frame-master/plugin/types" {
+	interface GlobalPluginContextMap {
+		"my-plugin": {
+			startedAt: number;
+		};
+	}
+}
+
+const plugin: FrameMasterPlugin = {
+	name: "my-plugin",
+	version: "1.0.0",
+	createContext: () => ({
+		startedAt: Date.now(),
+	}),
+};
+```
+
+Keeping the augmentation key equal to `name` is what makes the helpers infer the correct type.
+
+## Common Mistakes
+
+- Declaring a context map key that does not match the plugin's `name`
+- Importing helpers from a private source file instead of `frame-master/plugin`
+- Assuming `getGlobalPluginContext("plugin-name")` cannot be `undefined`
+- Expecting deep merge behavior from `mergeGlobalPluginContext`
+- Forgetting that untyped namespaces resolve to `unknown`
+
+## Example From Tests
+
+Frame-Master includes a test where one plugin creates context and another plugin reads and updates it:
+
+```ts
+declare module "frame-master/plugin/types" {
+	interface GlobalPluginContextMap {
+		"context-owner": {
+			count: number;
+			source: string;
+			reloaded?: boolean;
+		};
+		"context-reader": {
+			seenCount: number;
+		};
+	}
+}
+```
+
+The reader plugin can then safely do:
+
+```ts
+const ownerContext = getGlobalPluginContext("context-owner");
+
+setGlobalPluginContext("context-reader", {
+	seenCount: ownerContext?.count ?? 0,
+});
+
+mergeGlobalPluginContext("context-owner", {
+	count: (ownerContext?.count ?? 0) + 1,
+	source: ownerContext?.source ?? "unknown",
+});
+```
+
+## Next Steps
+
+- [Configuration](/docs/core/configuration)
+- [Build System](/docs/core/build)
+- [Request Handling](/docs/core/request-handling)

@@ -1,0 +1,83 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1762902547578,
+      "tag": "0000_friendly_menace",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1762981165503,
+      "tag": "0001_loud_cerebro",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1763069628190,
+      "tag": "0002_third_night_thrasher",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1763075906317,
+      "tag": "0003_calm_leper_queen",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1763145251868,
+      "tag": "0004_ancient_spot",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1763231623263,
+      "tag": "0005_faithful_kylun",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1764010912580,
+      "tag": "0006_late_roulette",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1764097027496,
+      "tag": "0007_noisy_serpent_society",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1764179343402,
+      "tag": "0008_puzzling_supernaut",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1775621020195,
+      "tag": "0009_heavy_grim_reaper",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1775670880018,
+      "tag": "0010_needy_sunfire",
+      "breakpoints": true
+    }
+  ]
+}

@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "package.json"
+      - "packages/frame-master/package.json"
   workflow_dispatch:
 
 permissions:
@@ -14,6 +14,10 @@ permissions:
 concurrency:
   group: release-npm
   cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: packages/frame-master
 
 jobs:
   publish:
@@ -31,6 +35,7 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
+        working-directory: .
         run: bun install --frozen-lockfile
 
       - name: Type check
@@ -74,6 +79,7 @@ jobs:
 
       - name: Create git tag
         if: steps.check.outputs.published == 'false'
+        working-directory: .
         run: |
           VERSION="${{ steps.pkg.outputs.version }}"
           TAG="v${VERSION}"
@@ -88,12 +94,13 @@ jobs:
 
       - name: Create GitHub Release
         if: steps.check.outputs.published == 'false'
+        working-directory: .
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="${{ steps.pkg.outputs.version }}"
           TAG="v${VERSION}"
-          NOTES_FILE="release-notes/v${VERSION}.md"
+          NOTES_FILE="packages/frame-master/release-notes/v${VERSION}.md"
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "GitHub Release $TAG already exists"
             exit 0

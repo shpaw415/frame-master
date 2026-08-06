@@ -33,6 +33,13 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # Finder (MacOS) folder config
 .DS_Store
 *.code-workspace
-test-project
-test_project/.frame-master/build
-test_project/.frame-master/debug-ui
+
+# package-local temp / build artifacts
+packages/frame-master/tmp
+packages/frame-master/test_project/.frame-master/build
+packages/frame-master/test_project/.frame-master/debug-ui
+apps/docs/.frame-master/build
+apps/docs/.frame-master/cf-actions-temp
+apps/docs/.wrangler
+apps/docs/functions
+apps/docs/optimized

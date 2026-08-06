@@ -1,0 +1,197 @@
+<title>Plugin Types - TypeScript Definitions for Plugin Development</title>
+
+# Plugin Types
+
+TypeScript type definitions for Frame-Master plugin development.
+
+## FrameMasterPlugin
+
+Main plugin type definition.
+
+```ts
+type FrameMasterPlugin<
+  Options extends PluginOptions = Required<PluginOptions>,
+> = Required<{
+  name: string; // Unique plugin name
+  version: string; // Semver version
+}> &
+  Partial<{
+    router: RouterPlugin; // Request handling hooks
+    serverStart: ServerStart; // Server startup hooks
+    priority: number; // Execution order (0 = highest)
+    requirement: Requirement; // Dependencies & version requirements
+    runtimePlugins: Bun.BunPlugin[]; // Bun plugins for runtime
+    directives: Directive[]; // File directives
+    serverConfig: ServerConfig; // Server configuration overrides
+    fileSystemWatchDir: string[]; // Directories to watch (dev only)
+    onFileSystemChange: FileChangeCallback; // File change handler
+    websocket: WebSocketHandlers; // WebSocket event handlers
+    build: BuildOptionsPlugin; // Build hooks
+    cli: CLIExtension; // CLI commands
+  }>;
+```
+
+## Router Plugin
+
+Request lifecycle hooks.
+
+```ts
+type RouterPlugin = Partial<{
+  // Before request processing
+  before_request: (master: masterRequest) => void | Promise<void>;
+
+  // Main request handler
+  request: (master: masterRequest) => void | Promise<void>;
+
+  // After request processing
+  after_request: (
+    master: masterRequest,
+  ) => void | Response | Promise<void | Response>;
+
+  // HTML transformation
+  html_rewrite: {
+    initContext?: (req: masterRequest) => unknown;
+    rewrite?: (
+      reWriter: HTMLRewriter,
+      master: masterRequest,
+      context: unknown,
+    ) => void | Promise<void>;
+    after?: (
+      HTML: string,
+      master: masterRequest,
+      context: unknown,
+    ) => void | Promise<void>;
+  };
+}>;
+```
+
+## ServerStart
+
+Server startup hooks.
+
+```ts
+type ServerStart = Partial<{
+  /**
+   * Executed on the main thread when server starts
+   */
+  main: () => Promise<unknown> | unknown;
+
+  /**
+   * Executed only in development mode on main thread
+   * ONLY DEV MODE
+   */
+  dev_main: () => Promise<unknown> | unknown;
+}>;
+```
+
+## BuildOptionsPlugin
+
+Build lifecycle hooks.
+
+```ts
+type BuildOptionsPlugin = {
+  /**
+   * Build configuration - static object or dynamic function
+   */
+  buildConfig?:
+    | Partial<Bun.BuildConfig>
+    | ((
+        builder: Builder,
+      ) => Partial<Bun.BuildConfig> | Promise<Partial<Bun.BuildConfig>>);
+
+  /**
+   * Called before Bun.build() - setup, validation
+   */
+  beforeBuild?: (
+    buildConfig: Bun.BuildConfig,
+    builder: Builder,
+  ) => void | Promise<void>;
+
+  /**
+   * Called after Bun.build() - post-processing
+   */
+  afterBuild?: (
+    buildConfig: Bun.BuildConfig,
+    result: Bun.BuildOutput,
+    builder: Builder,
+  ) => void | Promise<void>;
+
+  /**
+   * Enable build logging
+   */
+  enableLoging?: boolean;
+};
+```
+
+## Requirement
+
+Plugin dependency requirements.
+
+```ts
+type Requirement = Partial<{
+  /**
+   * Required Frame-Master plugins with versions
+   * @example { "frame-master-auth": "^1.0.0" }
+   */
+  frameMasterPlugins: Record<string, string>;
+
+  /**
+   * Required Frame-Master version
+   * @example "^2.0.0"
+   */
+  frameMasterVersion: string;
+
+  /**
+   * Required Bun runtime version
+   * @example ">=1.0.0 <2.0.0"
+   */
+  bunVersion: string;
+}>;
+```
+
+## WebSocket Handlers
+
+WebSocket event handlers.
+
+```ts
+type WebSocketHandlers = Partial<{
+  onOpen: (ws: Bun.ServerWebSocket<undefined>) => Promise<void> | void;
+  onMessage: (
+    ws: Bun.ServerWebSocket<undefined>,
+    message: string | ArrayBufferView,
+  ) => Promise<void> | void;
+  onClose: (ws: Bun.ServerWebSocket<undefined>) => Promise<void> | void;
+}>;
+```
+
+## FileChangeCallback
+
+File system change handler.
+
+```ts
+type WatchEventType = "change" | "rename";
+
+type FileChangeCallback = (
+  eventType: WatchEventType,
+  filePath: string,
+  absolutePath: string,
+) => void | Promise<void>;
+```
+
+## CLI Extension
+
+Commander.js CLI extension.
+
+```ts
+import type { Command } from "commander";
+
+type CLIExtension = (command: Command) => Command;
+```
+
+> CLI extensions are available under `frame-master extended-cli <command>`.
+
+## Next Steps
+
+- [Request Manager](/docs/api/request-manager) — Request handling API
+- [Plugin Hooks](/docs/plugins/hooks) — Hooks reference
+- [Creating Plugins](/docs/plugins/creating) — Plugin development

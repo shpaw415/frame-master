@@ -1,0 +1,215 @@
+<title>Request Manager API - HTTP Request Handler Reference</title>
+
+# masterRequest
+
+API reference for the `masterRequest` class used in plugin hooks.
+
+## Overview
+
+`masterRequest` is passed to all router plugin hooks and provides methods for reading requests, setting responses, managing cookies, and injecting global values.
+
+## Properties
+
+Read-only and mutable properties.
+
+- `request: Request` — The original Bun Request object
+- `URL: URL` — Parsed URL object
+- `response: Response | undefined` — Current response (after_request only)
+- `isAskingHTML: boolean` — True if Accept header includes `text/html`
+- `isStaticAsset: boolean` — True if request is for static file
+- `currentState: RequestState` — `"before_request" | "request" | "after_request"`
+- `serverInstance: Bun.Server` — The Bun server instance
+
+## Response Methods
+
+### setResponse(body, init?)
+
+Set the response body and options.
+
+```ts
+setResponse(body: BodyInit | null, init?: ResponseInit): this
+```
+
+```ts
+// Set JSON response
+master.setResponse(JSON.stringify({ success: true }), {
+  headers: { "Content-Type": "application/json" },
+});
+
+// Set HTML response
+master.setResponse("<h1>Hello</h1>", {
+  headers: { "Content-Type": "text/html" },
+});
+```
+
+> Warning: Only available in `request` state. Throws if response already set.
+
+### isResponseSetted()
+
+Check if response has been set.
+
+```ts
+if (!master.isResponseSetted()) {
+  master.setResponse("Default response");
+}
+```
+
+### unsetResponse()
+
+Clear the current response.
+
+```ts
+// Override previous plugin's response
+master.unsetResponse();
+master.setResponse("New response");
+```
+
+### sendNow()
+
+Skip remaining request plugins and send immediately.
+
+```ts
+// Immediately send response, skip other request plugins
+master.setResponse("Immediate!");
+master.sendNow();
+```
+
+### setHeader(name, value)
+
+Set a response header.
+
+```ts
+master.setHeader("X-Custom-Header", "value");
+master.setHeader("Cache-Control", "no-cache");
+```
+
+## Context Methods
+
+### setContext(context)
+
+Set context data (merges with existing).
+
+```ts
+// In before_request
+master.setContext({ userId: "123", role: "admin" });
+
+// Later, add more context
+master.setContext({ timestamp: Date.now() });
+```
+
+### getContext\<T>()
+
+Get context data with type.
+
+```ts
+type MyContext = { userId: string; role: string };
+
+const ctx = master.getContext<MyContext>();
+console.log(ctx.userId); // "123"
+```
+
+## Cookie Methods
+
+### setCookie(name, data, options?)
+
+Set a cookie on the response.
+
+```ts
+setCookie<T extends Record<string, unknown>>(
+  name: string,
+  data: T,
+  options?: CookieOptions
+): this
+
+type CookieOptions = {
+  encrypted?: boolean;  // Encrypt cookie value
+  httpOnly?: boolean;
+  secure?: boolean;
+  sameSite?: "Lax" | "Strict" | "None";
+  maxAge?: number;      // Seconds
+  path?: string;
+  domain?: string;
+};
+```
+
+```ts
+// Set encrypted session cookie
+master.setCookie(
+  "session",
+  { userId: "123", role: "admin" },
+  { encrypted: true, httpOnly: true, secure: true },
+);
+
+// Set plain cookie
+master.setCookie("preferences", { theme: "dark" });
+```
+
+### getCookie\<T>(name, encrypted?)
+
+Read a cookie from the request.
+
+```ts
+// Read encrypted cookie
+const session = master.getCookie<{ userId: string }>(
+  "session",
+  true, // encrypted
+);
+
+if (session) {
+  console.log(session.userId);
+}
+```
+
+### deleteCookie(name, options?)
+
+Delete a cookie.
+
+```ts
+master.deleteCookie("session", { path: "/" });
+```
+
+## Global Values
+
+### setGlobalValues(values)
+
+Inject globals into client-side window.
+
+```ts
+// Declare global type
+declare global {
+  var __USER_DATA__: { name: string } | undefined;
+}
+
+// Inject in plugin
+master.setGlobalValues({
+  __USER_DATA__: { name: "John" },
+});
+
+// Access client-side
+console.log(globalThis.__USER_DATA__?.name); // "John"
+```
+
+> Only available in `before_request` and `request` states.
+
+### preventGlobalValuesInjection()
+
+Disable global value injection for this request.
+
+```ts
+// For API routes, prevent unnecessary injection
+if (master.URL.pathname.startsWith("/api")) {
+  master.preventGlobalValuesInjection();
+}
+```
+
+## Utility Methods
+
+- `preventLog()` — Disable server logging for this request
+- `preventRewrite()` — Disable HTML rewrite plugins for this request
+- `isGlobalValuesInjectionPrevented()` — Check if global injection is disabled
+
+## Next Steps
+
+- [Plugin Types](/docs/api/plugin-types) — Plugin type definitions
+- [Utilities](/docs/api/utils) — Runtime utilities
+- [Plugin Hooks](/docs/plugins/hooks) — Hooks reference

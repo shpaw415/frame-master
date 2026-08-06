@@ -2,8 +2,18 @@ name: Bun – Multi-Platform CI
 
 on:
   push:
-    branches: [main, 3.1.x, 3.1.1, "3.1.1+windows-patch"]
+    branches: [main]
+    paths:
+      - "packages/frame-master/**"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/bun-multiplatform.yml"
   pull_request:
+    paths:
+      - "packages/frame-master/**"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/bun-multiplatform.yml"
 
 jobs:
   test:
@@ -18,6 +28,10 @@ jobs:
           - macos-latest
           - windows-latest
 
+    defaults:
+      run:
+        working-directory: packages/frame-master
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -28,6 +42,7 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
+        working-directory: .
         run: bun install --frozen-lockfile
 
       - name: Type check

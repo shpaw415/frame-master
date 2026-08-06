@@ -1,0 +1,60 @@
+<title>Plugin Lifecycle - Loading & Execution Flow | Frame-Master</title>
+
+# Plugin Lifecycle
+
+Understanding how plugins are loaded, initialized, and executed in Frame-Master.
+
+## 🔄 Lifecycle Overview
+
+Plugins move through distinct phases:
+
+1. Initialization — Plugins loaded, sorted by priority, requirements validated
+2. Server Startup — `serverStart` hooks execute, runtime plugins loaded
+3. Request Processing — Router hooks handle each HTTP request
+4. Build Process — Build hooks customize compilation
+
+## 📋 Execution Flow
+
+```text
+// Server Start (once)
+serverStart.main() → serverStart.dev_main()
+
+// Each Request
+before_request → request → after_request → html_rewrite → global_value_injection
+
+// Build
+buildConfig → beforeBuild → [Bun Build] → afterBuild
+```
+
+## 📊 Priority Order
+
+Lower priority numbers execute first.
+
+```ts
+export default defineConfig({
+  plugins: [
+    logging(), // priority: 100 → runs last
+    reactSSR(), // priority: 50  → runs mid
+    session(), // priority: 10  → runs second
+    auth(), // priority: 0   → runs first
+  ],
+}); // Order: auth → session → reactSSR → logging
+```
+
+Recommended ranges:
+
+- Auth: 0–10
+- Session/DB: 10–30
+- Processing: 30–60
+- Logging: 80–100
+
+## ✨ Best Practices
+
+- ⚡ Keep hooks lightweight; push heavy work to `serverStart`
+- 🔒 Handle errors with try-catch; fail gracefully
+
+## 🎯 Next Steps
+
+- [Plugin Hooks](/docs/plugins/hooks) — Complete reference for all hooks
+- [Creating Plugins](/docs/plugins/creating) — Build your own plugins
+- [Build System](/docs/core/build) — Deep dive into build lifecycle

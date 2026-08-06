@@ -1,10 +1,8 @@
 {
-	"name": "frame-master",
-	"type": "module",
-	"version": "3.2.0",
-	"baseUrl": ".",
-	"license": "MIT",
-	"description": "Plugin-first meta-framework for Bun.js",
+	"name": "frame-master-monorepo",
+	"private": true,
+	"version": "0.0.0",
+	"description": "Frame-Master monorepo — core package and documentation site",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/shpaw415/frame-master.git"
@@ -12,88 +10,21 @@
 	"bugs": {
 		"url": "https://github.com/shpaw415/frame-master/issues"
 	},
-	"homepage": "https://github.com/shpaw415/frame-master#readme",
-	"publishConfig": {
-		"access": "public"
-	},
-	"files": [
-		"bin",
-		"src",
-		"test-suite/index.ts",
-		"test-suite/src",
-		"test-suite/README.md",
-		"package.json",
-		"README.md",
-		"LICENSE",
-		"biome.json",
-		"tsconfig.json"
+	"homepage": "https://frame-master.com",
+	"workspaces": [
+		"packages/*",
+		"apps/*"
 	],
-	"devDependencies": {
-		"@types/bun": "latest",
-		"@types/react-dom": "^19.2.3",
-		"@tailwindcss/cli": "^4.3.0",
-		"@types/git": "^0.0.21"
+	"scripts": {
+		"typecheck": "bun run --filter frame-master typecheck",
+		"test": "bun run --filter frame-master test",
+		"test:suite": "bun run --filter frame-master test:suite",
+		"dev:docs": "bun run --filter frame-master-docs dev",
+		"build:docs": "bun run --filter frame-master-docs build",
+		"frame-master": "bun run --filter frame-master frame-master"
 	},
-	"peerDependencies": {
-		"typescript": "^6.0.3"
-	},
-	"bin": {
-		"frame-master": "bin/index.ts"
-	},
-	"dependencies": {
-		"@monaco-editor/react": "^4.7.0",
-		"@shpaw415/webtoken": "^2.0.0",
-		"chalk": "^5.6.2",
-		"commander": "^14.0.3",
-		"git": "^0.1.5",
-		"lucide-react": "^1.14.0",
-		"react": "^19.2.5",
-		"react-dom": "^19.2.5",
-		"tailwindcss": "^4.3.0",
-		"tar": "^7.5.13"
-	},
-	"keywords": [
-		"framework",
-		"full-stack",
-		"front-end",
-		"backend",
-		"web",
-		"server",
-		"bun",
-		"plugin"
-	],
 	"engines": {
 		"bun": ">=1.2.0"
 	},
-	"scripts": {
-		"build:tool:test": "bun build bin/testing/src/frontend.tsx --outfile=bin/testing/src/frontend.js",
-		"build:tool:debug": "tailwindcss -i src/debug/ui/src/index.css -o src/debug/ui/src/style.css",
-		"frame-master": "bun run bin/index.ts",
-		"typecheck": "tsc --noEmit",
-		"test": "bun test",
-		"test:suite": "bun test test-suite",
-		"dev": "NODE_ENV=development bun --hot frame-master dev",
-		"start": "NODE_ENV=production bun frame-master start",
-		"dev:tool:debug": "NODE_ENV=development bun --cwd test_project frame-master debug"
-	},
-	"exports": {
-		"./runtime": "./src/server/runtime-loader.ts",
-		"./server": "./src/server/index.ts",
-		"./server/request": "./src/server/request-manager.ts",
-		"./server/types": "./src/server/type.ts",
-		"./server/config-watcher": "./src/server/config-watcher.ts",
-		"./server/hot-file-watcher": "./src/server/hot-file-watcher.ts",
-		"./server/init": "./src/server/init.ts",
-		"./plugin": "./src/plugins/index.ts",
-		"./plugin/types": "./src/plugins/types.ts",
-		"./plugin/utils": "./src/plugins/utils.ts",
-		"./config": "./src/server/config.ts",
-		"./utils": "./src/utils.ts",
-		"./paths": "./src/paths.ts",
-		"./build": "./src/build/index.ts",
-		"./search/plugin": "./bin/search/plugin.ts",
-		"./search/template": "./bin/search/template.ts",
-		"./testing": "./test-suite/index.ts",
-		"./test-suite": "./test-suite/index.ts"
-	}
+	"license": "MIT"
 }

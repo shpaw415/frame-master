@@ -1,0 +1,219 @@
+import { CodeBlockWithTheme } from "@/components/codeblock";
+
+<title>HTTP Server - Bun-Powered Request Handling | Frame-Master</title>
+
+# HTTP Server
+
+Frame-Master wraps `Bun.serve()` with a plugin-aware request pipeline.
+
+## Overview
+
+> Built on Bun: https://bun.sh/docs/api/http
+
+<CodeBlockWithTheme language="mermaid" id="http-server-sequence">
+{`
+sequenceDiagram
+    participant Client as HTTP Client
+    participant Bun as Bun.serve Runtime
+    participant Master as masterRequest Handler
+    participant Plugins as Plugin System
+    participant Logger as Request Logger
+
+    Client->>Bun: Incoming HTTP Request
+    Bun->>Master: Forward Request
+    Note over Master: Parse URL, Headers, Context
+    rect
+        Note right of Master: Phase 1: Pre-processing
+        Master->>Plugins: before_request hooks
+        Plugins-->>Master: Hook Results
+        Master->>Master: Setup Request Context
+    end
+    rect
+        Note right of Master: Phase 2: Request Handling
+        Master->>Plugins: request hooks
+        Plugins-->>Master: Response Data
+    end
+    rect
+        Note right of Master: Phase 2.5: HTML Rewriting
+        Master->>Plugins: html_rewrite hooks (if HTML)
+    end
+    rect
+        Note right of Master: Phase 3: Post-processing
+        Master->>Plugins: after_request hooks
+        Master->>Master: Inject Cookies + Headers
+    end
+    Master->>Bun: Final Response
+    Bun->>Logger: Log Request
+    Logger-->>Bun: Logging Complete
+    Bun->>Client: HTTP Response
+
+`}
+
+</CodeBlockWithTheme>
+
+## Server Initialization
+
+Startup steps:
+
+- Load `frame-master.config.ts`
+- Initialize plugins in order
+- Merge `serverConfig` from plugins with `HTTPServer`
+- Run `serverStart` hooks
+- (Dev) attach file watchers
+- Start `Bun.serve()` with merged config and fetch handler
+
+```ts
+export default async (params?: {
+  config?: FrameMasterConfig;
+  pluginLoader?: PluginLoader;
+  builder?: Builder;
+}) => {
+  // Loads and initializes all core components of the server.
+  await InitAll({ loders: params });
+
+  Bun.serve({...});
+};
+```
+
+> Warning: Conflicting server options (e.g., ports) throw unless `disableHttpServerOptionsConflictWarning` is true.
+
+## Route Handling
+
+### Static Routes
+
+```ts
+const config: FrameMasterConfig = {
+  HTTPServer: {
+    port: 3000,
+    routes: {
+      "/api/health": () => Response.json({ status: "ok" }),
+      "/api/version": () =>
+        Response.json({ version: "1.0.0", framework: "Frame-Master" }),
+    },
+  },
+};
+```
+
+### Plugin Routes
+
+```ts
+const myPlugin: FrameMasterPlugin = {
+  name: "my-api-plugin",
+  version: "1.0.0",
+  serverConfig: {
+    routes: {
+      "/api/custom": () => Response.json({ message: "From plugin" }),
+    },
+  },
+  router: {
+    request(master) {
+      if (master.pathname === "/api/complex") {
+        master.setResponse(JSON.stringify({ data: "Complex logic" }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+    },
+  },
+};
+```
+
+Route priority:
+
+1. Plugin routes (earlier plugins first)
+2. HTTPServer config routes
+3. `masterRequest` fallback via plugin request hooks
+
+## WebSocket Support
+
+```ts
+const config: FrameMasterConfig = {
+  HTTPServer: {
+    port: 3000,
+    websocket: {
+      maxPayloadLength: 16 * 1024 * 1024,
+      idleTimeout: 120,
+      backpressureLimit: 1024 * 1024,
+      perMessageDeflate: true,
+    },
+  },
+};
+```
+
+Plugin upgrade + handlers:
+
+```ts
+const wsPlugin: FrameMasterPlugin = {
+  name: "websocket-plugin",
+  version: "1.0.0",
+  serverConfig: {
+    routes: {
+      "/ws/my-identifier": (req, server) =>
+        server.upgrade(req as Request, { data: { id: "my-identifier" } }) ||
+        Response.json({ error: "WebSocket upgrade failed" }, { status: 400 }),
+    },
+  },
+  websocket: {
+    onOpen(ws) {
+      const { id } = ws.data as { id: string };
+      ws.send(
+        id === "my-identifier"
+          ? "Welcome, my-identifier!"
+          : "Welcome, unknown identifier!",
+      );
+    },
+    onMessage(ws, message) {
+      const { id } = ws.data as { id: string };
+      if (id === "my-identifier") ws.send(`Echo: ${message}`);
+    },
+    onClose(ws) {
+      const { id } = ws.data as { id: string };
+      if (id === "my-identifier") console.log("WebSocket closed");
+    },
+  },
+};
+```
+
+More: https://bun.sh/docs/api/websockets
+
+## Development Features
+
+### File System Watchers
+
+> `absolutePath` refers to the full path from the root of the project, while `filePath` is relative to the watched directory.
+
+```ts
+const myPlugin: FrameMasterPlugin = {
+  name: "my-plugin",
+  version: "1.0.0",
+  fileSystemWatchDir: ["src/pages", "src/components"],
+  onFileSystemChange(event, file, absolutePath) {
+    console.log(`${event}: ${file}`);
+    if (event === "change" && file.endsWith(".tsx"))
+      rebuildComponent(absolutePath);
+  },
+};
+```
+
+> Production: watchers are disabled when `NODE_ENV=production`.
+
+## Best Practices
+
+- Set `development: true` during local dev for better errors
+- Keep plugin request hooks fast; avoid heavy sync work
+- Place request-modifying plugins early, response-modifying plugins later
+- Use custom error handlers for better UX and security
+- Disable noisy logging in production
+
+## External Resources
+
+- Bun HTTP: https://bun.sh/docs/api/http
+- Bun WebSocket: https://bun.sh/docs/api/websockets
+- Bun routing: https://bun.sh/docs/api/http#routing
+- MDN Fetch API: https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API
+
+## Next Steps
+
+- [Request Handling](/docs/request-handling)
+- [Configuration](/docs/configuration)
+- [Plugin System](/docs/plugins)
+- [Build System](/docs/build-system)
