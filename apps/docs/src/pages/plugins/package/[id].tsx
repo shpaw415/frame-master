@@ -1,16 +1,16 @@
 "use dynamic";
+import { useMarkdown } from "@markdown";
+import { createLoader, createPageConfig } from "@next/ssr";
+import { useLoader } from "@next/ssr/hooks";
 import type { parsedPlugin } from "db/schema";
+import { ThrowNotFound } from "frame-master-plugin-apply-react/utils";
 import { useMemo, useState } from "react";
+import { APIError } from "@/action_ext/utils";
 import { getExample } from "@/actions/api/plugins/examples";
 import { getReadme } from "@/actions/api/plugins/readme";
 import { getVersions } from "@/actions/api/plugins/versions";
 import { CodeBlockWithTheme } from "@/components/codeblock";
 import { routes } from "@/utils";
-import { createPageConfig, createLoader } from "@next/ssr";
-import { useLoader } from "@next/ssr/hooks";
-import { ThrowNotFound } from "frame-master-plugin-apply-react/utils";
-import { APIError } from "@/action_ext/utils";
-import { useMarkdown } from "@markdown";
 
 export const ssr_configs = createPageConfig({
 	callback() {

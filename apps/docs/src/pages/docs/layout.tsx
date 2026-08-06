@@ -1,3 +1,4 @@
+import { useMarkdown } from "@markdown";
 import { search } from "frame-master-plugin-html-search-engine/client";
 import { usePath } from "frame-master-plugin-react-to-html/hooks";
 import type { JSX } from "react";
@@ -12,7 +13,6 @@ import {
 import { routes } from "@/utils";
 import { AnchorContext, type AnchorItem } from "./context";
 import { docSections } from "./share.ts";
-import { useMarkdown } from "@markdown";
 
 function queryAutoRag(query: string) {
 	return fetch(`/api/search/autorag?query=${encodeURIComponent(query)}`);

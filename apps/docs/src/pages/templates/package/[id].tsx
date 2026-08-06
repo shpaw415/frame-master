@@ -1,12 +1,12 @@
 "use dynamic";
 
-import { useMemo, useState } from "react";
-import { navigate, routes } from "@/utils";
+import { useMarkdown } from "@markdown";
+import { ThrowNotFound } from "@next/client";
 import { createLoader, createPageConfig } from "@next/ssr";
 import { useLoader } from "@next/ssr/hooks";
+import { useMemo, useState } from "react";
 import { APIError } from "@/action_ext/utils";
-import { ThrowNotFound } from "@next/client";
-import { useMarkdown } from "@markdown";
+import { navigate, routes } from "@/utils";
 
 export const ssr_configs = createPageConfig({
 	callback() {

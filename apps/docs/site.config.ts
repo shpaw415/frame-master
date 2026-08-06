@@ -9,14 +9,15 @@ type SiteConfigType = {
 		 * @default [".tsx", ".jsx"]
 		 */
 		routesExtensions?: string[];
-	}
+	};
 };
 
 export default {
 	siteUrl: "https://frame-master.com",
 	SEO: {
 		title: "Frame-Master Documentation - Plugins store",
-		description: "Create your own plugins for Frame-Master and share them with the community in our plugins store.",
+		description:
+			"Create your own plugins for Frame-Master and share them with the community in our plugins store.",
 		keywords: ["Frame-Master", "Optimization", "Plugins", "Documentation"],
 		author: "Justin Halle (@shpaw415)",
 		canonical: "https://frame-master.com",
@@ -24,7 +25,8 @@ export default {
 		themeColor: "#0a0a0a",
 		openGraph: {
 			title: "Frame-Master Documentation - Plugins store",
-			description: "Create your own plugins for Frame-Master and share them with the community in our plugins store.",
+			description:
+				"Create your own plugins for Frame-Master and share them with the community in our plugins store.",
 			url: "https://frame-master.com",
 			type: "website",
 			image: "https://frame-master.com/static/logo.png",
@@ -35,12 +37,13 @@ export default {
 			site: "@frame-master",
 			creator: "@shpaw415",
 			title: "Frame-Master Documentation - Plugins store",
-			description: "Create your own plugins for Frame-Master and share them with the community in our plugins store.",
+			description:
+				"Create your own plugins for Frame-Master and share them with the community in our plugins store.",
 			image: "https://frame-master.com/static/logo.png",
 		},
 		customTags: [],
 	},
 	frameworkConfig: {
 		routesExtensions: [".tsx", ".mdx"],
-	}
+	},
 } satisfies SiteConfigType;

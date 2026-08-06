@@ -1,9 +1,9 @@
-import type { parsedPlugin } from "db/schema";
-import { useState } from "react";
 import {
 	DELETE as deletePlugin,
 	PATCH as updatePlugin,
 } from "@api/admin/plugin";
+import type { parsedPlugin } from "db/schema";
+import { useState } from "react";
 import { GET as getPlugins } from "@/actions/api/plugins";
 import { useAuthEffect } from "@/hooks";
 

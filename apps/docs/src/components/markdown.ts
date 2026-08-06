@@ -1,8 +1,8 @@
-import { createHighlighter } from "shiki";
 import { fromHighlighter } from "@shikijs/markdown-it";
 import MarkdownIt from "markdown-it/lib/index.mjs";
 import type { RenderRule } from "markdown-it/lib/renderer.mjs";
 import { type DependencyList, useEffect, useState } from "react";
+import { createHighlighter } from "shiki";
 
 function mermaidPlugin(md: MarkdownIt) {
 	const defaultFence: RenderRule =

@@ -1,48 +1,52 @@
-import { errorLogs, githubAppLinks, plugins, releaseNotes, templates } from "./schema";
 import type {
-  parsedPlugin,
-  parsedGitHubAppLink,
-  parsedErrorLog,
-  parsedReleaseNote,
-  parsedTemplate,
+	errorLogs,
+	githubAppLinks,
+	parsedErrorLog,
+	parsedGitHubAppLink,
+	parsedPlugin,
+	parsedReleaseNote,
+	parsedTemplate,
+	plugins,
+	releaseNotes,
+	templates,
 } from "./schema";
 
 export function parsePlugin(plugin: typeof plugins.$inferSelect): parsedPlugin {
-  return plugin;
+	return plugin;
 }
 
 export function parsePluginsToDB(
-  plugin: Partial<parsedPlugin>
+	plugin: Partial<parsedPlugin>,
 ): Partial<typeof plugins.$inferInsert> {
-  return plugin;
+	return plugin;
 }
 
 export function parseErrorLog(
-  log: typeof errorLogs.$inferSelect
+	log: typeof errorLogs.$inferSelect,
 ): parsedErrorLog {
-  return log;
+	return log;
 }
 
 export function parseGitHubAppLink(
-  link: typeof githubAppLinks.$inferSelect
+	link: typeof githubAppLinks.$inferSelect,
 ): parsedGitHubAppLink {
-  return link;
+	return link;
 }
 
 export function parseReleaseNote(
-  releaseNote: typeof releaseNotes.$inferSelect
+	releaseNote: typeof releaseNotes.$inferSelect,
 ): parsedReleaseNote {
-  return releaseNote;
+	return releaseNote;
 }
 
 export function parseTemplate(
-  template: typeof templates.$inferSelect
+	template: typeof templates.$inferSelect,
 ): parsedTemplate {
-  return template;
+	return template;
 }
 
 export function parseTemplateToDB(
-  template: Partial<parsedTemplate>
+	template: Partial<parsedTemplate>,
 ): Partial<typeof templates.$inferInsert> {
-  return template;
+	return template;
 }

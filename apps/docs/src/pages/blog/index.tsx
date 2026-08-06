@@ -1,11 +1,11 @@
 "use dynamic";
 
+import { useMarkdown } from "@markdown";
 import { createLoader, createPageConfig } from "@next/ssr";
 import { useLoader } from "@next/ssr/hooks";
 import type { parsedReleaseNote } from "db/schema";
-import { getReleaseNotes } from "@/action_ext/utils";
 import type MarkdownIt from "markdown-it";
-import { useMarkdown } from "@markdown";
+import { getReleaseNotes } from "@/action_ext/utils";
 
 export const ssr_configs = createPageConfig({
 	callback(_ctx) {

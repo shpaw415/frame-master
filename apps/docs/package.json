@@ -54,7 +54,8 @@
 		"remark-gfm": "^4.0.1",
 		"shiki": "^4.0.2",
 		"tailwindcss": "^4.3.0",
-		"unenv": "v2.0.0-rc.24"
+		"unenv": "v2.0.0-rc.24",
+		"superjson": "2.2.6"
 	},
 	"scripts": {
 		"dev": "NODE_ENV=development bun frame-master start",

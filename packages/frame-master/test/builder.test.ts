@@ -5,8 +5,8 @@ import type { BunPlugin } from "bun";
 import type { FrameMasterConfig } from "frame-master/server/type";
 import { createBuilder } from "../src/build";
 import {
-	BuildTraceSessionStore,
 	type BuildTraceSession,
+	BuildTraceSessionStore,
 } from "../src/build/debug-trace";
 import { PluginLoader } from "../src/plugins";
 

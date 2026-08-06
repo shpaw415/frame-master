@@ -1,7 +1,7 @@
+import { GET as getState } from "@api/admin/state";
 import { clsx } from "clsx";
 import { useState } from "react";
 import { toast } from "react-toastify";
-import { GET as getState } from "@api/admin/state";
 import { useAuthEffect } from "@/hooks";
 import { routes } from "@/utils";
 

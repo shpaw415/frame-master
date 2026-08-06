@@ -1,9 +1,9 @@
-import type { parsedTemplate } from "db/schema";
-import { useState } from "react";
 import {
 	DELETE as deleteTemplate,
 	PATCH as updateTemplate,
 } from "@api/admin/template";
+import type { parsedTemplate } from "db/schema";
+import { useState } from "react";
 import { GET as getTemplates } from "@/actions/api/templates";
 import { useAuthEffect } from "@/hooks";
 import { CacheManager } from "@/utils";

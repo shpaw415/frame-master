@@ -1,4 +1,3 @@
-
 type RouteTreeNode = {
 	isStaticPage: boolean;
 	hasDynamicDescendant: boolean;
@@ -62,7 +61,8 @@ export function collectStaticExcludeRules(
 
 	const rules = pathname === "/" && node.isStaticPage ? ["/"] : [];
 	for (const [segment, child] of node.children) {
-		const childPath = pathname === "/" ? `/${segment}` : `${pathname}/${segment}`;
+		const childPath =
+			pathname === "/" ? `/${segment}` : `${pathname}/${segment}`;
 		rules.push(...collectStaticExcludeRules(child, childPath));
 	}
 

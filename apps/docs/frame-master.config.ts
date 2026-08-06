@@ -1,30 +1,29 @@
 import { getBuilder } from "frame-master/build";
+import {
+	directiveToolSingleton,
+	getGlobalPluginContext,
+} from "frame-master/plugin/utils";
 import type { FrameMasterConfig } from "frame-master/server/types";
+import { isProd } from "frame-master/utils";
 import ApplyReact from "frame-master-plugin-apply-react/plugin";
 import AssetsToBuild from "frame-master-plugin-assets-to-build";
 import AutoSiteMap from "frame-master-plugin-auto-sitemap";
 import buildUnifier from "frame-master-plugin-build-unifier";
 import SSRPlugin from "frame-master-plugin-cloudflare-pages-dynamic-ssr";
 import CFActionPlugin from "frame-master-plugin-cloudflare-pages-functions-action";
+import CloudflareRouteFilePlugin from "frame-master-plugin-cloudflare-route-file-generator";
 import EnvInHTML from "frame-master-plugin-env-in-html";
+import searchIndex from "frame-master-plugin-html-search-engine";
 import imageOptimizer from "frame-master-plugin-image-optimizer";
+import MdxLoader from "frame-master-plugin-mdx-to-js-loader";
+import nodeToBundlePlugin from "frame-master-plugin-node-polyfills";
 import ReactToHTML from "frame-master-plugin-react-to-html";
 import SEOPlugin from "frame-master-plugin-seo";
 import ServeFromBuild from "frame-master-plugin-serve-from-build";
 import TailwindPlugin from "frame-master-plugin-tailwind";
 import SVGLoader from "frame-master-svg-to-jsx-loader";
-import SiteConfig from "./site.config";
-import AsyncFallback from "./src/components/loading";
-import searchIndex from "frame-master-plugin-html-search-engine";
-import MdxLoader from "frame-master-plugin-mdx-to-js-loader";
 import rehypePrettyCode from "rehype-pretty-code";
 import remarkGfm from "remark-gfm";
-import {
-	getGlobalPluginContext,
-	directiveToolSingleton,
-} from "frame-master/plugin/utils";
-import { isProd } from "frame-master/utils";
-import CloudflareRouteFilePlugin from "frame-master-plugin-cloudflare-route-file-generator";
 import {
 	addStaticRoute,
 	collectStaticExcludeRules,
@@ -33,7 +32,8 @@ import {
 	isNonPageRoute,
 	markDynamicRoute,
 } from "./.frame-master/optimization/cloudflare_route/hoffman_coding";
-import nodeToBundlePlugin from "frame-master-plugin-node-polyfills";
+import SiteConfig from "./site.config";
+import AsyncFallback from "./src/components/loading";
 
 const WranglerServerPort = Number(process.env.WRANGLER_PORT || 8787);
 
