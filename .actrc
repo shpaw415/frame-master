@@ -1,0 +1,12 @@
+# nektos/act defaults for this monorepo
+# https://github.com/nektos/act
+#
+# Image sizes (pick one in ~/.actrc or override with -P):
+#   micro  ~200MB  — limited tools
+#   medium ~500MB  — good default for Node/Bun tooling
+#   large  ~2GB    — closer to github-hosted ubuntu-latest
+-P ubuntu-latest=catthehacker/ubuntu:act-latest
+-P ubuntu-22.04=catthehacker/ubuntu:act-22.04
+-P ubuntu-24.04=catthehacker/ubuntu:act-24.04
+# Prefer amd64 images (matches most GH-hosted runners)
+--container-architecture=linux/amd64

@@ -61,9 +61,16 @@ Notes:
 
 | Workflow | Trigger | What it does |
 |----------|---------|--------------|
-| `bun-multiplatform.yml` | PR / push (package paths) | Typecheck + tests on Linux, macOS, Windows |
+| `bun-multiplatform.yml` | PR / push to `main`, manual | Typecheck + tests on Linux, macOS, Windows |
 | `release.yml` | `packages/frame-master/package.json` on `main` | npm publish via OIDC |
 
+**Local CI** (mimic Actions with [nektos/act](https://github.com/nektos/act) or host/Docker): see [`docs/ci-local.md`](./docs/ci-local.md).
+
+```bash
+bun run ci:local          # host: same steps as GHA (no Docker)
+bun run ci:local:docker   # Ubuntu + Bun container
+bun run ci:local:act      # real workflow YAML via act (Docker required)
+```
 ## Workspace layout
 
 ```

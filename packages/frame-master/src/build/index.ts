@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { cwd } from "node:process";
 import chalk from "chalk";
 import type { FrameMasterConfig } from "frame-master/server/type";
@@ -35,6 +35,11 @@ export type BuilderProps = {
 };
 
 const DEFAULT_BUILD_DIR = ".frame-master/build";
+
+/** Resolve outdir against cwd when relative; keep absolute paths as-is (Windows-safe). */
+function resolveOutDir(outDir: string, baseCwd: string = cwd()): string {
+	return isAbsolute(outDir) ? outDir : join(baseCwd, outDir);
+}
 
 export class Builder {
 	//private buildConfigFactory: BuilderProps["pluginBuildConfig"];
@@ -92,8 +97,9 @@ export class Builder {
 
 		this.outDir = outDir.at(0) ?? DEFAULT_BUILD_DIR;
 
-		if (!existsSync(join(cwd(), this.outDir))) {
-			mkdirSync(join(cwd(), this.outDir), { recursive: true });
+		const resolvedOutDir = resolveOutDir(this.outDir);
+		if (!existsSync(resolvedOutDir)) {
+			mkdirSync(resolvedOutDir, { recursive: true });
 		}
 
 		return this;
@@ -301,13 +307,13 @@ export class Builder {
 	}
 	/** Remove leftOver files from previous build */
 	public async cleanUpOutputDir(): Promise<void> {
-		const cwd = process.cwd();
 		const outDir = this.outDir;
 		if (!outDir || !this.outputs) return Promise.resolve();
 		const filesInResult = this.outputs.map((output) => output.path);
+		const resolvedOutDir = resolveOutDir(outDir);
 		const fileToRemove = Array.from(
 			new Bun.Glob("**/*").scanSync({
-				cwd: join(cwd, outDir),
+				cwd: resolvedOutDir,
 				onlyFiles: true,
 				absolute: true,
 			}),
