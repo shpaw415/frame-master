@@ -1,19 +1,16 @@
 name: Bun – Multi-Platform CI
 
+# Always run on main + PRs (path filters were silently skipping monorepo
+# merges and follow-up pushes). Manual re-run via workflow_dispatch.
 on:
   push:
     branches: [main]
-    paths:
-      - "packages/frame-master/**"
-      - "package.json"
-      - "bun.lock"
-      - ".github/workflows/bun-multiplatform.yml"
   pull_request:
-    paths:
-      - "packages/frame-master/**"
-      - "package.json"
-      - "bun.lock"
-      - ".github/workflows/bun-multiplatform.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -28,10 +25,6 @@ jobs:
           - macos-latest
           - windows-latest
 
-    defaults:
-      run:
-        working-directory: packages/frame-master
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -42,11 +35,12 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
-        working-directory: .
         run: bun install --frozen-lockfile
 
       - name: Type check
+        working-directory: packages/frame-master
         run: bun run typecheck
 
       - name: Run tests
+        working-directory: packages/frame-master
         run: bun test
