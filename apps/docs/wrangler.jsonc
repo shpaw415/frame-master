@@ -3,7 +3,9 @@
 	"name": "frame-master-docs",
 	"pages_build_output_dir": ".frame-master/build",
 	"compatibility_date": "2026-02-17",
-	"compatibility_flags": ["nodejs_compat"],
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
 	"d1_databases": [
 		{
 			"binding": "DB",
