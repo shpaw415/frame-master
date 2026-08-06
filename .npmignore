@@ -1,5 +1,7 @@
 !.frame-master
 test
+test-suite/tests
+test-suite/examples
 bunext.code-workspace
 release-notes
 logo
@@ -8,3 +10,4 @@ TODO.md
 .ai-context
 test_project
 test.ts
+.github

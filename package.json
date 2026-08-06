@@ -4,6 +4,30 @@
 	"version": "3.2.0",
 	"baseUrl": ".",
 	"license": "MIT",
+	"description": "Plugin-first meta-framework for Bun.js",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/shpaw415/frame-master.git"
+	},
+	"bugs": {
+		"url": "https://github.com/shpaw415/frame-master/issues"
+	},
+	"homepage": "https://github.com/shpaw415/frame-master#readme",
+	"publishConfig": {
+		"access": "public"
+	},
+	"files": [
+		"bin",
+		"src",
+		"test-suite/index.ts",
+		"test-suite/src",
+		"test-suite/README.md",
+		"package.json",
+		"README.md",
+		"LICENSE",
+		"biome.json",
+		"tsconfig.json"
+	],
 	"devDependencies": {
 		"@types/bun": "latest",
 		"@types/react-dom": "^19.2.3",
@@ -35,7 +59,8 @@
 		"backend",
 		"web",
 		"server",
-		"bun"
+		"bun",
+		"plugin"
 	],
 	"engines": {
 		"bun": ">=1.2.0"
@@ -46,6 +71,7 @@
 		"frame-master": "bun run bin/index.ts",
 		"typecheck": "tsc --noEmit",
 		"test": "bun test",
+		"test:suite": "bun test test-suite",
 		"dev": "NODE_ENV=development bun --hot frame-master dev",
 		"start": "NODE_ENV=production bun frame-master start",
 		"dev:tool:debug": "NODE_ENV=development bun --cwd test_project frame-master debug"
@@ -66,6 +92,8 @@
 		"./paths": "./src/paths.ts",
 		"./build": "./src/build/index.ts",
 		"./search/plugin": "./bin/search/plugin.ts",
-		"./search/template": "./bin/search/template.ts"
+		"./search/template": "./bin/search/template.ts",
+		"./testing": "./test-suite/index.ts",
+		"./test-suite": "./test-suite/index.ts"
 	}
 }

@@ -98,6 +98,28 @@ bun frame-master dev
 # Hot reload, plugin management, and more!
 ```
 
+## 🧪 Testing plugins
+
+Plugin authors can integration-test routes, lifecycle hooks, and the **build pipeline** with the public harness:
+
+```bash
+bun add -d frame-master
+```
+
+```typescript
+import { createPluginTestEnv } from "frame-master/testing";
+import myPlugin from "./index";
+
+const env = await createPluginTestEnv({ plugins: [myPlugin()] });
+const res = await env.fetch("/hello");
+// assert res...
+await env.dispose();
+```
+
+Full guide: [`test-suite/README.md`](./test-suite/README.md).  
+Interactive HTTP GUI: `frame-master test start`.  
+Release / npm OIDC: [`docs/releasing.md`](./docs/releasing.md).
+
 ## 🏗️ Architecture
 
 ```

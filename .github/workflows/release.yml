@@ -1,0 +1,105 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "package.json"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: release-npm
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish to npm (OIDC)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Type check
+        run: bun run typecheck
+
+      - name: Run tests
+        run: bun test
+
+      - name: Setup Node (npm OIDC requires Node ≥ 22.14)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Ensure npm CLI supports trusted publishing
+        run: npm install -g npm@latest
+
+      - name: Read package version
+        id: pkg
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Package version: $VERSION"
+
+      - name: Check if version already published
+        id: check
+        run: |
+          VERSION="${{ steps.pkg.outputs.version }}"
+          if npm view "frame-master@$VERSION" version >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "Version $VERSION is already on npm — skipping publish."
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            echo "Version $VERSION is not on npm — will publish."
+          fi
+
+      - name: Publish to npm via OIDC
+        if: steps.check.outputs.published == 'false'
+        run: npm publish --access public
+
+      - name: Create git tag
+        if: steps.check.outputs.published == 'false'
+        run: |
+          VERSION="${{ steps.pkg.outputs.version }}"
+          TAG="v${VERSION}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" -m "Release $TAG"
+            git push origin "$TAG"
+          fi
+
+      - name: Create GitHub Release
+        if: steps.check.outputs.published == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.pkg.outputs.version }}"
+          TAG="v${VERSION}"
+          NOTES_FILE="release-notes/v${VERSION}.md"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "GitHub Release $TAG already exists"
+            exit 0
+          fi
+          if [ -f "$NOTES_FILE" ]; then
+            gh release create "$TAG" --title "$TAG" --notes-file "$NOTES_FILE"
+          else
+            gh release create "$TAG" --title "$TAG" --notes "Release $TAG of frame-master."
+          fi

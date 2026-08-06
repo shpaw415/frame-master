@@ -409,6 +409,12 @@ pluginCommand
 				version: "0.1.0",
 				type: "module",
 				main: "index.ts",
+				scripts: {
+					test: "bun test",
+				},
+				devDependencies: {
+					"frame-master": `^${_packageJson_.version}`,
+				},
 				peerDependencies: {
 					"frame-master": `^${_packageJson_.version}`,
 				},
@@ -423,6 +429,16 @@ pluginCommand
 				join(pluginDir, "package.json"),
 				JSON.stringify(packageJson, null, 2),
 			);
+
+			// Create sample integration test
+			const testTemplate = await Bun.file(
+				join(import.meta.dir, "plugin.test.template.ts"),
+			)
+				.text()
+				.then((content) => formatTemplateFile(content, name));
+			const testFileName = join(pluginDir, "plugin.test.ts");
+			onVerbose(() => console.log(chalk.gray(`Writing ${testFileName}...`)));
+			await Bun.write(testFileName, testTemplate);
 
 			// Create README
 			onVerbose(() => console.log(chalk.gray("Reading README template...")));
@@ -439,11 +455,14 @@ pluginCommand
 			console.log(chalk.gray("Files created:"));
 			console.log(chalk.gray(`  ${pluginFileName}`));
 			console.log(chalk.gray(`  ${join(pluginDir, "package.json")}`));
+			console.log(chalk.gray(`  ${testFileName}`));
 			console.log(chalk.gray(`  ${join(pluginDir, "README.md")}`));
 			console.log("");
 			console.log(chalk.blue("Next steps:"));
 			console.log(chalk.gray(`  cd ${pluginDir}`));
+			console.log(chalk.gray("  bun install"));
 			console.log(chalk.gray("  # Edit index.ts to implement your plugin"));
+			console.log(chalk.gray("  bun test"));
 			console.log(
 				chalk.gray(
 					"  # Add to your frame-master.config.ts when ready to use\n",

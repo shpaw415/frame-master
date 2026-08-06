@@ -31,8 +31,13 @@
 			"frame-master/server": ["./src/server/index.ts"],
 			"frame-master/runtime": ["./src/server/runtime-loader.ts"],
 			"frame-master/server/types": ["./src/server/type.ts"],
-			"frame-master/server/request": ["./src/server/request-manager.ts"]
+			"frame-master/server/request": ["./src/server/request-manager.ts"],
+			"frame-master/config": ["./src/server/config.ts"],
+			"frame-master/build": ["./src/build/index.ts"],
+			"frame-master/testing": ["./test-suite/index.ts"],
+			"frame-master/test-suite": ["./test-suite/index.ts"]
 		}
 	},
-	"include": ["src", "bin", "config", "test", "test_project"]
+	"include": ["src", "bin", "config", "test", "test_project", "test-suite"],
+	"exclude": ["**/node_modules", "**/*.template.ts"]
 }
