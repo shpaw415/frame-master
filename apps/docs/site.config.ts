@@ -44,6 +44,6 @@ export default {
 		customTags: [],
 	},
 	frameworkConfig: {
-		routesExtensions: [".tsx", ".mdx"],
+		routesExtensions: [".tsx", ".mdx"] as const,
 	},
 } satisfies SiteConfigType;

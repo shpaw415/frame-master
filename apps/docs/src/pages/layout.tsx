@@ -1,3 +1,4 @@
+import FMLogo from "@images/fm-logo.png";
 import { usePath } from "frame-master-plugin-react-to-html/hooks";
 import type { JSX } from "react";
 import { useMemo, useState } from "react";
@@ -29,7 +30,7 @@ export default function LayoutPage({ children }: { children: JSX.Element }) {
 							>
 								<span className="w-10 h-10 transition-transform group-hover:translate-x-0.75">
 									<img
-										src="/static/logo.png"
+										src={FMLogo.src(320)}
 										alt="Frame-master logo"
 										className="w-full h-full"
 									/>
@@ -186,7 +187,7 @@ export default function LayoutPage({ children }: { children: JSX.Element }) {
 							<div className="flex items-center gap-3 mb-4">
 								<div className="w-10 h-10 flex">
 									<img
-										src="/static/logo.png"
+										src={FMLogo.src(320)}
 										alt="Frame-master logo"
 										className="w-full h-full object-fill"
 									/>

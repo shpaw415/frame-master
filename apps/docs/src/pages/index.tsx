@@ -1,3 +1,4 @@
+import FMLogo from "@images/fm-logo.png";
 import { CodeBlockWithTheme } from "@/components/codeblock";
 import { routes } from "@/utils";
 
@@ -171,7 +172,7 @@ export function CTA() {
 					Join developers who stopped settling for "almost perfect" frameworks.
 				</p>
 				<div className="flex gap-4 justify-center flex-wrap">
-					<Button href="/docs/getting-started" variant="primary">
+					<Button href="/docs/start" variant="primary">
 						Get Started
 						<span className="text-xl transition-transform group-hover:translate-x-1">
 							→
@@ -197,7 +198,7 @@ export function Logo() {
 		<div className="mb-2">
 			<div className="w-36 h-36 flex transition-transform duration-300 hover:scale-105">
 				<img
-					src="/static/logo.png"
+					src={FMLogo.src(320)}
 					alt="Frame-Master Logo"
 					className="h-full w-full"
 				/>

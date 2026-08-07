@@ -94,6 +94,7 @@ export const routes = {
 			creating: "/docs/plugins/creating",
 			lifeCycle: "/docs/plugins/lifecycle",
 			hooks: "/docs/plugins/hooks",
+			testPlugins: "/docs/plugins/test",
 		},
 		cli: {
 			overview: "/docs/cli",

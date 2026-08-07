@@ -36,6 +36,7 @@ export const docSections = [
 			{ title: "Creating Plugins", href: routes.docs.plugins.creating },
 			{ title: "Plugin Lifecycle", href: routes.docs.plugins.lifeCycle },
 			{ title: "Plugin Hooks", href: routes.docs.plugins.hooks },
+			{ title: "Testing plugins", href: routes.docs.plugins.testPlugins },
 		],
 	},
 	{

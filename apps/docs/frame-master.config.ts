@@ -39,6 +39,15 @@ const WranglerServerPort = Number(process.env.WRANGLER_PORT || 8787);
 
 const nodePolyfillPlugin = nodeToBundlePlugin();
 
+const imgOptimizerPlugin = imageOptimizer({
+	input: "images",
+	output: "optimized",
+	skipExisting: true,
+	formats: ["webp"],
+	keepOriginal: true,
+	sizes: [320, 720, 1280],
+});
+
 export default {
 	HTTPServer: {
 		port: 3000,
@@ -63,6 +72,7 @@ export default {
 			asyncFallback: AsyncFallback,
 			exclude: [/loading\.(tsx|jsx)$/, /404\.(tsx|jsx)$/],
 		}),
+		imgOptimizerPlugin,
 		...buildUnifier({
 			plugins: [
 				CFActionPlugin({
@@ -131,6 +141,18 @@ export default {
 						);
 					},
 				},
+				{
+					name: "img-optimizer",
+					version: "1.0.0",
+					createContext() {
+						getGlobalPluginContext("build-unifier")?.setBuildConfig?.(
+							"img-optimizer",
+							{
+								buildConfig: imgOptimizerPlugin.build?.buildConfig,
+							},
+						);
+					},
+				},
 			],
 		}),
 		{
@@ -191,14 +213,6 @@ export default {
 				autoInjectInBuild: true,
 				runtime: "bun",
 			},
-		}),
-		imageOptimizer({
-			input: "images",
-			output: "optimized",
-			skipExisting: true,
-			formats: ["webp"],
-			keepOriginal: true,
-			sizes: [320, 720, 1280],
 		}),
 		SVGLoader(),
 		AssetsToBuild({

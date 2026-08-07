@@ -1,3 +1,4 @@
+import type React from "react";
 import { AuthProvider } from "./hooks";
 import { ThemeProvider } from "./theme";
 

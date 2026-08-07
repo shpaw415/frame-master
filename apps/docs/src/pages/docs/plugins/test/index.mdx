@@ -1,0 +1,793 @@
+# Testing Plugins ( frame-master v3.2+ )
+
+Programmatic integration tests for Frame-Master plugins using Bun’s test runner.
+
+Use **`frame-master/testing`** to spin up an isolated environment that exercises the same production paths as a real app: the HTTP server, the request pipeline, and the **unified build pipeline** — without a full project scaffold or `frame-master.config.ts` on disk.
+
+| Tool | When to use it |
+| ---- | -------------- |
+| **`frame-master/testing`** | Automated unit/integration tests in CI (`bun test`) |
+| **`frame-master test start`** | Interactive GUI to poke requests and inspect plugin state |
+| **Core `test/` in this repo** | Frame-Master framework self-tests (not for plugin authors) |
+
+Related:
+
+- [test Command (GUI)](/docs/cli/test) — interactive request debugger
+- [Creating Plugins](/docs/plugins/creating) — scaffold with `frame-master plugin create`
+- [Plugin Hooks](/docs/plugins/hooks) — lifecycle surfaces you can assert on
+- [Plugin Lifecycle](/docs/plugins/lifecycle) — startup order (`createContext`, `serverStart`, `serverReady`)
+
+---
+
+## Overview
+
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                     createPluginTestEnv()                        │
+├──────────────────────────────────────────────────────────────────┤
+│  FrameMasterConfig (in-memory)                                   │
+│  PluginLoader  ──►  Builder  ──►  optional Bun.serve (port 0)    │
+├──────────────────────────────────────────────────────────────────┤
+│  env.fetch()           Live HTTP against your router plugins     │
+│  env.handleRequest()   Pipeline without network (inspect master) │
+│  env.build()           Unified singleton build pipeline          │
+│  env.dispose()         Tear down server / release resources      │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**Import paths** (equivalent):
+
+```ts
+import { createPluginTestEnv } from "frame-master/testing";
+// or
+import { createPluginTestEnv } from "frame-master/test-suite";
+```
+
+Canonical import for docs and examples: **`frame-master/testing`**.
+
+---
+
+## Requirements
+
+- **Bun** ≥ 1.2 (same as Frame-Master engines)
+- **frame-master** as a dependency (or peer + devDependency) of your plugin package
+- Tests written for **`bun:test`** (Bun’s built-in runner)
+
+```bash
+bun add -d frame-master
+```
+
+In your plugin `package.json`:
+
+```json
+{
+  "scripts": {
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "frame-master": "^3.2.0"
+  },
+  "peerDependencies": {
+    "frame-master": "^3.2.0"
+  }
+}
+```
+
+`frame-master plugin create <name>` scaffolds a sample `plugin.test.ts` that uses this harness.
+
+---
+
+## Quick start
+
+```ts
+import { afterEach, expect, test } from "bun:test";
+import type { FrameMasterPlugin } from "frame-master/plugin/types";
+import {
+  createPluginTestEnv,
+  type PluginTestEnv,
+} from "frame-master/testing";
+
+function helloPlugin(): FrameMasterPlugin {
+  return {
+    name: "hello-plugin",
+    version: "1.0.0",
+    router: {
+      request(master) {
+        if (master.URL.pathname === "/hello") {
+          master.setResponse("ok", {
+            status: 200,
+            headers: { "Content-Type": "text/plain" },
+          });
+        }
+      },
+    },
+  };
+}
+
+let env: PluginTestEnv | undefined;
+
+afterEach(async () => {
+  await env?.dispose();
+  env = undefined;
+});
+
+test("GET /hello returns ok", async () => {
+  env = await createPluginTestEnv({
+    plugins: [helloPlugin()],
+  });
+
+  const res = await env.fetch("/hello");
+  expect(res.status).toBe(200);
+  expect(await res.text()).toBe("ok");
+});
+```
+
+Run:
+
+```bash
+bun test
+```
+
+---
+
+## Best practices
+
+1. **One env per test** — create in the test body (or `beforeEach`), dispose in `afterEach`.
+2. **Always dispose** — `await env?.dispose()` so ports and dummy servers do not leak.
+3. **Prefer sequential files** for suites that touch global plugin context (see [Isolation](#isolation-and-limitations)).
+4. **Assert production hooks** — test the same `router`, `build`, `createContext`, and `serverReady` code your users run.
+5. **Use temp dirs for file-based plugins** — `withTempDir` + `writeFixture` keep builds and assets off your package tree.
+6. **Set `startServer: false`** when you only need `handleRequest` or `build` (faster, no listen socket until needed).
+
+---
+
+## API reference
+
+### `createPluginTestEnv(options)`
+
+Creates an isolated plugin environment.
+
+```ts
+function createPluginTestEnv(
+  options: CreatePluginTestEnvOptions,
+): Promise<PluginTestEnv>;
+```
+
+#### Options (`CreatePluginTestEnvOptions`)
+
+| Option | Type | Default | Description |
+| ------ | ---- | ------- | ----------- |
+| `plugins` | `FrameMasterPlugin[]` | **required** | Plugins under test (and any hard dependencies) |
+| `config` | partial `FrameMasterConfig` | `{}` | Overrides merged on top of test defaults |
+| `cwd` | `string` | `process.cwd()` | Working directory for relative paths / fixtures |
+| `startServer` | `boolean` | `true` | Start the HTTP server during env creation |
+| `runCreateContext` | `boolean` | `true` | Run all `createContext` hooks |
+| `runServerStart` | `boolean` | `true` | Run `serverStart.main` and (non-production) `dev_main` |
+
+**Defaults applied for you:**
+
+- `HTTPServer.port`: `0` (ephemeral free port)
+- `HTTPServer.hostname`: `127.0.0.1`
+- In-memory config via `setMockConfig` (no disk `frame-master.config.ts` required)
+- `WEB_TOKEN_SECRET` is set automatically if missing (cookie helpers work)
+
+`config.plugins`, when provided, replaces `options.plugins`.
+
+---
+
+### `PluginTestEnv`
+
+Returned environment object.
+
+#### Properties
+
+| Property | Type | Description |
+| -------- | ---- | ----------- |
+| `config` | `FrameMasterConfig` | Effective config used for this env |
+| `pluginLoader` | `PluginLoader` | Sorted loaders / hook accessors |
+| `builder` | `Builder` | Singleton-style builder for this env |
+| `server` | `Bun.Server \| null` | Live server, or `null` if not started / disposed |
+| `baseUrl` | `string \| null` | e.g. `http://127.0.0.1:54321` |
+| `cwd` | `string` | Working directory from options |
+
+#### Methods
+
+##### `env.fetch(path, init?)`
+
+```ts
+fetch(path: string, init?: RequestInit): Promise<Response>
+```
+
+Issues a real HTTP request against the env server. Starts the server on first use if it was not started yet.
+
+- `path` may be absolute (`/hello`) or a full URL
+- Returns a standard `Response` (status, headers, body)
+
+##### `env.handleRequest(request)`
+
+```ts
+handleRequest(request: Request): Promise<{
+  response: Response;
+  master: masterRequest;
+}>
+```
+
+Runs the **request pipeline** (`before_request` → `request` → `after_request`) without a network hop. Prefer this when you need:
+
+- Execution order assertions
+- `master.getContext()` / cookies / response metadata after the pipeline
+- Faster tests than opening a socket
+
+##### `env.build(options?)`
+
+```ts
+build(options?: {
+  entrypoints?: string[];
+  buildConfig?: Partial<Bun.BuildConfig>;
+}): Promise<Bun.BuildOutput>
+```
+
+Runs Frame-Master’s **unified build** for plugins registered with a `build` section:
+
+- Merges static and dynamic `buildConfig` from all plugins
+- Runs `beforeBuild` / `afterBuild` hooks
+- Applies onLoad chaining (unless disabled in config)
+
+Optional `entrypoints` are passed to `builder.build(...entrypoints)`.  
+Optional `buildConfig` is injected for that call only (convenience for tests; prefer real plugin `build.buildConfig` for production-faithful coverage).
+
+##### `env.start()`
+
+Ensures the HTTP server is running (idempotent). Useful after `startServer: false`.
+
+##### `env.dispose()`
+
+Stops the live server and any internal dummy server used by `handleRequest`. Safe to call multiple times. After dispose, further `fetch` / `build` / `handleRequest` throw.
+
+---
+
+### Fixture helpers
+
+```ts
+import {
+  withTempDir,
+  writeFixture,
+  createTempDir,
+  removeTempDir,
+} from "frame-master/testing";
+```
+
+| Helper | Description |
+| ------ | ----------- |
+| `withTempDir(fn, prefix?)` | Runs `fn(dir)` with a unique temp directory; always cleans up |
+| `writeFixture(root, relativePath, contents)` | Writes a file (creates parents); returns absolute path |
+| `createTempDir(prefix?)` | Creates a temp dir under `os.tmpdir()` |
+| `removeTempDir(dir)` | Recursive `rm` (best-effort) |
+
+```ts
+await withTempDir(async (dir) => {
+  const entry = await writeFixture(
+    dir,
+    "src/client.ts",
+    `export const x = 1;\n`,
+  );
+  // use entry with env.build / plugin options
+});
+```
+
+---
+
+### Advanced lifecycle helpers
+
+For custom harnesses or partial setups, low-level hooks are also exported:
+
+```ts
+import {
+  runCreateContextHooks,
+  runServerStartHooks,
+  runServerReadyHooks,
+} from "frame-master/testing";
+```
+
+Most authors should use `createPluginTestEnv` instead of calling these directly. They mirror production init order used inside the harness.
+
+---
+
+## Recipes
+
+### HTTP route plugin
+
+Assert status, headers, and JSON body through the live server.
+
+```ts
+import { afterEach, expect, test } from "bun:test";
+import type { FrameMasterPlugin } from "frame-master/plugin/types";
+import { createPluginTestEnv, type PluginTestEnv } from "frame-master/testing";
+
+function apiPlugin(): FrameMasterPlugin {
+  return {
+    name: "api-plugin",
+    version: "1.0.0",
+    priority: 10,
+    router: {
+      request(master) {
+        if (master.URL.pathname === "/api/items" && master.request.method === "GET") {
+          master.setResponse(JSON.stringify({ items: [] }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+      },
+      after_request(master) {
+        master.response?.headers.set("X-Plugin", "api-plugin");
+      },
+    },
+  };
+}
+
+let env: PluginTestEnv | undefined;
+
+afterEach(async () => {
+  await env?.dispose();
+  env = undefined;
+});
+
+test("lists items", async () => {
+  env = await createPluginTestEnv({ plugins: [apiPlugin()] });
+  const res = await env.fetch("/api/items");
+  expect(res.status).toBe(200);
+  expect(res.headers.get("X-Plugin")).toBe("api-plugin");
+  expect(await res.json()).toEqual({ items: [] });
+});
+```
+
+---
+
+### Request pipeline order and context
+
+Use `handleRequest` when you care about intermediate state.
+
+```ts
+test("before → request → after and context", async () => {
+  const order: string[] = [];
+
+  env = await createPluginTestEnv({
+    startServer: false,
+    plugins: [
+      {
+        name: "order-plugin",
+        version: "1.0.0",
+        router: {
+          before_request(master) {
+            if (master.URL.pathname === "/order") {
+              order.push("before");
+              master.setContext({ id: "abc" });
+            }
+          },
+          request(master) {
+            if (master.URL.pathname === "/order") {
+              order.push("request");
+              const { id } = master.getContext<{ id: string }>();
+              master.setResponse(id);
+            }
+          },
+          after_request() {
+            order.push("after");
+          },
+        },
+      },
+    ],
+  });
+
+  const { response, master } = await env.handleRequest(
+    new Request("http://test/order"),
+  );
+
+  expect(order).toEqual(["before", "request", "after"]);
+  expect(await response.text()).toBe("abc");
+  expect(master.getContext<{ id: string }>().id).toBe("abc");
+});
+```
+
+---
+
+### Plugin priority and `sendNow`
+
+Lower `priority` numbers run first. `sendNow()` stops later `request` plugins.
+
+```ts
+test("high-priority plugin wins with sendNow", async () => {
+  env = await createPluginTestEnv({
+    plugins: [
+      {
+        name: "first",
+        version: "1.0.0",
+        priority: 1,
+        router: {
+          request(master) {
+            if (master.URL.pathname === "/race") {
+              master.setResponse("first");
+              master.sendNow();
+            }
+          },
+        },
+      },
+      {
+        name: "second",
+        version: "1.0.0",
+        priority: 50,
+        router: {
+          request(master) {
+            if (master.URL.pathname === "/race") {
+              master.setResponse("second");
+            }
+          },
+        },
+      },
+    ],
+  });
+
+  const res = await env.fetch("/race");
+  expect(await res.text()).toBe("first");
+});
+```
+
+---
+
+### Build pipeline (priority surface)
+
+Plugins share **one** builder. Assert hooks, merge behavior, and artifacts.
+
+```ts
+import { join } from "node:path";
+import {
+  createPluginTestEnv,
+  withTempDir,
+  writeFixture,
+} from "frame-master/testing";
+
+test("build hooks and outputs", async () => {
+  await withTempDir(async (dir) => {
+    const entry = await writeFixture(
+      dir,
+      "entry.ts",
+      `export const message = "built";\n`,
+    );
+    const outdir = join(dir, "out");
+    const order: string[] = [];
+
+    const env = await createPluginTestEnv({
+      startServer: false,
+      cwd: dir,
+      plugins: [
+        {
+          name: "build-plugin",
+          version: "1.0.0",
+          build: {
+            enableLoging: false,
+            buildConfig: {
+              outdir,
+              target: "bun",
+              entrypoints: [entry],
+            },
+            beforeBuild: async () => {
+              order.push("before");
+            },
+            afterBuild: async (_cfg, result) => {
+              order.push("after");
+              expect(result.success).toBe(true);
+            },
+          },
+        },
+      ],
+    });
+
+    try {
+      const result = await env.build();
+      expect(result.success).toBe(true);
+      expect(result.outputs.length).toBeGreaterThan(0);
+      expect(order).toEqual(["before", "after"]);
+    } finally {
+      await env.dispose();
+    }
+  });
+});
+```
+
+#### Multiple plugins contributing to one build
+
+```ts
+// Plugin A: static buildConfig (outdir, target, Bun plugins…)
+// Plugin B: dynamic buildConfig(() => ({ entrypoints, … }))
+// env.build() merges both into a single Bun.build call
+```
+
+Assert:
+
+- both plugins’ Bun `setup()` markers run
+- `outdir` / `entrypoints` resolve as expected
+- onLoad chaining still applies when multiple build plugins transform the same files
+
+See also: [Plugin Chaining](/docs/plugins/chaining) (repo: `docs/plugin-chaining.md`) for onLoad composition details.
+
+---
+
+### `createContext` and global plugin context
+
+```ts
+import { getGlobalPluginContext } from "frame-master/plugin/utils";
+
+test("createContext is visible to other plugins", async () => {
+  env = await createPluginTestEnv({
+    startServer: false,
+    plugins: [
+      {
+        name: "auth-plugin",
+        version: "1.0.0",
+        createContext: () => ({ issuer: "https://example.test" }),
+      },
+    ],
+  });
+
+  const ctx = getGlobalPluginContext("auth-plugin") as
+    | { issuer: string }
+    | undefined;
+  expect(ctx?.issuer).toBe("https://example.test");
+});
+```
+
+Skip hooks when testing pure loaders:
+
+```ts
+await createPluginTestEnv({
+  plugins: [myPlugin()],
+  runCreateContext: false,
+  runServerStart: false,
+  startServer: false,
+});
+```
+
+---
+
+### `serverStart` and `serverReady`
+
+```ts
+test("serverReady receives builder and server", async () => {
+  let ready = false;
+
+  env = await createPluginTestEnv({
+    plugins: [
+      {
+        name: "ready-plugin",
+        version: "1.0.0",
+        serverReady: async ({ server, builder, config, pluginLoader }) => {
+          ready = true;
+          expect(server.port).toBeGreaterThan(0);
+          expect(builder).toBeDefined();
+          expect(config.plugins.length).toBe(1);
+          expect(pluginLoader.getPlugins().length).toBe(1);
+        },
+      },
+    ],
+  });
+
+  expect(ready).toBe(true);
+});
+```
+
+`serverStart.main` always runs when `runServerStart` is true. `serverStart.dev_main` runs when `NODE_ENV !== "production"`.
+
+---
+
+### HTML rewrite and content types
+
+```ts
+test("html_rewrite only affects HTML responses", async () => {
+  env = await createPluginTestEnv({
+    plugins: [
+      {
+        name: "html-plugin",
+        version: "1.0.0",
+        router: {
+          request(master) {
+            if (master.URL.pathname === "/page") {
+              master.setResponse("<html><head></head><body></body></html>", {
+                headers: { "Content-Type": "text/html" },
+              });
+            }
+          },
+          html_rewrite: {
+            rewrite(rewriter) {
+              rewriter.on("head", {
+                element(el) {
+                  el.append(`<meta name="x" content="1">`, { html: true });
+                },
+              });
+            },
+          },
+        },
+      },
+    ],
+  });
+
+  const html = await (await env.fetch("/page")).text();
+  expect(html).toContain('name="x"');
+});
+```
+
+---
+
+### Multi-plugin dependency graphs
+
+Pass required plugins alongside the plugin under test (same as a real app config):
+
+```ts
+env = await createPluginTestEnv({
+  plugins: [
+    dependencyPlugin(), // e.g. shared context / build externals
+    myPlugin({ option: true }),
+  ],
+});
+```
+
+If your plugin declares `requirement.frameMasterPlugins`, those peers must be present in the same `plugins` array or env creation throws during loader validation.
+
+---
+
+### Lazy server start
+
+```ts
+env = await createPluginTestEnv({
+  plugins: [myPlugin()],
+  startServer: false, // no listen yet
+});
+
+// pure pipeline / build work...
+await env.handleRequest(new Request("http://test/"));
+await env.build({ entrypoints: [entry] });
+
+// later HTTP
+await env.start();
+const res = await env.fetch("/health");
+```
+
+`env.fetch` also auto-starts the server if needed.
+
+---
+
+## Isolation and limitations
+
+Frame-Master uses process-level state:
+
+- Config mock (`setMockConfig` / `getConfig`)
+- Global plugin context (`__GLOBAL_CONTEXT__` / `getGlobalPluginContext`)
+- Builder / plugin-loader singletons in some production entry paths
+
+The harness creates **per-env** `PluginLoader` and `Builder` instances and passes them explicitly into `createServer` / `masterRequest`, but globals can still leak between tests if you:
+
+- Rely on `getGlobalPluginContext` without unique plugin names
+- Run parallel test files that both call `createPluginTestEnv`
+- Forget `dispose()` and leave servers open
+
+**Recommendations:**
+
+| Do | Don’t |
+| -- | ----- |
+| Dispose every env in `afterEach` | Share one env across many unrelated tests without reset |
+| Use unique plugin `name`s when asserting global context | Assume empty global context after a previous file |
+| Keep integration files sequential when needed | Rely on order-dependent parallel `bun test` shards |
+| Prefer `handleRequest` for pure pipeline unit tests | Open many live servers in parallel on fixed ports (port `0` is fine) |
+
+---
+
+## Project layout for plugin packages
+
+Suggested layout for a published plugin:
+
+```
+frame-master-plugin-example/
+├── package.json
+├── index.ts              # or src/index.ts
+├── plugin.test.ts        # or test/*.test.ts
+└── README.md
+```
+
+Example `plugin.test.ts` (matches CLI scaffold):
+
+```ts
+import { afterEach, describe, expect, test } from "bun:test";
+import {
+  createPluginTestEnv,
+  type PluginTestEnv,
+} from "frame-master/testing";
+import myPlugin from "./index";
+
+describe("frame-master-plugin-example", () => {
+  let env: PluginTestEnv | undefined;
+
+  afterEach(async () => {
+    await env?.dispose();
+    env = undefined;
+  });
+
+  test("plugin loads", async () => {
+    env = await createPluginTestEnv({ plugins: [myPlugin()] });
+    expect(env.pluginLoader.getPlugins().some((p) => p.name)).toBe(true);
+  });
+});
+```
+
+---
+
+## Interactive GUI vs programmatic suite
+
+| | **Programmatic (`frame-master/testing`)** | **GUI (`frame-master test start`)** |
+| -- | ---------------------------------------- | ----------------------------------- |
+| Runner | `bun test` / CI | Local process + browser |
+| Build pipeline | Yes (`env.build`) | No (request-focused) |
+| Assert automation | Yes | Manual |
+| Config source | In-memory options | Project `frame-master.config.ts` |
+| Best for | Regression, PRs, multi-plugin matrices | Exploratory debugging |
+
+Both are supported. Use the suite for continuous verification; use the GUI when debugging a live project.
+
+---
+
+## CI example (plugin repository)
+
+```yaml
+# .github/workflows/test.yml
+name: Test
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun test
+```
+
+No special Frame-Master CI secret is required for the harness itself.
+
+---
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+| ------- | ------------ | --- |
+| `PluginTestEnv has been disposed` | Use after `dispose()` | Create a new env per test |
+| Port already in use | Fixed port in `config.HTTPServer` | Leave default `port: 0` |
+| Build has no outputs | Missing `entrypoints` / `outdir` | Set them in plugin `build.buildConfig` or `env.build({ entrypoints })` |
+| `createContext` / `serverStart` not called | Options disabled | Ensure `runCreateContext` / `runServerStart` are not `false` |
+| Requirement errors on construct | Missing peer plugins or version | Pass dependencies in `plugins`, align `requirement.frameMasterVersion` |
+| Flaky global context | Shared process state | Unique plugin names; dispose; avoid parallel conflicting suites |
+| Cookie / token errors | Missing secret | Harness sets `WEB_TOKEN_SECRET`; set your own if you override env |
+
+---
+
+## Type exports
+
+```ts
+import type {
+  CreatePluginTestEnvOptions,
+  HandleRequestResult,
+  PluginTestEnv,
+  PluginTestEnvBuildOptions,
+} from "frame-master/testing";
+```
+
+---
+
+## Next steps
+
+- [Creating Plugins](/docs/plugins/creating) — scaffold and publish
+- [Plugin Hooks](/docs/plugins/hooks) — full hook reference
+- [Plugin Lifecycle](/docs/plugins/lifecycle) — startup order
+- [test Command](/docs/cli/test) — interactive GUI
+- [Request handling](/docs/core/request-handling) — `masterRequest` behavior
+- Plugin marketplace — discover existing plugins to depend on in tests
