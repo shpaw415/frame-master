@@ -44,30 +44,65 @@ async function waitForJson<T>(
 }
 
 async function cleanupTestDir(directory: string) {
-	let lastError: unknown;
+	// Best-effort only: Windows runners often hold locks on node_modules /
+	// killed child trees long enough that a hard failure flakes CI.
+	// Race each rm attempt so a hung unlink cannot block the afterAll hook.
+	const deadline = Date.now() + 20_000;
 
-	for (let attempt = 0; attempt < 10; attempt++) {
+	while (Date.now() < deadline) {
+		const remaining = deadline - Date.now();
 		try {
-			await rm(directory, { recursive: true, force: true });
-			return;
-		} catch (error) {
-			lastError = error;
-			await Bun.sleep(250);
+			const result = await Promise.race([
+				rm(directory, {
+					recursive: true,
+					force: true,
+					maxRetries: 5,
+					retryDelay: 100,
+				}).then(() => "ok" as const),
+				Bun.sleep(Math.min(remaining, 5_000)).then(() => "timeout" as const),
+			]);
+			if (result === "ok") return;
+		} catch {
+			// EBUSY / EPERM — retry until deadline
 		}
+		await Bun.sleep(200);
 	}
-
-	throw (
-		lastError ?? new Error(`Failed to clean up test directory: ${directory}`)
-	);
 }
 
 async function stopProcess(proc: {
-	kill: () => void;
+	kill: (signal?: number | NodeJS.Signals) => void;
 	exited: Promise<number>;
+	pid?: number;
 }) {
-	proc.kill();
-	await proc.exited;
-	await Bun.sleep(250);
+	try {
+		if (process.platform === "win32" && proc.pid != null) {
+			// Kill the whole tree — Bun.spawn children otherwise leave file locks.
+			Bun.spawnSync(["taskkill", "/pid", String(proc.pid), "/T", "/F"], {
+				stdout: "ignore",
+				stderr: "ignore",
+			});
+		} else {
+			proc.kill("SIGTERM");
+		}
+	} catch {
+		// already exited
+	}
+
+	const outcome = await Promise.race([
+		proc.exited.then(() => "exited" as const),
+		Bun.sleep(3_000).then(() => "timeout" as const),
+	]);
+
+	if (outcome === "timeout") {
+		try {
+			proc.kill(9);
+		} catch {
+			// ignore
+		}
+		await Promise.race([proc.exited, Bun.sleep(1_000)]);
+	}
+
+	await Bun.sleep(process.platform === "win32" ? 500 : 100);
 }
 
 beforeAll(() => {
@@ -80,7 +115,7 @@ afterAll(async () => {
 	if (existsSync(TEST_DIR)) {
 		await cleanupTestDir(TEST_DIR);
 	}
-});
+}, 30_000);
 
 describe("frame-master CLI", () => {
 	describe("version and help", () => {
