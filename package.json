@@ -21,7 +21,10 @@
 		"test:suite": "bun run --filter frame-master test:suite",
 		"dev:docs": "bun run --filter frame-master-docs dev",
 		"build:docs": "bun run --filter frame-master-docs build",
-		"frame-master": "bun run --filter frame-master frame-master"
+		"frame-master": "bun run --filter frame-master frame-master",
+		"ci:local": "./scripts/ci-local.sh host",
+		"ci:local:act": "./scripts/ci-local.sh act",
+		"ci:local:docker": "./scripts/ci-local.sh docker"
 	},
 	"engines": {
 		"bun": ">=1.3.14"
