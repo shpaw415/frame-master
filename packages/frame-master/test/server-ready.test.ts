@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { createBuilder } from "frame-master/build";
-import { PluginLoader } from "frame-master/plugins";
+import { PluginLoader } from "frame-master/plugin";
 import type { FrameMasterConfig } from "frame-master/server/type";
 import serve, { reloadServer } from "../src/server";
 

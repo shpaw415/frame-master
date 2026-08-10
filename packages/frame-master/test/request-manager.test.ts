@@ -9,7 +9,7 @@ import {
 import { webToken } from "@shpaw415/webtoken";
 import type Builder from "frame-master/build";
 import { createBuilder } from "frame-master/build";
-import { PluginLoader } from "frame-master/plugins";
+import { PluginLoader } from "frame-master/plugin";
 import type { FrameMasterConfig } from "frame-master/server/type";
 import serve from "../src/server";
 import { masterRequest } from "../src/server/request-manager";
