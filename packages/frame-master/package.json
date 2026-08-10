@@ -1,7 +1,7 @@
 {
 	"name": "frame-master",
 	"type": "module",
-	"version": "3.2.0",
+	"version": "3.2.1",
 	"baseUrl": ".",
 	"license": "MIT",
 	"description": "Plugin-first meta-framework for Bun.js",
