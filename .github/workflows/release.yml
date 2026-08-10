@@ -10,10 +10,6 @@ on:
       - ".github/workflows/release.yml"
   workflow_dispatch:
 
-permissions:
-  contents: write
-  id-token: write
-
 concurrency:
   group: release-npm
   cancel-in-progress: false
@@ -22,6 +18,10 @@ jobs:
   publish:
     name: Publish to npm (OIDC)
     runs-on: ubuntu-latest
+    # Job-level permissions are required for OIDC token minting.
+    permissions:
+      contents: write
+      id-token: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -44,15 +44,26 @@ jobs:
         working-directory: packages/frame-master
         run: bun test
 
+      # npm Trusted Publishing needs Node ≥ 22.14 and npm ≥ 11.5.1.
+      # Do NOT set registry-url here: setup-node injects a dummy NODE_AUTH_TOKEN
+      # that can make npm prefer a bad token over OIDC.
       - name: Setup Node (npm OIDC requires Node ≥ 22.14)
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
-          registry-url: "https://registry.npmjs.org"
-          package-manager-cache: false
+          node-version: "22.14"
 
       - name: Ensure npm CLI supports trusted publishing
         run: npm install -g npm@latest
+
+      - name: OIDC + tooling preflight
+        run: |
+          echo "node: $(node --version)"
+          echo "npm:  $(npm --version)"
+          if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ]; then
+            echo "::error::ACTIONS_ID_TOKEN_REQUEST_URL is unset. id-token: write is not effective; OIDC publish cannot work."
+            exit 1
+          fi
+          echo "OIDC request URL is present."
 
       - name: Read package version
         id: pkg
@@ -77,7 +88,12 @@ jobs:
       - name: Publish to npm via OIDC
         if: steps.check.outputs.published == 'false'
         working-directory: packages/frame-master
-        run: npm publish --access public
+        env:
+          # Force OIDC path; never use a placeholder/automation token.
+          NODE_AUTH_TOKEN: ""
+        run: |
+          unset NODE_AUTH_TOKEN
+          npm publish --access public
 
       - name: Create git tag
         if: steps.check.outputs.published == 'false'
