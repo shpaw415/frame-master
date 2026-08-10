@@ -7,7 +7,7 @@ import {
 } from "@shpaw415/webtoken";
 import type { BodyInit } from "bun";
 import type Builder from "frame-master/build";
-import { PluginLoader } from "frame-master/plugins";
+import { PluginLoader } from "frame-master/plugin";
 import { renderToReadableStream, renderToString } from "react-dom/server";
 import { directiveToolSingleton } from "../plugins/utils";
 import { getConfig } from "./config";

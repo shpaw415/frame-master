@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { pluginLoader } from "frame-master/plugins";
+import { pluginLoader } from "frame-master/plugin";
 import { ConfigFileNotFound } from "frame-master/server/config";
 import { InitCLIPlugins } from "frame-master/server/init";
 
