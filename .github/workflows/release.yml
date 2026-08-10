@@ -93,7 +93,7 @@ jobs:
           NODE_AUTH_TOKEN: ""
         run: |
           unset NODE_AUTH_TOKEN
-          npm publish --access public
+          npm publish --access public --provenance
 
       - name: Create git tag
         if: steps.check.outputs.published == 'false'
