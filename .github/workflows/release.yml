@@ -44,13 +44,14 @@ jobs:
         working-directory: packages/frame-master
         run: bun test
 
-      # npm Trusted Publishing needs Node ≥ 22.14 and npm ≥ 11.5.1.
-      # Do NOT set registry-url here: setup-node injects a dummy NODE_AUTH_TOKEN
-      # that can make npm prefer a bad token over OIDC.
-      - name: Setup Node (npm OIDC requires Node ≥ 22.14)
+      # npm Trusted Publishing: Node that satisfies current npm engines + npm ≥ 11.5.1.
+      # npm@12 requires node ^22.22.2 || ^24.15.0 || >=26 — do not pin old 22.14.
+      # Do NOT set registry-url: setup-node injects a dummy NODE_AUTH_TOKEN that
+      # can make npm prefer a bad token over OIDC.
+      - name: Setup Node (npm OIDC)
         uses: actions/setup-node@v4
         with:
-          node-version: "22.14"
+          node-version: "24"
 
       - name: Ensure npm CLI supports trusted publishing
         run: npm install -g npm@latest
@@ -64,6 +65,14 @@ jobs:
             exit 1
           fi
           echo "OIDC request URL is present."
+          # Trusted publishing needs npm ≥ 11.5.1
+          node -e "
+            const [maj, min] = require('child_process').execSync('npm --version').toString().trim().split('.').map(Number);
+            if (maj < 11 || (maj === 11 && min < 5)) {
+              console.error('npm too old for trusted publishing:', process.version);
+              process.exit(1);
+            }
+          "
 
       - name: Read package version
         id: pkg

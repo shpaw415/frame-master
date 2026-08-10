@@ -41,8 +41,8 @@ Then re-run: **Actions → Release → Run workflow** (or push another `package.
 
 Requirements (enforced by the workflow):
 
-- Node.js ≥ 22.14
-- npm CLI ≥ 11.5.1
+- Node.js current LTS/Current that satisfies the installed npm engines (workflow uses Node 24; npm@12 needs `^22.22.2 || ^24.15.0 || >=26`)
+- npm CLI ≥ 11.5.1 (workflow installs `npm@latest`)
 - `package.json` `repository.url` must match the GitHub repo (`git+https://github.com/shpaw415/frame-master.git`)
 - Job permission `id-token: write` (OIDC); job log should list **Id-token: write**
 - No long-lived `NODE_AUTH_TOKEN` / `NPM_TOKEN` on the publish step (OIDC only)
