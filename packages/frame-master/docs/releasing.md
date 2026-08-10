@@ -20,24 +20,32 @@ You can also run the workflow manually: **Actions → Release → Run workflow**
 
 ## One-time: configure Trusted Publisher on npm
 
+**Required before the first OIDC publish.** Without this, `npm publish` fails with
+`E404 … could not be found or you do not have permission` (npm hides auth failures as 404).
+
 After `release.yml` exists on the default branch:
 
 1. Open [npmjs.com](https://www.npmjs.com) → package **frame-master** → **Settings** → **Trusted Publisher**
 2. Choose **GitHub Actions**
-3. Fill in:
+3. Fill in **exactly**:
    - **Organization or user:** `shpaw415`
    - **Repository:** `frame-master`
-   - **Workflow filename:** `release.yml` (filename only)
+   - **Workflow filename:** `release.yml` (filename only — not `.github/workflows/release.yml`)
    - **Environment name:** leave empty (unless you add a GitHub Environment later)
 4. Allow **`npm publish`**
 5. Save
+
+npm does **not** validate the form until you publish — typos only show up as E404 at publish time.
+
+Then re-run: **Actions → Release → Run workflow** (or push another `package.json` version bump).
 
 Requirements (enforced by the workflow):
 
 - Node.js ≥ 22.14
 - npm CLI ≥ 11.5.1
-- `package.json` `repository.url` must match `https://github.com/shpaw415/frame-master.git`
-- Workflow permission `id-token: write`
+- `package.json` `repository.url` must match the GitHub repo (`git+https://github.com/shpaw415/frame-master.git`)
+- Job permission `id-token: write` (OIDC); job log should list **Id-token: write**
+- No long-lived `NODE_AUTH_TOKEN` / `NPM_TOKEN` on the publish step (OIDC only)
 - Publish runs with working directory `packages/frame-master`
 
 ## Local dry-run (no publish)
