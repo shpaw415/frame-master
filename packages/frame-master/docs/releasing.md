@@ -12,9 +12,14 @@ This monorepo lives at [shpaw415/frame-master](https://github.com/shpaw415/frame
 4. Workflow [`.github/workflows/release.yml`](../../../.github/workflows/release.yml) runs:
    - typecheck + tests (in `packages/frame-master`)
    - if the version is **not** already on the npm registry → `npm publish`
+     (prereleases are published with the `beta` dist-tag)
    - creates git tag `vX.Y.Z` and a GitHub Release when notes exist
 
 If the version is already published, the job **skips** publish (safe re-runs).
+
+Stable versions are published with npm's default `latest` dist-tag. Versions with a
+prerelease suffix, such as `4.0.0-beta.1`, are published with `beta`, so they do
+not replace the stable install by default.
 
 You can also run the workflow manually: **Actions → Release → Run workflow**.
 

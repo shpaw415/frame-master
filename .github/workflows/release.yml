@@ -93,7 +93,12 @@ jobs:
           NODE_AUTH_TOKEN: ""
         run: |
           unset NODE_AUTH_TOKEN
-          npm publish --access public --provenance
+          VERSION="${{ steps.pkg.outputs.version }}"
+          if [[ "$VERSION" == *-* ]]; then
+            npm publish --access public --provenance --tag beta
+          else
+            npm publish --access public --provenance
+          fi
 
       - name: Create git tag
         if: steps.check.outputs.published == 'false'
