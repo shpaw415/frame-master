@@ -117,6 +117,19 @@ describe("plugin virtual modules", () => {
 		});
 
 		expect(result.success).toBeTrue();
+
+		const buildOnlyEntry = join(TEST_DIR, "build-only-runtime-entry.ts");
+		await Bun.write(
+			buildOnlyEntry,
+			`import { buildOnly } from "@test/build-only"; console.log(buildOnly);`,
+		);
+		await expect(
+			Bun.build({
+				entrypoints: [buildOnlyEntry],
+				outdir: join(TEST_DIR, "build-only-runtime-out"),
+				plugins: [runtimePlugin],
+			}),
+		).rejects.toThrow("Bundle failed");
 	});
 
 	test("reports both plugins when a specifier is declared twice", () => {
