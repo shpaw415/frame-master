@@ -15,6 +15,7 @@
  */
 
 export { createPluginTestEnv } from "./src/create-env";
+export { loadRuntimePluginFromPlugins } from "./src/runtime";
 export {
 	createTempDir,
 	removeTempDir,
