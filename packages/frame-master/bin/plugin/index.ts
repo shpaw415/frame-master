@@ -388,6 +388,7 @@ pluginCommand
 		try {
 			const pluginDir = join(options.dir, name);
 			const pluginFileName = join(pluginDir, "index.ts");
+			const testDir = join(pluginDir, "test");
 
 			console.log(chalk.bold.blue(`\n📦 Creating plugin "${name}"...\n`));
 
@@ -436,9 +437,23 @@ pluginCommand
 			)
 				.text()
 				.then((content) => formatTemplateFile(content, name));
-			const testFileName = join(pluginDir, "plugin.test.ts");
+			const testFileName = join(testDir, "plugin.test.ts");
 			onVerbose(() => console.log(chalk.gray(`Writing ${testFileName}...`)));
 			await Bun.write(testFileName, testTemplate);
+
+			const preloadTemplate = await Bun.file(
+				join(import.meta.dir, "preload.template.ts"),
+			).text();
+			const preloadFileName = join(testDir, "preload.ts");
+			onVerbose(() => console.log(chalk.gray(`Writing ${preloadFileName}...`)));
+			await Bun.write(preloadFileName, preloadTemplate);
+
+			const bunfigTemplate = await Bun.file(
+				join(import.meta.dir, "bunfig.template.toml"),
+			).text();
+			const bunfigFileName = join(pluginDir, "bunfig.toml");
+			onVerbose(() => console.log(chalk.gray(`Writing ${bunfigFileName}...`)));
+			await Bun.write(bunfigFileName, bunfigTemplate);
 
 			// Create README
 			onVerbose(() => console.log(chalk.gray("Reading README template...")));
@@ -456,6 +471,8 @@ pluginCommand
 			console.log(chalk.gray(`  ${pluginFileName}`));
 			console.log(chalk.gray(`  ${join(pluginDir, "package.json")}`));
 			console.log(chalk.gray(`  ${testFileName}`));
+			console.log(chalk.gray(`  ${preloadFileName}`));
+			console.log(chalk.gray(`  ${bunfigFileName}`));
 			console.log(chalk.gray(`  ${join(pluginDir, "README.md")}`));
 			console.log("");
 			console.log(chalk.blue("Next steps:"));

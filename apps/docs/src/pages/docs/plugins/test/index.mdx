@@ -294,6 +294,36 @@ Most authors should use `createPluginTestEnv` instead of calling these directly.
 
 ---
 
+### Runtime plugin preload
+
+`createPluginTestEnv` exercises Frame-Master's HTTP, request, and build paths. Bun runtime plugins are process-level registrations, so preload a plugin's declared `runtimePlugins` before importing a module that depends on them:
+
+```ts
+// test/preload.ts
+import { loadRuntimePluginFromPlugins } from "frame-master/testing";
+import MyPlugin from "../";
+import OtherPluginFromThirdParty from "frame-master-plugin-other-plugin";
+
+await loadRuntimePluginFromPlugins([
+  MyPlugin({}),
+  OtherPluginFromThirdParty({}),
+]);
+```
+
+Register that preload in your package's `bunfig.toml` so Bun loads it before test modules:
+
+```toml
+# bunfig.toml
+[test]
+preload = ["./test/preload.ts"]
+```
+
+Now test files can import modules handled by the runtime plugins normally. `loadRuntimePluginFromPlugins(plugins)` collects only the `runtimePlugins` declared by the provided `FrameMasterPlugin` instances and registers them with the same `onLoad` chaining behavior as the production runtime loader. It does not read `frame-master.config.ts`, create a `PluginLoader`, or start a `PluginTestEnv`.
+
+Because Bun runtime plugin registrations cannot be removed, load a stable plugin set once per test process. Avoid parallel test files that register overlapping runtime plugin filters.
+
+---
+
 ## Recipes
 
 ### HTTP route plugin

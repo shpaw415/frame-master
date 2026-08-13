@@ -90,6 +90,28 @@ await withTempDir(async (dir) => {
 
 Also: `createTempDir`, `removeTempDir`.
 
+### Runtime plugins
+
+Runtime plugins are registered by Bun before their dependent modules load. Preload
+the `runtimePlugins` declared by the plugins under test before importing those
+modules:
+
+```ts
+// test/preload.ts
+import { loadRuntimePluginFromPlugins } from "frame-master/testing";
+import MyPlugin from "../";
+import OtherPluginFromThirdParty from "frame-master-plugin-other-plugin";
+
+await loadRuntimePluginFromPlugins([
+  MyPlugin({}),
+  OtherPluginFromThirdParty({}),
+]);
+```
+
+The helper preserves Frame-Master's runtime `onLoad` chaining behavior. It only
+registers `runtimePlugins` declared by the provided plugins and does not load a
+project configuration or create a test environment.
+
 ## Build testing (priority)
 
 ```ts
