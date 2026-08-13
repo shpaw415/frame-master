@@ -18,6 +18,7 @@
 	},
 	"files": [
 		"bin",
+		"bin/plugin/bunfig.template.toml",
 		"src",
 		"test-suite/index.ts",
 		"test-suite/src",
