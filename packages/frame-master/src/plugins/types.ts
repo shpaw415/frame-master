@@ -133,6 +133,16 @@ export type PluginOptions = {
 	HTMLRewrite?: unknown;
 };
 
+/** A virtual source module declared by a Frame-Master plugin. */
+export type VirtualModuleDeclaration = {
+	/** Source made available when the module specifier is imported. */
+	contents: string | Uint8Array;
+	/** Bun loader used for the source. */
+	loader: Bun.Loader;
+	/** Also make this module available through `frame-master/runtime`. */
+	injectRuntime: boolean;
+};
+
 /**
  * Build lifecycle hooks configuration for Frame-Master plugins.
  *
@@ -467,6 +477,13 @@ export type FrameMasterPlugin<
 	version: string;
 }> &
 	Partial<{
+		/**
+		 * Virtual modules owned by this plugin. Frame-Master resolves these modules
+		 * for all plugin build configurations, allowing other plugins to import them.
+		 * Modules with `injectRuntime: true` are additionally registered by the
+		 * runtime loader.
+		 */
+		virtualModules: Record<string, VirtualModuleDeclaration>;
 		/**
 		 * Router related plugin section
 		 */

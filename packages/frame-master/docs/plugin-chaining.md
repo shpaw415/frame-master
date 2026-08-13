@@ -121,6 +121,49 @@ build.onLoad({ filter: /.*/, namespace: "virtual" }, async (args) => {
 
 Custom namespace handlers can still be chained if multiple plugins register handlers for the same namespace/filter combination.
 
+## Plugin Virtual Modules
+
+Plugins can declaratively publish source modules for other plugins and application
+code to import. Frame-Master owns resolution and loading, so plugin authors do not
+need to repeat `onResolve` and `onLoad` boilerplate.
+
+```typescript
+import type { FrameMasterPlugin } from "frame-master/plugin";
+
+export const routesPlugin = (): FrameMasterPlugin => ({
+  name: "routes-plugin",
+  version: "1.0.0",
+  virtualModules: {
+    "@routes/generated": {
+      contents: `export const routes = ["/"];`,
+      loader: "ts",
+      injectRuntime: true,
+    },
+    "@routes/build-manifest": {
+      contents: JSON.stringify({ version: 1 }),
+      loader: "json",
+      injectRuntime: false,
+    },
+  },
+});
+```
+
+All declared modules are available to Frame-Master builds. Only declarations with
+`injectRuntime: true` are registered through `frame-master/runtime`. A plugin can
+therefore publish both runtime and build-only modules.
+
+Registered module contents and their declared loader are the initial
+`args.__chainedContents` and `args.__chainedLoader` values for chained transforms.
+Use `getChainableContent(args)` or those values directly; Frame-Master never reads
+a registered virtual path from disk. A duplicate specifier is rejected during
+plugin loading with an error that names both declaring plugins.
+
+### Virtual module transforms
+
+Plugins should consume `args.__chainedContents` rather than calling
+`Bun.file(args.path)` for virtual modules. This preserves the registry-provided
+source and avoids a disk read for a specifier that has no file on disk.
+
 ## Other Handlers
 
 Only `onLoad` handlers are chained. Other handlers are passed through unchanged:

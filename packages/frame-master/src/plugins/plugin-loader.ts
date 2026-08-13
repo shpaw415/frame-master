@@ -5,6 +5,7 @@ import FrameMasterPackageJson from "../../package.json";
 import { getConfig } from "../server/config";
 import type { FrameMasterPlugin } from "./types";
 import { directiveToolSingleton } from "./utils";
+import { VirtualModuleRegistry } from "./virtual-modules";
 
 export class PluginLoader {
 	protected Plugins: Array<FrameMasterPlugin> = [];
@@ -16,6 +17,7 @@ export class PluginLoader {
 		}>
 	> = new Map();
 	private sub_plugin_cache: Map<string, Array<unknown>> = new Map();
+	private virtualModuleRegistry: VirtualModuleRegistry;
 
 	constructor(config: FrameMasterConfig) {
 		if (!config) {
@@ -30,6 +32,7 @@ export class PluginLoader {
 		});
 		this.ensurePluginRequirements();
 		this.registerPluginDirectives();
+		this.virtualModuleRegistry = new VirtualModuleRegistry(this.Plugins);
 
 		// Clear caches when plugins are reinitialized
 		this.clearCaches();
@@ -42,6 +45,10 @@ export class PluginLoader {
 
 	getPlugins() {
 		return this.Plugins;
+	}
+
+	getVirtualModuleRegistry() {
+		return this.virtualModuleRegistry;
 	}
 
 	getPluginByName<T extends keyof FrameMasterPlugin>(
