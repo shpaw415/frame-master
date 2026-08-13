@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createPluginTestEnv, type PluginTestEnv } from "frame-master/testing";
-import __CleanPluginName__ from "./index";
+import __CleanPluginName__ from "../index";
 
 /**
  * Integration tests for __PluginName__ using the Frame-Master plugin test suite.
