@@ -164,6 +164,25 @@ Plugins should consume `args.__chainedContents` rather than calling
 `Bun.file(args.path)` for virtual modules. This preserves the registry-provided
 source and avoids a disk read for a specifier that has no file on disk.
 
+### Bun.file compatibility proxy
+
+For existing plugins that cannot yet use `getChainableContent(args)`, enable the
+opt-in compatibility proxy:
+
+```typescript
+export default defineConfig({
+  pluginsOptions: {
+    virtualModuleFileProxy: true,
+  },
+});
+```
+
+It makes `Bun.file(args.path)` return the current registered source for a
+virtual-module specifier, including `text()`, `json()`, binary reads, streams,
+and metadata. All unregistered paths are passed to Bun unchanged. The proxy is
+for migration support only: `getChainableContent(args)` remains the preferred
+API because it sees output from earlier transforms in the chain.
+
 ## Other Handlers
 
 Only `onLoad` handlers are chained. Other handlers are passed through unchanged:

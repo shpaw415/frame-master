@@ -47,6 +47,14 @@ export type FrameMasterConfig = {
 		 * ```
 		 */
 		entrypoints?: string[];
+		/**
+		 * Allow existing Bun plugins to read registered virtual-module source through
+		 * `Bun.file(args.path)`. Prefer `getChainableContent(args)` for new plugins,
+		 * because it receives preceding chained transforms.
+		 *
+		 * @default false
+		 */
+		virtualModuleFileProxy?: boolean;
 	}>;
 };
 
