@@ -152,11 +152,16 @@ frame-master plugin create my-awesome-plugin --dir ./plugins
 Files created:
   my-awesome-plugin/index.ts
   my-awesome-plugin/package.json
+  my-awesome-plugin/test/plugin.test.ts
+  my-awesome-plugin/test/preload.ts
+  my-awesome-plugin/bunfig.toml
   my-awesome-plugin/README.md
 
 Next steps:
   cd my-awesome-plugin
+  bun install
   # Edit index.ts to implement your plugin
+  bun test
   # Add to your frame-master.config.ts when ready to use
 ```
 
@@ -164,10 +169,19 @@ Generated structure:
 
 ```text
 my-awesome-plugin/
-├── index.ts        # Plugin implementation
-├── package.json    # Package metadata
-└── README.md       # Documentation template
+├── index.ts             # Plugin implementation
+├── package.json         # Package metadata and test script
+├── bunfig.toml          # Configures Bun's test preload
+├── test/
+│   ├── plugin.test.ts   # Sample integration test
+│   └── preload.ts       # Registers declared runtime plugins before tests load
+└── README.md            # Documentation template
 ```
+
+`bunfig.toml` preloads `test/preload.ts` before Bun evaluates test modules. The
+preload registers runtime plugins declared by the plugin, so tests exercise the
+same runtime plugin chain used in production. Keep this preload when adding tests
+that import modules depending on runtime plugins.
 
 > Tip: Use the format `frame-master-plugin-[name]` for consistency when publishing to npm.
 

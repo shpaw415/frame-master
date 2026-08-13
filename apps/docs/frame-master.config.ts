@@ -233,6 +233,10 @@ export default {
 					src: "robots.txt",
 					dist: "robots.txt",
 				},
+				{
+					src: "404.html",
+					dist: "404.html",
+				}
 			],
 		}),
 		SEOPlugin(SiteConfig.SEO),
