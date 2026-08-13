@@ -31,7 +31,7 @@ describe("frame-master plugin create", () => {
 		expect(await bunfig.exists()).toBeTrue();
 		expect(await preload.exists()).toBeTrue();
 		expect(await testFile.exists()).toBeTrue();
-		expect(await bunfig.text()).toContain(
+		expect((await bunfig.text()).replaceAll("\r\n", "\n")).toContain(
 			'[test]\npreload = ["./test/preload.ts"]',
 		);
 		expect(await preload.text()).toContain("loadRuntimePluginFromPlugins");
