@@ -133,9 +133,14 @@ export type PluginOptions = {
 	HTMLRewrite?: unknown;
 };
 
-/** A virtual source module declared by a Frame-Master plugin. */
+/**
+ * A virtual source module declared by a Frame-Master plugin.
+ *
+ * Frame-Master resolves and loads declarations through its managed provider, so
+ * plugin authors do not need a matching Bun `onResolve` or `onLoad` handler.
+ */
 export type VirtualModuleDeclaration = {
-	/** Source made available when the module specifier is imported. */
+	/** Source made available when the module specifier is imported and chained. */
 	contents: string | Uint8Array;
 	/** Bun loader used for the source. */
 	loader: Bun.Loader;

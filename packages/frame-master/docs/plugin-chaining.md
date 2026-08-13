@@ -125,7 +125,8 @@ Custom namespace handlers can still be chained if multiple plugins register hand
 
 Plugins can declaratively publish source modules for other plugins and application
 code to import. Frame-Master owns resolution and loading, so plugin authors do not
-need to repeat `onResolve` and `onLoad` boilerplate.
+need to repeat `onResolve` and `onLoad` boilerplate. Declaring an entry is enough:
+do not add a separate `onLoad` just to return `contents`.
 
 ```typescript
 import type { FrameMasterPlugin } from "frame-master/plugin";
@@ -154,15 +155,37 @@ therefore publish both runtime and build-only modules.
 
 Registered module contents and their declared loader are the initial
 `args.__chainedContents` and `args.__chainedLoader` values for chained transforms.
-Use `getChainableContent(args)` or those values directly; Frame-Master never reads
-a registered virtual path from disk. A duplicate specifier is rejected during
-plugin loading with an error that names both declaring plugins.
+Frame-Master's managed virtual-module provider runs first, reads the declaration
+from its in-memory registry, and seeds the chain before any matching plugin
+transform runs. It never reads a registered virtual path from disk. A duplicate
+specifier is rejected during plugin loading with an error that names both
+declaring plugins.
+
+For example, a transform registered by another plugin receives the declared
+source automatically:
+
+```typescript
+build.onLoad({ filter: /.*/ }, async (args) => {
+  if (args.path !== "@routes/generated") return;
+
+  // `source` starts as the declaration's contents. If a prior transform ran,
+  // it instead contains that transform's output.
+  const source = await getChainableContent(args);
+
+  return { contents: `${source}\nexport const transformed = true;`, loader: "ts" };
+});
+```
 
 ### Virtual module transforms
 
-Plugins should consume `args.__chainedContents` rather than calling
-`Bun.file(args.path)` for virtual modules. This preserves the registry-provided
-source and avoids a disk read for a specifier that has no file on disk.
+Use `getChainableContent(args)` when a handler transforms source. It returns the
+declaration's registry-backed source for the first transform and the accumulated
+output for later transforms, preserving the full chain. It does not require a
+disk file.
+
+`Bun.file(args.path)` has a different purpose: with the compatibility proxy
+enabled, it reads the declaration's original registry-backed source. It does not
+include prior chained transforms.
 
 ### Bun.file compatibility proxy
 
@@ -177,11 +200,12 @@ export default defineConfig({
 });
 ```
 
-It makes `Bun.file(args.path)` return the current registered source for a
+It makes `Bun.file(args.path)` return the current declared registry source for a
 virtual-module specifier, including `text()`, `json()`, binary reads, streams,
-and metadata. All unregistered paths are passed to Bun unchanged. The proxy is
-for migration support only: `getChainableContent(args)` remains the preferred
-API because it sees output from earlier transforms in the chain.
+and metadata. All unregistered paths are passed to Bun unchanged. Use it when a
+plugin needs the declared source for parsing or compatibility with existing Bun
+plugin code. Use `getChainableContent(args)` for transforms that must preserve
+output from earlier handlers in the chain.
 
 ## Other Handlers
 
