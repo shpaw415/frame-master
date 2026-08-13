@@ -1,0 +1,103 @@
+<title>Plugin Chaining and Virtual Modules | Frame-Master</title>
+
+# Plugin Chaining & Virtual Modules
+
+Frame-Master lets several Bun plugins transform the same module in sequence and
+lets plugins publish generated modules without repeating `onResolve` and
+`onLoad` boilerplate.
+
+## Plugin chaining
+
+When chaining is enabled, the output of one matching `onLoad` handler is passed
+to the next handler in plugin order. Use `getChainableContent(args)` when a
+transform must preserve output produced by an earlier handler.
+
+```ts
+import { getChainableContent } from "frame-master/plugin";
+
+build.onLoad({ filter: /\.ts$/ }, async (args) => {
+  const source = await getChainableContent(args);
+
+  return {
+    contents: `${source}\nexport const transformed = true;`,
+    loader: "ts",
+  };
+});
+```
+
+For ordinary files, the first handler reads from disk. Later handlers receive
+the accumulated output instead. Set `pluginsOptions.disableOnLoadChaining` to
+`true` only when a plugin requires Bun's first-match `onLoad` behavior.
+
+## Declarative virtual modules
+
+Declare generated source on the owning `FrameMasterPlugin`:
+
+```ts
+import type { FrameMasterPlugin } from "frame-master/plugin";
+
+export const routesPlugin = (): FrameMasterPlugin => ({
+  name: "routes-plugin",
+  version: "1.0.0",
+  virtualModules: {
+    "@routes/generated": {
+      contents: `export const routes = ["/"];`,
+      loader: "ts",
+      injectRuntime: true,
+    },
+  },
+});
+```
+
+Declaring the entry is enough. Frame-Master internally resolves and loads the
+module; plugin authors do **not** add a separate `onResolve` or `onLoad` merely
+to return its declared contents.
+
+All declared modules are available during builds. `injectRuntime: true` also
+makes that individual module available through `frame-master/runtime`, while
+`injectRuntime: false` keeps it build-only.
+
+## Virtual modules in a chain
+
+Frame-Master's managed virtual-module provider runs first. It reads the
+declaration from the in-memory registry and uses it to seed:
+
+```ts
+args.__chainedContents // declared module contents
+args.__chainedLoader   // declared module loader
+```
+
+The next matching transform receives that source automatically. Each later
+transform receives the preceding transform's output through
+`getChainableContent(args)`. Virtual module source is never read from disk.
+
+## Reading declared source with Bun.file
+
+For plugins that need the originally declared source for parsing, enable the
+opt-in compatibility proxy:
+
+```ts
+export default defineConfig({
+  pluginsOptions: {
+    virtualModuleFileProxy: true,
+  },
+});
+```
+
+Then existing code can read a registered module without an `ENOENT` error:
+
+```ts
+const source = await Bun.file(args.path).text();
+```
+
+The proxy returns the declaration's current registry source, not output from
+earlier transforms. Use `getChainableContent(args)` for a transformation that
+must preserve the rest of the chain. Unregistered paths retain native
+`Bun.file()` behavior.
+
+## Rules
+
+- A virtual module specifier has one owner; duplicate declarations fail during plugin loading and name both plugins.
+- Registry contents are rebuilt when `frame-master.config.ts` reloads.
+- Use `string` for text modules and `Uint8Array` when byte preservation matters.
+- Prefer specific `onLoad` filters when a transform does not need every module.

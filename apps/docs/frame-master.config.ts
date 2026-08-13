@@ -50,7 +50,7 @@ const imgOptimizerPlugin = imageOptimizer({
 
 export default {
 	HTTPServer: {
-		port: 3000,
+		port: Number(process.env.PORT || 3000),
 	},
 	plugins: [
 		ApplyReact({

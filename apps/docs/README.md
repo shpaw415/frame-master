@@ -470,11 +470,16 @@ Set `siteUrl` to your production domain.
 1. Push to a GitHub repository.
 2. In the Cloudflare Dashboard go to **Pages** → **Create a project** → **Connect to Git**.
 3. Select your repository and set:
-   - **Framework preset**: None / Custom
-   - **Build command**: `bun i --production && NODE_ENV=production bun run build`
-   - **Build output directory**: `.frame-master/build`
+    - **Framework preset**: None / Custom
+    - **Build command**: `bun i --production && NODE_ENV=production bun run build`
+    - **Build output directory**: `.frame-master/build`
+    - **Root directory**: `apps/docs` when deploying this monorepo
 4. Add the `DYNAMIC_PAGE_KV` KV namespace binding under **Settings → Functions → KV namespace bindings**.
-5. Click **Save and Deploy**.
+5. Add `AUTH_SECRET`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`,
+   `CLOUDFLARE_D1_TOKEN`, and `CLOUDFLARE_WORKER_AI_API_KEY` as encrypted
+   variables under **Settings → Environment variables**. Cloudflare Pages does
+   not support a `secrets` field in `wrangler.jsonc`.
+6. Click **Save and Deploy**.
 
 ---
 

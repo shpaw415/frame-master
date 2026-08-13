@@ -7,6 +7,123 @@ export type RegisteredVirtualModule = VirtualModuleDeclaration & {
 	pluginName: string;
 };
 
+type VirtualModuleFile = Pick<
+	Bun.BunFile,
+	| "arrayBuffer"
+	| "bytes"
+	| "exists"
+	| "json"
+	| "size"
+	| "stream"
+	| "text"
+	| "type"
+>;
+
+let nativeBunFile: typeof Bun.file | null = null;
+let activeRegistry: VirtualModuleRegistry | null = null;
+let virtualModuleFileProxyInstalled = false;
+
+function moduleBytes(module: RegisteredVirtualModule): Uint8Array {
+	return typeof module.contents === "string"
+		? new TextEncoder().encode(module.contents)
+		: module.contents;
+}
+
+function moduleType(loader: Bun.Loader): string {
+	switch (loader) {
+		case "json":
+			return "application/json";
+		case "css":
+			return "text/css";
+		case "html":
+			return "text/html";
+		case "text":
+			return "text/plain";
+		default:
+			return "application/javascript";
+	}
+}
+
+function createVirtualModuleFile(
+	registry: VirtualModuleRegistry,
+	specifier: string,
+): VirtualModuleFile {
+	const getModule = () => registry.getModule(specifier);
+	const getBytes = () => {
+		const module = getModule();
+		if (!module)
+			throw new Error(`Virtual module "${specifier}" is no longer registered.`);
+		return moduleBytes(module);
+	};
+
+	return {
+		get size() {
+			return getBytes().byteLength;
+		},
+		get type() {
+			const module = getModule();
+			return module ? moduleType(module.loader) : "";
+		},
+		async arrayBuffer() {
+			const bytes = getBytes();
+			return bytes.buffer.slice(
+				bytes.byteOffset,
+				bytes.byteOffset + bytes.byteLength,
+			) as ArrayBuffer;
+		},
+		async bytes() {
+			return new Uint8Array(getBytes());
+		},
+		async exists() {
+			return getModule() !== undefined;
+		},
+		async json() {
+			return JSON.parse(await this.text());
+		},
+		stream() {
+			return new Blob([getBytes().slice().buffer], {
+				type: this.type,
+			}).stream();
+		},
+		async text() {
+			return new TextDecoder().decode(getBytes());
+		},
+	};
+}
+
+/**
+ * Enables the opt-in Bun.file compatibility layer for registry-backed modules.
+ * The wrapper itself is installed once; config reloads only replace its registry.
+ */
+export function configureVirtualModuleFileProxy(
+	enabled: boolean,
+	registry: VirtualModuleRegistry,
+): void {
+	activeRegistry = enabled ? registry : null;
+
+	if (enabled && !virtualModuleFileProxyInstalled) {
+		const bunWithMutableFile = Bun as unknown as { file: typeof Bun.file };
+		nativeBunFile = Bun.file;
+		bunWithMutableFile.file = ((path: string, options?: BlobPropertyBag) => {
+			const module = activeRegistry?.getModule(path);
+			if (module && activeRegistry) {
+				return createVirtualModuleFile(activeRegistry, path) as Bun.BunFile;
+			}
+			if (!nativeBunFile) throw new Error("Bun.file is not available.");
+			return nativeBunFile(path, options);
+		}) as typeof Bun.file;
+		virtualModuleFileProxyInstalled = true;
+	}
+
+	if (!enabled && virtualModuleFileProxyInstalled) {
+		const bunWithMutableFile = Bun as unknown as { file: typeof Bun.file };
+		if (!nativeBunFile) throw new Error("Bun.file is not available.");
+		bunWithMutableFile.file = nativeBunFile;
+		virtualModuleFileProxyInstalled = false;
+		nativeBunFile = null;
+	}
+}
+
 /**
  * Owns declared plugin virtual modules for one loaded Frame-Master config.
  * A new instance is created with each PluginLoader, including config reloads.
@@ -25,7 +142,10 @@ export class VirtualModuleRegistry {
 						`Virtual module "${specifier}" is declared by both plugins "${existing.pluginName}" and "${plugin.name}".`,
 					);
 				}
-				this.modules.set(specifier, { ...declaration, pluginName: plugin.name });
+				this.modules.set(specifier, {
+					...declaration,
+					pluginName: plugin.name,
+				});
 			}
 		}
 	}
@@ -40,7 +160,9 @@ export class VirtualModuleRegistry {
 
 	createPlugin(runtimeOnly = false): BunPlugin | null {
 		const modules = new Map(
-			[...this.modules].filter(([, module]) => !runtimeOnly || module.injectRuntime),
+			[...this.modules].filter(
+				([, module]) => !runtimeOnly || module.injectRuntime,
+			),
 		);
 		if (modules.size === 0) return null;
 

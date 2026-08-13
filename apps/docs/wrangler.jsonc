@@ -3,9 +3,7 @@
 	"name": "frame-master-docs",
 	"pages_build_output_dir": ".frame-master/build",
 	"compatibility_date": "2026-02-17",
-	"compatibility_flags": [
-		"nodejs_compat"
-	],
+	"compatibility_flags": ["nodejs_compat"],
 	"d1_databases": [
 		{
 			"binding": "DB",
@@ -35,14 +33,13 @@
 	"ai": {
 		"binding": "AI",
 		"remote": true
-	},
-	"secrets": {
-		"required": [
-			"AUTH_SECRET",
-			"GITHUB_APP_PRIVATE_KEY",
-			"GITHUB_WEBHOOK_SECRET",
-			"CLOUDFLARE_D1_TOKEN",
-			"CLOUDFLARE_WORKER_AI_API_KEY"
-		]
 	}
+
+	// Required encrypted Cloudflare Pages environment variables:
+	// AUTH_SECRET, GITHUB_APP_PRIVATE_KEY, GITHUB_WEBHOOK_SECRET,
+	// CLOUDFLARE_D1_TOKEN, CLOUDFLARE_WORKER_AI_API_KEY
+	//
+	// Pages does not support a `secrets` configuration property. Keep these values
+	// in the Pages dashboard under Settings > Environment variables as encrypted
+	// variables; this inventory stays here for deployment configuration discoverability.
 }
