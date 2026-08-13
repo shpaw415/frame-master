@@ -19,7 +19,7 @@ type VirtualModuleFile = Pick<
 	| "type"
 >;
 
-const nativeBunFile = Bun.file;
+let nativeBunFile: typeof Bun.file | null = null;
 let activeRegistry: VirtualModuleRegistry | null = null;
 let virtualModuleFileProxyInstalled = false;
 
@@ -100,22 +100,27 @@ export function configureVirtualModuleFileProxy(
 	registry: VirtualModuleRegistry,
 ): void {
 	activeRegistry = enabled ? registry : null;
-	const bunWithMutableFile = Bun as unknown as { file: typeof Bun.file };
 
 	if (enabled && !virtualModuleFileProxyInstalled) {
+		const bunWithMutableFile = Bun as unknown as { file: typeof Bun.file };
+		nativeBunFile = Bun.file;
 		bunWithMutableFile.file = ((path: string, options?: BlobPropertyBag) => {
 			const module = activeRegistry?.getModule(path);
 			if (module && activeRegistry) {
 				return createVirtualModuleFile(activeRegistry, path) as Bun.BunFile;
 			}
+			if (!nativeBunFile) throw new Error("Bun.file is not available.");
 			return nativeBunFile(path, options);
 		}) as typeof Bun.file;
 		virtualModuleFileProxyInstalled = true;
 	}
 
 	if (!enabled && virtualModuleFileProxyInstalled) {
+		const bunWithMutableFile = Bun as unknown as { file: typeof Bun.file };
+		if (!nativeBunFile) throw new Error("Bun.file is not available.");
 		bunWithMutableFile.file = nativeBunFile;
 		virtualModuleFileProxyInstalled = false;
+		nativeBunFile = null;
 	}
 }
 
