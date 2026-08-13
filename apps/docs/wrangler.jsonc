@@ -34,4 +34,12 @@
 		"binding": "AI",
 		"remote": true
 	}
+
+	// Required encrypted Cloudflare Pages environment variables:
+	// AUTH_SECRET, GITHUB_APP_PRIVATE_KEY, GITHUB_WEBHOOK_SECRET,
+	// CLOUDFLARE_D1_TOKEN, CLOUDFLARE_WORKER_AI_API_KEY
+	//
+	// Pages does not support a `secrets` configuration property. Keep these values
+	// in the Pages dashboard under Settings > Environment variables as encrypted
+	// variables; this inventory stays here for deployment configuration discoverability.
 }
