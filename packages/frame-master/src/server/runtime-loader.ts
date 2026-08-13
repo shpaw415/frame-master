@@ -34,6 +34,11 @@ export async function load() {
 		}
 	}
 
+	const virtualModulePlugin = pluginLoader
+		.getVirtualModuleRegistry()
+		.createPlugin(true);
+	if (virtualModulePlugin) allRuntimePlugins.unshift(virtualModulePlugin);
+
 	if (allRuntimePlugins.length > 0) {
 		if (disableChaining) {
 			// Load plugins individually without chaining

@@ -32,6 +32,7 @@ export type BuilderProps = {
 	 * These are merged with plugin-provided and per-build entrypoints.
 	 */
 	baseEntrypoints?: string[];
+	virtualModulePlugin?: Bun.BunPlugin | null;
 };
 
 const DEFAULT_BUILD_DIR = ".frame-master/build";
@@ -51,6 +52,7 @@ export class Builder {
 	private currentBuildConfig: Bun.BuildConfig | null = null;
 	private disableOnLoadChaining: boolean = false;
 	private baseEntrypoints: string[];
+	private virtualModulePlugin: Bun.BunPlugin | null;
 
 	readonly isLogEnabled: boolean;
 	public outputs: Bun.BuildArtifact[] | null = null;
@@ -75,6 +77,7 @@ export class Builder {
 		this.isLogEnabled = props.enableLogging ?? true;
 		this.disableOnLoadChaining = props.disableOnLoadChaining ?? false;
 		this.baseEntrypoints = props.baseEntrypoints ?? [];
+		this.virtualModulePlugin = props.virtualModulePlugin ?? null;
 	}
 
 	private async init() {
@@ -605,17 +608,20 @@ export class Builder {
 	private normalizeBuildPlugins<T extends Partial<Bun.BuildConfig>>(
 		config: T,
 	): T {
+		const plugins = [
+			...(this.virtualModulePlugin ? [this.virtualModulePlugin] : []),
+			...(config.plugins ?? []),
+		];
 		if (
 			this.disableOnLoadChaining ||
-			config.plugins === undefined ||
-			config.plugins.length === 0
+			plugins.length === 0
 		) {
-			return config;
+			return plugins.length > 0 ? { ...config, plugins } : config;
 		}
 
 		if (
-			config.plugins.length === 1 &&
-			config.plugins[0]?.name === "frame-master-chained-loader"
+			plugins.length === 1 &&
+			plugins[0]?.name === "frame-master-chained-loader"
 		) {
 			return config;
 		}
@@ -623,7 +629,7 @@ export class Builder {
 		return {
 			...config,
 			plugins: [
-				chainPlugins(config.plugins, {
+				chainPlugins(plugins, {
 					suffix: "build",
 					trace: this.debugSession,
 				}),
@@ -1121,6 +1127,9 @@ export async function createBuilder(
 		disableOnLoadChaining: _config?.pluginsOptions?.disableOnLoadChaining,
 		buildConfigs: plugin.map((p) => p.pluginParent),
 		baseEntrypoints: _config?.pluginsOptions?.entrypoints,
+		virtualModulePlugin: _pluginLoader
+			.getVirtualModuleRegistry()
+			.createPlugin(),
 	});
 }
 
