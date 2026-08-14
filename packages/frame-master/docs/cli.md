@@ -115,6 +115,7 @@ frame-master plugin info frame-master-plugin-react-ssr
 - Requirements (Frame-Master version, Bun version, dependencies)
 - Directives
 - WebSocket handlers
+- Virtual modules and whether each is available to the runtime and/or build pipeline
 
 **Example Output:**
 
@@ -135,6 +136,9 @@ Features:
     ✓ dev_main
   File System:
     ✓ Watching 2 directories
+  Virtual Modules:
+    ✓ @routes/generated (runtime and build)
+    ✓ @routes/manifest (build only)
 
 Requirements:
   Frame-Master: ^1.0.0
