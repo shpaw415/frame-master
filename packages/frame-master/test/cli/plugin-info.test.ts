@@ -43,7 +43,7 @@ describe("frame-master plugin info", () => {
 			["bun", CLI_PATH, "plugin", "info", "virtual-modules-plugin"],
 			{ cwd: dir, stdout: "pipe", stderr: "pipe" },
 		);
-		const output = await new Response(process.stdout).text();
+		const output = Bun.stripANSI(await new Response(process.stdout).text());
 		await process.exited;
 
 		expect(process.exitCode).toBe(0);
