@@ -6,6 +6,28 @@ import {
 	useRef,
 	useState,
 } from "react";
+import Alert from "@shpaw415/mui-lite/Alert";
+import AppBar from "@shpaw415/mui-lite/AppBar";
+import Box from "@shpaw415/mui-lite/Box";
+import Button from "@shpaw415/mui-lite/Button";
+import Chip from "@shpaw415/mui-lite/Chip";
+import IconButton from "@shpaw415/mui-lite/IconButton";
+import Paper from "@shpaw415/mui-lite/Paper";
+import { Tab } from "@shpaw415/mui-lite/Tabs";
+import Tabs from "@shpaw415/mui-lite/Tabs";
+import { DefaultTheme, ThemeProvider } from "@shpaw415/mui-lite/theme";
+import TextField from "@shpaw415/mui-lite/TextField";
+import Toolbar from "@shpaw415/mui-lite/Toolbar";
+import Typography from "@shpaw415/mui-lite/Typography";
+import {
+	CloudUpload,
+	Download,
+	Menu,
+	Moon,
+	RefreshCw,
+	Search,
+	Sun,
+} from "lucide-react";
 import type {
 	BuildTraceBuild,
 	BuildTraceBuildStatus,
@@ -92,32 +114,25 @@ function statusLabel(status: BuildTraceBuildStatus) {
 	return "running";
 }
 
-function statusBadge(status: BuildTraceBuildStatus) {
-	if (status === "success") return "t-badge-ok";
-	if (status === "error") return "t-badge-err";
-	return "t-badge-run";
+function statusColor(status: BuildTraceBuildStatus) {
+	if (status === "success") return "success" as const;
+	if (status === "error") return "error" as const;
+	return "warning" as const;
 }
 
 function StepErrorPanel({ error }: { error: BuildTraceStepError }) {
 	return (
-		<div className="flex flex-col h-full overflow-y-auto p-4 gap-4 font-mono text-xs">
+		<Box className="debug-error-panel">
 			{/* Error type + message */}
-			<div className="flex flex-col gap-1.5">
-				<div className="flex items-center gap-2">
-					<span className="t-badge t-badge-err shrink-0">{error.name}</span>
-					<span className="t-err font-semibold text-sm leading-snug break-all">
-						{error.message}
-					</span>
-				</div>
-			</div>
+			<Alert severity="error" className="debug-error-alert">
+				<strong>{error.name}</strong>: {error.message}
+			</Alert>
 
 			{/* Stack trace */}
 			{error.stack && (
-				<div className="flex flex-col gap-1">
-					<div className="t-section-label text-xs uppercase tracking-wider pb-1">
-						stack trace
-					</div>
-					<pre className="t-surface border rounded p-3 text-xs leading-relaxed t-dim overflow-x-auto whitespace-pre-wrap break-all">
+				<Paper variant="outlined" className="debug-error-detail">
+					<Typography variant="overline">Stack trace</Typography>
+					<pre>
 						{/* Strip the first line of the stack if it duplicates name+message */}
 						{error.stack.startsWith(`${error.name}: ${error.message}`)
 							? error.stack
@@ -125,28 +140,24 @@ function StepErrorPanel({ error }: { error: BuildTraceStepError }) {
 									.trimStart()
 							: error.stack}
 					</pre>
-				</div>
+				</Paper>
 			)}
 
 			{/* Cause chain */}
 			{error.cause && (
-				<div className="flex flex-col gap-1">
-					<div className="t-section-label text-xs uppercase tracking-wider pb-1">
-						caused by
-					</div>
-					<pre className="t-surface border rounded p-3 text-xs leading-relaxed t-dim overflow-x-auto whitespace-pre-wrap break-all">
+				<Paper variant="outlined" className="debug-error-detail">
+					<Typography variant="overline">Caused by</Typography>
+					<pre>
 						{error.cause}
 					</pre>
-				</div>
+				</Paper>
 			)}
 
 			{/* Extra properties */}
 			{error.extra && Object.keys(error.extra).length > 0 && (
-				<div className="flex flex-col gap-1">
-					<div className="t-section-label text-xs uppercase tracking-wider pb-1">
-						extra
-					</div>
-					<div className="t-surface border rounded p-3 flex flex-col gap-1">
+				<Paper variant="outlined" className="debug-error-detail">
+					<Typography variant="overline">Extra</Typography>
+					<div className="debug-key-value-list">
 						{Object.entries(error.extra).map(([k, v]) => (
 							<div key={k} className="flex gap-2">
 								<span className="t-faint shrink-0 w-24 truncate">{k}</span>
@@ -154,9 +165,9 @@ function StepErrorPanel({ error }: { error: BuildTraceStepError }) {
 							</div>
 						))}
 					</div>
-				</div>
+				</Paper>
 			)}
-		</div>
+		</Box>
 	);
 }
 
@@ -164,6 +175,9 @@ export default function DebugApp() {
 	const [state, setState] = useState(createInitialDebugUIState);
 	const [theme, setTheme] = useState<"dark" | "light">("dark");
 	const [leftTab, setLeftTab] = useState<LeftTabKey>("builds");
+	const [fileNameFilter, setFileNameFilter] = useState("");
+	const [fileTypeFilter, setFileTypeFilter] = useState("all");
+	const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
 	const socketRef = useRef<WebSocket | null>(null);
 	const importFileRef = useRef<HTMLInputElement | null>(null);
 
@@ -206,6 +220,22 @@ export default function DebugApp() {
 	const deferredBuildList = useDeferredValue(state.buildList);
 	const deferredRegistry = useDeferredValue(state.registry);
 	const deferredWatcherEvents = useDeferredValue(state.watcherEvents);
+	const deferredFileNameFilter = useDeferredValue(fileNameFilter.trim().toLowerCase());
+	const availableFileTypes = [
+		...new Set(
+			(selectedBuild?.files ?? [])
+				.map((file) => file.finalLoader)
+				.filter((loader): loader is Bun.Loader => Boolean(loader)),
+		),
+	].sort();
+	const filteredFiles = (selectedBuild?.files ?? []).filter((file) => {
+		const matchesName =
+			!deferredFileNameFilter ||
+			file.path.toLowerCase().includes(deferredFileNameFilter);
+		const matchesType =
+			fileTypeFilter === "all" || file.finalLoader === fileTypeFilter;
+		return matchesName && matchesType;
+	});
 
 	const handleMessage = useEffectEvent((message: DebugBuildMessage) => {
 		startTransition(() => {
@@ -318,58 +348,75 @@ export default function DebugApp() {
 		selectedStep?.loaderAfter ?? selectedStep?.loaderBefore,
 	);
 
+	const debugTheme = { ...DefaultTheme, theme };
+	const isLive = state.connection !== "closed";
+
 	return (
-		<div className="flex h-screen flex-col overflow-hidden" data-theme={theme}>
+		<ThemeProvider
+			theme={debugTheme}
+			className="debug-theme"
+			data-theme={theme}
+		>
+			<div className="debug-app" data-theme={theme}>
 			{/* ── Top bar ── */}
-			<div className="t-surface border-b px-4 py-2 flex items-center justify-between shrink-0">
-				<div className="flex items-center gap-2 text-xs">
-					<span className="t-accent font-semibold">frame-master</span>
-					<span className="t-faint">/</span>
-					<span className="t-dim">debug build</span>
-				</div>
-				<div className="flex items-center gap-3 text-xs">
-					<span className="t-dim">{window.location.host}</span>
-					<span className="t-faint">·</span>
-					<span className="t-muted">
-						{deferredBuildList.length} <span className="t-faint">builds</span>
-					</span>
-					<span className="t-muted">
-						{deferredRegistry.length} <span className="t-faint">plugins</span>
-					</span>
-					<span className="t-muted">
-						{String(state.session?.options.watch ?? false)}{" "}
-						<span className="t-faint">watch</span>
-					</span>
-					<span className={state.connection === "open" ? "t-ok" : "t-run"}>
-						● {state.connection}
-					</span>
-					<div className="flex items-center gap-1.5 ml-2">
-						<button
+			<AppBar className="debug-app-bar" position="static">
+				<Toolbar className="debug-toolbar">
+					<IconButton
+						type="button"
+						className="debug-navigation-trigger"
+						onClick={() => setMobileNavigationOpen(true)}
+						aria-label="Open debug navigation"
+					>
+						<Menu size={20} />
+					</IconButton>
+					<Box className="debug-product-title">
+						<Typography variant="subtitle1">Frame Master</Typography>
+						<Typography variant="caption">Build debugger</Typography>
+					</Box>
+					<Box className="debug-toolbar-status">
+						<Typography variant="caption">{window.location.host}</Typography>
+						<Chip size="small">{deferredBuildList.length} builds</Chip>
+						<Chip size="small">{deferredRegistry.length} plugins</Chip>
+						<Chip size="small">watch {String(state.session?.options.watch ?? false)}</Chip>
+						<Chip size="small" color={state.connection === "open" ? "success" : "warning"}>
+							{state.connection}
+						</Chip>
+					</Box>
+					<Box className="debug-toolbar-actions">
+						<Button
 							type="button"
 							onClick={() =>
 								socketRef.current?.send(
 									JSON.stringify({ type: "trigger-rebuild" }),
 								)
 							}
-							className="t-btn-accent"
+							variant="contained"
+							size="small"
+							startIcon={<RefreshCw size={15} />}
+							disabled={!isLive}
+							title={isLive ? "Trigger a new build" : "Unavailable while viewing a saved trace"}
 						>
-							rebuild
-						</button>
-						<a
+							Rebuild
+						</Button>
+						<Button
 							href="/api/export"
 							download="frame-master-debug-trace.json"
-							className="t-btn"
+							variant="outlined"
+							size="small"
+							startIcon={<Download size={15} />}
 						>
-							export
-						</a>
-						<button
+							Export
+						</Button>
+						<Button
 							type="button"
 							onClick={() => importFileRef.current?.click()}
-							className="t-btn"
+							variant="outlined"
+							size="small"
+							startIcon={<CloudUpload size={15} />}
 							title="Import a debug-trace.json file"
 						>
-							import trace
-						</button>
+							Import trace
+						</Button>
 						<input
 							ref={importFileRef}
 							type="file"
@@ -377,39 +424,51 @@ export default function DebugApp() {
 							className="hidden"
 							onChange={handleImportFile}
 						/>
-						<button
+						<IconButton
 							type="button"
 							onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-							className="t-btn"
 							title="Toggle light/dark theme"
+							aria-label="Toggle light and dark theme"
 						>
-							{theme === "dark" ? "☀" : "◗"}
-						</button>
-					</div>
-				</div>
-			</div>
+							{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
+						</IconButton>
+					</Box>
+				</Toolbar>
+			</AppBar>
 
 			{/* ── Main 2-column layout ── */}
-			<div className="flex flex-1 overflow-hidden">
+			<div className="debug-workspace">
+				{mobileNavigationOpen && (
+					<button
+						type="button"
+						className="debug-navigation-backdrop"
+						onClick={() => setMobileNavigationOpen(false)}
+						aria-label="Close debug navigation"
+					/>
+				)}
 				{/* Left panel — tabbed */}
-				<div className="w-60 shrink-0 border-r flex flex-col overflow-hidden">
+				<Paper
+					variant="outlined"
+					square
+					className={`debug-sidebar${mobileNavigationOpen ? " debug-sidebar-open" : ""}`}
+				>
 					{/* Tab bar */}
-					<div className="flex shrink-0 border-b">
+					<Tabs
+						value={leftTab}
+						onChange={(_, value) => {
+							setLeftTab(value as LeftTabKey);
+						}}
+						variant="fullWidth"
+						aria-label="Debug navigation"
+					>
 						{LEFT_TABS.map((tab) => (
-							<button
+							<Tab
 								key={tab.key}
-								type="button"
-								onClick={() => setLeftTab(tab.key)}
-								className={`flex-1 px-2 py-1.5 text-xs transition-colors${
-									leftTab === tab.key
-										? " t-accent font-semibold border-b-2 border-current -mb-px"
-										: " t-faint t-hover"
-								}`}
-							>
-								{tab.label}
-							</button>
+								value={tab.key}
+								label={tab.label}
+							/>
 						))}
-					</div>
+					</Tabs>
 
 					{/* Tab: builds + watch feed */}
 					{leftTab === "builds" && (
@@ -443,11 +502,9 @@ export default function DebugApp() {
 													>
 														#{build.sequence}
 													</span>
-													<span
-														className={`t-badge ${statusBadge(build.status)}`}
-													>
+													<Chip size="small" color={statusColor(build.status)}>
 														{statusLabel(build.status)}
-													</span>
+													</Chip>
 												</div>
 												<div className="mt-1 text-xs t-dim">
 													{new Date(build.startedAt).toLocaleTimeString()}
@@ -494,9 +551,33 @@ export default function DebugApp() {
 								style={{ flex: "1 1 50%" }}
 							>
 								<div className="t-section-label border-b shrink-0">files</div>
+								<div className="debug-file-filters">
+									<TextField
+										className="debug-file-search"
+										variant="outlined"
+										label="Find files"
+										value={fileNameFilter}
+										onChange={(event) => setFileNameFilter(event.target.value)}
+										startIcon={<Search size={16} />}
+									/>
+									<select
+										className="debug-file-type-filter"
+										value={fileTypeFilter}
+										onChange={(event) => setFileTypeFilter(event.target.value)}
+										aria-label="Filter files by type"
+									>
+										<option value="all">All types</option>
+										{availableFileTypes.map((loader) => (
+											<option key={loader} value={loader}>
+												{loader}
+											</option>
+										))}
+									</select>
+								</div>
 								<div className="flex-1 overflow-y-auto">
 									{selectedBuild?.files.length ? (
-										selectedBuild.files.map((file) => {
+										filteredFiles.length ? (
+											filteredFiles.map((file) => {
 											const isSelected = selectedFile?.id === file.id;
 											return (
 												<button
@@ -506,9 +587,9 @@ export default function DebugApp() {
 														const firstStep = file.steps[0];
 														if (!firstStep) return;
 														startTransition(() => {
-															setState((current) =>
-																selectStep(current, file.id, firstStep.id),
-															);
+														setState((current) =>
+															selectStep(current, file.id, firstStep.id),
+														);
 														});
 													}}
 													className={`w-full px-3 py-2 text-left border-b transition-colors t-hover${
@@ -526,7 +607,12 @@ export default function DebugApp() {
 													</div>
 												</button>
 											);
-										})
+											})
+										) : (
+											<div className="px-3 py-6 text-xs t-faint text-center">
+												no files match these filters
+											</div>
+										)
 									) : (
 										<div className="px-3 py-6 text-xs t-faint text-center">
 											select a build
@@ -550,9 +636,9 @@ export default function DebugApp() {
 													type="button"
 													onClick={() => {
 														startTransition(() => {
-															setState((current) =>
-																selectStep(current, selectedFile.id, step.id),
-															);
+														setState((current) =>
+															selectStep(current, selectedFile.id, step.id),
+														);
 														});
 													}}
 													className={`w-full px-3 py-2 text-left border-b transition-colors t-hover${
@@ -703,7 +789,7 @@ export default function DebugApp() {
 							</div>
 						</div>
 					)}
-				</div>
+				</Paper>
 
 				{/* Center — diff editor (full height) */}
 				<div className="flex flex-1 flex-col overflow-hidden">
@@ -714,11 +800,9 @@ export default function DebugApp() {
 								<span className="t-text font-medium">
 									build #{selectedSummary.sequence}
 								</span>
-								<span
-									className={`t-badge ${statusBadge(selectedSummary.status)}`}
-								>
+								<Chip size="small" color={statusColor(selectedSummary.status)}>
 									{statusLabel(selectedSummary.status)}
-								</span>
+								</Chip>
 								<span className="t-dim">
 									{formatDuration(selectedSummary.durationMs)}
 								</span>
@@ -784,6 +868,7 @@ export default function DebugApp() {
 					</div>
 				</div>
 			</div>
-		</div>
+			</div>
+		</ThemeProvider>
 	);
 }

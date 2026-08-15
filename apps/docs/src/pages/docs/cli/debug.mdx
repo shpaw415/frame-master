@@ -68,9 +68,12 @@ The debug UI is meant for build-level diagnosis:
 
 - Build history — each captured build, status, duration, entrypoints, and output counts
 - File pipeline — every traced file, loader transitions, and final loader/size
+- File filters — search traced file paths by name and narrow the list by final loader type
 - Plugin interventions — `onLoad` and `finally` steps with execution order and timings
 - Snapshots — before/after content snapshots for traced transformations
 - Plugin registry metrics — plugin priority, dependency constraints, loader coverage, and total intervention time
+- Material diagnostic workspace — adaptive tabs, status chips, and a high-contrast diff surface for desktop and narrow screens
+- Mobile navigation drawer — keeps the diff workspace visible until you open Builds, Files, or Info
 
 ### HTTP Endpoints
 
@@ -119,6 +122,7 @@ In view mode, the UI is read-only:
 - No live rebuilds
 - No active WebSocket stream
 - `/api/export` returns the loaded trace file contents
+- The rebuild action is disabled while the saved trace is open
 
 ## Recommended Workflow
 
