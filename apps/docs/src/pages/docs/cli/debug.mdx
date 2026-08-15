@@ -71,6 +71,7 @@ The debug UI is meant for build-level diagnosis:
 - Plugin interventions — `onLoad` and `finally` steps with execution order and timings
 - Snapshots — before/after content snapshots for traced transformations
 - Plugin registry metrics — plugin priority, dependency constraints, loader coverage, and total intervention time
+- Material diagnostic workspace — adaptive tabs, status chips, and a high-contrast diff surface for desktop and narrow screens
 
 ### HTTP Endpoints
 
@@ -119,6 +120,7 @@ In view mode, the UI is read-only:
 - No live rebuilds
 - No active WebSocket stream
 - `/api/export` returns the loaded trace file contents
+- The rebuild action is disabled while the saved trace is open
 
 ## Recommended Workflow
 
