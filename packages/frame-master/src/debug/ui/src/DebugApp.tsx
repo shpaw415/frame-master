@@ -457,7 +457,6 @@ export default function DebugApp() {
 						value={leftTab}
 						onChange={(_, value) => {
 							setLeftTab(value as LeftTabKey);
-							setMobileNavigationOpen(false);
 						}}
 						variant="fullWidth"
 						aria-label="Debug navigation"
@@ -491,7 +490,6 @@ export default function DebugApp() {
 														setState((current) =>
 															selectBuild(current, build.id),
 														);
-														setMobileNavigationOpen(false);
 													});
 												}}
 												className={`w-full px-3 py-2.5 text-left border-b transition-colors t-hover${
@@ -590,7 +588,6 @@ export default function DebugApp() {
 														setState((current) =>
 															selectStep(current, file.id, firstStep.id),
 														);
-														setMobileNavigationOpen(false);
 														});
 													}}
 													className={`w-full px-3 py-2 text-left border-b transition-colors t-hover${
@@ -640,7 +637,6 @@ export default function DebugApp() {
 														setState((current) =>
 															selectStep(current, selectedFile.id, step.id),
 														);
-														setMobileNavigationOpen(false);
 														});
 													}}
 													className={`w-full px-3 py-2 text-left border-b transition-colors t-hover${
