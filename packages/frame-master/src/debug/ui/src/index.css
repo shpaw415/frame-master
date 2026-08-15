@@ -325,6 +325,21 @@ body {
 	justify-content: flex-end;
 }
 
+.debug-navigation-trigger {
+	display: none;
+}
+
+.debug-workspace {
+	display: flex;
+	min-height: 0;
+	flex: 1;
+	overflow: hidden;
+}
+
+.debug-navigation-backdrop {
+	display: none;
+}
+
 .debug-sidebar {
 	display: flex;
 	width: 288px;
@@ -340,6 +355,28 @@ body {
 .debug-sidebar .MUI_Tabs {
 	flex-shrink: 0;
 	border-bottom: 1px solid var(--debug-border);
+}
+
+.debug-file-filters {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 8px;
+	padding: 8px;
+	border-bottom: 1px solid var(--debug-border);
+}
+
+.debug-file-filters .MUI_TextField {
+	min-width: 0;
+}
+
+.debug-file-type-filter {
+	max-width: 92px;
+	border: 1px solid var(--debug-border);
+	border-radius: 4px;
+	background: var(--debug-panel);
+	color: var(--debug-text);
+	font: 500 12px "Roboto Flex", "Roboto", system-ui, sans-serif;
+	padding: 0 8px;
 }
 
 .debug-error-panel {
@@ -407,18 +444,55 @@ body {
 }
 
 @media (max-width: 640px) {
+	.debug-toolbar {
+		gap: 8px;
+	}
+
+	.debug-navigation-trigger {
+		display: inline-flex;
+	}
+
+	.debug-workspace {
+		position: relative;
+	}
+
+	.debug-navigation-backdrop {
+		position: fixed;
+		z-index: 1201;
+		inset: 0;
+		display: block;
+		border: 0;
+		background: rgba(0, 0, 0, .48);
+	}
+
 	.debug-toolbar-actions .MUI_Button {
 		min-width: 0;
 		padding-inline: 8px;
 	}
 
 	.debug-sidebar {
-		width: 184px;
-		flex-basis: 184px;
+		position: fixed;
+		z-index: 1202;
+		top: 0;
+		bottom: 0;
+		left: 0;
+		width: min(88vw, 336px);
+		max-width: 336px;
+		transform: translateX(-102%);
+		transition: transform 225ms cubic-bezier(.2, 0, 0, 1);
+		box-shadow: 12px 0 32px rgba(0, 0, 0, .28);
+	}
+
+	.debug-sidebar-open {
+		transform: translateX(0);
 	}
 
 	.debug-sidebar .t-section-label {
 		padding-inline: 8px;
+	}
+
+	.debug-file-type-filter {
+		max-width: 108px;
 	}
 
 	.debug-error-panel {

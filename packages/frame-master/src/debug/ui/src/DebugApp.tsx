@@ -16,13 +16,16 @@ import Paper from "@shpaw415/mui-lite/Paper";
 import { Tab } from "@shpaw415/mui-lite/Tabs";
 import Tabs from "@shpaw415/mui-lite/Tabs";
 import { DefaultTheme, ThemeProvider } from "@shpaw415/mui-lite/theme";
+import TextField from "@shpaw415/mui-lite/TextField";
 import Toolbar from "@shpaw415/mui-lite/Toolbar";
 import Typography from "@shpaw415/mui-lite/Typography";
 import {
 	CloudUpload,
 	Download,
+	Menu,
 	Moon,
 	RefreshCw,
+	Search,
 	Sun,
 } from "lucide-react";
 import type {
@@ -172,6 +175,9 @@ export default function DebugApp() {
 	const [state, setState] = useState(createInitialDebugUIState);
 	const [theme, setTheme] = useState<"dark" | "light">("dark");
 	const [leftTab, setLeftTab] = useState<LeftTabKey>("builds");
+	const [fileNameFilter, setFileNameFilter] = useState("");
+	const [fileTypeFilter, setFileTypeFilter] = useState("all");
+	const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
 	const socketRef = useRef<WebSocket | null>(null);
 	const importFileRef = useRef<HTMLInputElement | null>(null);
 
@@ -214,6 +220,22 @@ export default function DebugApp() {
 	const deferredBuildList = useDeferredValue(state.buildList);
 	const deferredRegistry = useDeferredValue(state.registry);
 	const deferredWatcherEvents = useDeferredValue(state.watcherEvents);
+	const deferredFileNameFilter = useDeferredValue(fileNameFilter.trim().toLowerCase());
+	const availableFileTypes = [
+		...new Set(
+			(selectedBuild?.files ?? [])
+				.map((file) => file.finalLoader)
+				.filter((loader): loader is Bun.Loader => Boolean(loader)),
+		),
+	].sort();
+	const filteredFiles = (selectedBuild?.files ?? []).filter((file) => {
+		const matchesName =
+			!deferredFileNameFilter ||
+			file.path.toLowerCase().includes(deferredFileNameFilter);
+		const matchesType =
+			fileTypeFilter === "all" || file.finalLoader === fileTypeFilter;
+		return matchesName && matchesType;
+	});
 
 	const handleMessage = useEffectEvent((message: DebugBuildMessage) => {
 		startTransition(() => {
@@ -339,6 +361,14 @@ export default function DebugApp() {
 			{/* ── Top bar ── */}
 			<AppBar className="debug-app-bar" position="static">
 				<Toolbar className="debug-toolbar">
+					<IconButton
+						type="button"
+						className="debug-navigation-trigger"
+						onClick={() => setMobileNavigationOpen(true)}
+						aria-label="Open debug navigation"
+					>
+						<Menu size={20} />
+					</IconButton>
 					<Box className="debug-product-title">
 						<Typography variant="subtitle1">Frame Master</Typography>
 						<Typography variant="caption">Build debugger</Typography>
@@ -407,13 +437,28 @@ export default function DebugApp() {
 			</AppBar>
 
 			{/* ── Main 2-column layout ── */}
-			<div className="flex flex-1 overflow-hidden">
+			<div className="debug-workspace">
+				{mobileNavigationOpen && (
+					<button
+						type="button"
+						className="debug-navigation-backdrop"
+						onClick={() => setMobileNavigationOpen(false)}
+						aria-label="Close debug navigation"
+					/>
+				)}
 				{/* Left panel — tabbed */}
-				<Paper variant="outlined" square className="debug-sidebar">
+				<Paper
+					variant="outlined"
+					square
+					className={`debug-sidebar${mobileNavigationOpen ? " debug-sidebar-open" : ""}`}
+				>
 					{/* Tab bar */}
 					<Tabs
 						value={leftTab}
-						onChange={(_, value) => setLeftTab(value as LeftTabKey)}
+						onChange={(_, value) => {
+							setLeftTab(value as LeftTabKey);
+							setMobileNavigationOpen(false);
+						}}
 						variant="fullWidth"
 						aria-label="Debug navigation"
 					>
@@ -446,6 +491,7 @@ export default function DebugApp() {
 														setState((current) =>
 															selectBuild(current, build.id),
 														);
+														setMobileNavigationOpen(false);
 													});
 												}}
 												className={`w-full px-3 py-2.5 text-left border-b transition-colors t-hover${
@@ -507,9 +553,31 @@ export default function DebugApp() {
 								style={{ flex: "1 1 50%" }}
 							>
 								<div className="t-section-label border-b shrink-0">files</div>
+								<div className="debug-file-filters">
+									<TextField
+										label="Find files"
+										value={fileNameFilter}
+										onChange={(event) => setFileNameFilter(event.target.value)}
+										startIcon={<Search size={16} />}
+									/>
+									<select
+										className="debug-file-type-filter"
+										value={fileTypeFilter}
+										onChange={(event) => setFileTypeFilter(event.target.value)}
+										aria-label="Filter files by type"
+									>
+										<option value="all">All types</option>
+										{availableFileTypes.map((loader) => (
+											<option key={loader} value={loader}>
+												{loader}
+											</option>
+										))}
+									</select>
+								</div>
 								<div className="flex-1 overflow-y-auto">
 									{selectedBuild?.files.length ? (
-										selectedBuild.files.map((file) => {
+										filteredFiles.length ? (
+											filteredFiles.map((file) => {
 											const isSelected = selectedFile?.id === file.id;
 											return (
 												<button
@@ -519,9 +587,10 @@ export default function DebugApp() {
 														const firstStep = file.steps[0];
 														if (!firstStep) return;
 														startTransition(() => {
-															setState((current) =>
-																selectStep(current, file.id, firstStep.id),
-															);
+														setState((current) =>
+															selectStep(current, file.id, firstStep.id),
+														);
+														setMobileNavigationOpen(false);
 														});
 													}}
 													className={`w-full px-3 py-2 text-left border-b transition-colors t-hover${
@@ -539,7 +608,12 @@ export default function DebugApp() {
 													</div>
 												</button>
 											);
-										})
+											})
+										) : (
+											<div className="px-3 py-6 text-xs t-faint text-center">
+												no files match these filters
+											</div>
+										)
 									) : (
 										<div className="px-3 py-6 text-xs t-faint text-center">
 											select a build
@@ -563,9 +637,10 @@ export default function DebugApp() {
 													type="button"
 													onClick={() => {
 														startTransition(() => {
-															setState((current) =>
-																selectStep(current, selectedFile.id, step.id),
-															);
+														setState((current) =>
+															selectStep(current, selectedFile.id, step.id),
+														);
+														setMobileNavigationOpen(false);
 														});
 													}}
 													className={`w-full px-3 py-2 text-left border-b transition-colors t-hover${
