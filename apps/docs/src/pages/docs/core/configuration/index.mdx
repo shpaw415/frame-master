@@ -66,6 +66,22 @@ const config: FrameMasterConfig = {
 
 > Plugin order matters unless a plugin sets priority. Check dependencies in plugin docs.
 
+### Skipping Runtime Requirement Checks
+
+Set `pluginsOptions.skipRequirementsCheck` to bypass requirement checks during application startup. This is useful for temporary compatibility testing, but requirements are normally enforced to prevent unsupported plugin combinations.
+
+```ts
+const config: FrameMasterConfig = {
+  HTTPServer: { port: 3000 },
+  plugins: [/* plugins */],
+  pluginsOptions: {
+    skipRequirementsCheck: true,
+  },
+};
+```
+
+This setting only affects runtime initialization. `frame-master plugin validate` continues to report unmet plugin requirements.
+
 ## Environment-Specific Configuration
 
 ```ts

@@ -33,7 +33,9 @@ export class PluginLoader {
 		this.Plugins = this.Plugins.sort((a, b) => {
 			return (a?.priority ?? 1000) - (b?.priority ?? 1000);
 		});
-		this.ensurePluginRequirements();
+		if (!config.pluginsOptions?.skipRequirementsCheck) {
+			this.ensurePluginRequirements();
+		}
 		this.registerPluginDirectives();
 		this.virtualModuleRegistry = new VirtualModuleRegistry(this.Plugins);
 		configureVirtualModuleFileProxy(
