@@ -44,6 +44,10 @@ jobs:
         working-directory: packages/frame-master
         run: bun test
 
+      - name: Build debug UI
+        working-directory: packages/frame-master
+        run: bun run build:tool:debug
+
       # npm Trusted Publishing needs Node ≥ 22.14 and npm ≥ 11.5.1.
       # Do NOT set registry-url here: setup-node injects a dummy NODE_AUTH_TOKEN
       # that can make npm prefer a bad token over OIDC.

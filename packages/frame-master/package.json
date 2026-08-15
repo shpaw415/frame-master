@@ -68,6 +68,7 @@
 	},
 	"scripts": {
 		"build:tool:test": "bun build bin/testing/src/frontend.tsx --outfile=bin/testing/src/frontend.js",
+		"build:tool:debug": "bun build src/debug/ui/src/index.html --outdir /tmp/frame-master-debug-ui --minify --target browser",
 		"frame-master": "bun run bin/index.ts",
 		"typecheck": "tsc --noEmit",
 		"test": "bun test",
