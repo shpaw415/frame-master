@@ -238,6 +238,24 @@ body {
 	background-color: var(--debug-accent);
 }
 
+.debug-theme .MUI_Button,
+.debug-theme .MUI_IconButton,
+.debug-theme .MUI_Tab,
+.debug-theme button,
+.debug-theme select,
+.debug-theme input {
+	outline-offset: 2px;
+}
+
+.debug-theme .MUI_Button:focus-visible,
+.debug-theme .MUI_IconButton:focus-visible,
+.debug-theme .MUI_Tab:focus-visible,
+.debug-theme button:focus-visible,
+.debug-theme select:focus-visible,
+.debug-theme input:focus-visible {
+	outline: 2px solid var(--debug-accent);
+}
+
 .debug-theme[data-theme="light"] {
 	--debug-surface: #f6f8fa;
 	--debug-panel: #ffffff;
@@ -264,6 +282,7 @@ body {
 
 .debug-app .t-selected {
 	background: var(--debug-selected);
+	box-shadow: inset 3px 0 var(--debug-accent);
 }
 
 .debug-app .t-accent {
@@ -355,6 +374,7 @@ body {
 .debug-sidebar .MUI_Tabs {
 	flex-shrink: 0;
 	border-bottom: 1px solid var(--debug-border);
+	background: color-mix(in srgb, var(--debug-surface) 88%, var(--debug-accent));
 }
 
 .debug-file-filters {
@@ -363,20 +383,63 @@ body {
 	gap: 8px;
 	padding: 8px;
 	border-bottom: 1px solid var(--debug-border);
+	background: color-mix(in srgb, var(--debug-surface) 88%, var(--debug-accent));
 }
 
-.debug-file-filters .MUI_TextField {
+.debug-file-search {
 	min-width: 0;
 }
 
+.debug-file-search .MUI_TextField_Box_outlined {
+	min-height: 40px;
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--debug-panel) 90%, var(--debug-accent));
+	border-color: var(--debug-border);
+}
+
+.debug-file-search .MUI_TextField_Box_outlined:focus-within {
+	border-color: var(--debug-accent);
+	box-shadow: 0 0 0 1px var(--debug-accent);
+}
+
+.debug-file-search .MUI_TextField_label_outlined {
+	transform: translate(14px, 10px) scale(1);
+	color: var(--debug-muted);
+}
+
+.debug-file-search .MUI_TextField_label_outlined:has(+ div .MUI_StartIcon) {
+	transform: translate(38px, 10px) scale(1);
+}
+
+.debug-file-search .MUI_TextField_label_outlined:has(+ div .MUI_TextField_Input:focus, + div .MUI_TextField_Input:not(:placeholder-shown)) {
+	transform: translate(14px, -9px) scale(.75);
+	background: var(--debug-surface);
+	padding-inline: 4px;
+}
+
+.debug-file-search .MUI_StartIcon {
+	color: var(--debug-muted);
+}
+
 .debug-file-type-filter {
-	max-width: 92px;
+	min-width: 96px;
+	max-width: 112px;
 	border: 1px solid var(--debug-border);
-	border-radius: 4px;
-	background: var(--debug-panel);
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--debug-panel) 90%, var(--debug-accent));
 	color: var(--debug-text);
 	font: 500 12px "Roboto Flex", "Roboto", system-ui, sans-serif;
 	padding: 0 8px;
+	transition: border-color 150ms, box-shadow 150ms, background-color 150ms;
+}
+
+.debug-file-type-filter:hover {
+	border-color: color-mix(in srgb, var(--debug-accent) 60%, var(--debug-border));
+}
+
+.debug-file-type-filter:focus {
+	border-color: var(--debug-accent);
+	box-shadow: 0 0 0 1px var(--debug-accent);
 }
 
 .debug-error-panel {
@@ -398,6 +461,7 @@ body {
 	padding: 16px;
 	background: var(--debug-surface) !important;
 	border-color: var(--debug-border) !important;
+	border-radius: 12px !important;
 }
 
 .debug-error-detail pre {
@@ -416,6 +480,15 @@ body {
 	gap: 6px 12px;
 	margin-top: 8px;
 	font-size: 12px;
+}
+
+.debug-app .t-hover:hover {
+	background: color-mix(in srgb, var(--debug-accent) 9%, transparent);
+}
+
+.debug-app .t-section-label {
+	color: var(--debug-muted);
+	background: color-mix(in srgb, var(--debug-surface) 92%, var(--debug-accent));
 }
 
 @media (max-width: 900px) {

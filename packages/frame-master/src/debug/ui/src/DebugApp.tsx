@@ -553,6 +553,8 @@ export default function DebugApp() {
 								<div className="t-section-label border-b shrink-0">files</div>
 								<div className="debug-file-filters">
 									<TextField
+										className="debug-file-search"
+										variant="outlined"
 										label="Find files"
 										value={fileNameFilter}
 										onChange={(event) => setFileNameFilter(event.target.value)}
