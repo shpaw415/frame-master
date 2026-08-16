@@ -32,6 +32,10 @@ function mkdirIfNeeded(path: string) {
 	}
 }
 
+function publicAssetPath(assetsDir: string, assetPath: string): string {
+	return `/${relative(assetsDir, assetPath).replaceAll("\\", "/")}`;
+}
+
 export class DebugBuildServer {
 	private wsClients = new Set<Bun.ServerWebSocket<unknown>>();
 	private server: Bun.Server<undefined> | null = null;
@@ -411,7 +415,7 @@ export class DebugBuildServer {
 		});
 		return result.outputs.map((out) => {
 			return {
-				pathname: normalize(out.path.split(assetsDir).at(1) as string),
+				pathname: publicAssetPath(assetsDir, out.path),
 				assetPath: out.path,
 			};
 		});
@@ -731,7 +735,7 @@ export class DebugTraceViewServer {
 			target: "browser",
 		});
 		return result.outputs.map((out) => ({
-			pathname: normalize(out.path.split(assetsDir).at(1) as string),
+			pathname: publicAssetPath(assetsDir, out.path),
 			assetPath: out.path,
 		}));
 	}
