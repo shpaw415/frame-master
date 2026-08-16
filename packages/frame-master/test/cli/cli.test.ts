@@ -512,9 +512,10 @@ export default {
 			try {
 				const ui = await waitForText(
 					"http://localhost:3311/",
-					(value) => value.includes('src="./chunk-'),
+					(value) =>
+						value.includes('src="/chunk-') && value.includes("data-cfasync="),
 				);
-				const scriptPath = ui.match(/src="\.\/(chunk-[^"]+\.js)"/)?.[1];
+				const scriptPath = ui.match(/src="\/(chunk-[^"]+\.js)"/)?.[1];
 				if (!scriptPath) {
 					throw new Error("Expected debug UI to reference a bundled script");
 				}

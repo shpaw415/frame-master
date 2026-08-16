@@ -16,6 +16,7 @@ import type {
 } from "frame-master/build/debug-trace";
 import { pluginLoader } from "../../src/plugins";
 import { createWatcher, type FileSystemWatcher } from "../../src/server/watch";
+import { serveDebugUiAsset } from "./ui-assets";
 import type { DebugBuildMessage, DebugRegistryEntry } from "./types";
 
 type DebugPipelineBuilder = { id: string; label: string; builder: Builder };
@@ -65,9 +66,9 @@ export class DebugBuildServer {
 		const routes = Object.assign(
 			{},
 			...buildFiles.map((asset) => ({
-				[normalize(asset.pathname).replaceAll("\\", "/")]: Bun.file(
-					asset.assetPath,
-				),
+				[normalize(asset.pathname).replaceAll("\\", "/")]: () =>
+					serveDebugUiAsset(asset.pathname) ??
+					new Response("Not found", { status: 404 }),
 			})),
 		);
 
@@ -90,8 +91,13 @@ export class DebugBuildServer {
 					}),
 				"/api/registry": () => Response.json(this.projectRegistry()),
 				...routes,
-				"/": htmlBuildAsset ? Bun.file(htmlBuildAsset.assetPath) : new Response("Not found", { status: 404 }),
+				"/": () =>
+					serveDebugUiAsset("/index.html") ??
+					new Response("Not found", { status: 404 }),
 			},
+			fetch: (req) =>
+				serveDebugUiAsset(new URL(req.url).pathname) ??
+				new Response("Not found", { status: 404 }),
 			websocket: {
 				open: (ws) => {
 					this.wsClients.add(ws);
@@ -650,9 +656,9 @@ export class DebugTraceViewServer {
 		const routes = Object.assign(
 			{},
 			...buildFiles.map((asset) => ({
-				[normalize(asset.pathname).replaceAll("\\", "/")]: Bun.file(
-					asset.assetPath,
-				),
+				[normalize(asset.pathname).replaceAll("\\", "/")]: () =>
+					serveDebugUiAsset(asset.pathname) ??
+					new Response("Not found", { status: 404 }),
 			})),
 		);
 
@@ -687,8 +693,13 @@ export class DebugTraceViewServer {
 					}),
 				"/api/registry": () => Response.json([]),
 				...routes,
-				"/": htmlBuildAsset ? Bun.file(htmlBuildAsset.assetPath) : new Response("Not found", { status: 404 }),
+				"/": () =>
+					serveDebugUiAsset("/index.html") ??
+					new Response("Not found", { status: 404 }),
 			},
+			fetch: (req) =>
+				serveDebugUiAsset(new URL(req.url).pathname) ??
+				new Response("Not found", { status: 404 }),
 		});
 
 		this.logStartup(absoluteTracePath);

@@ -1,3 +1,9 @@
+declare global {
+	interface Window {
+		__FM_DEBUG_BOOTED?: boolean;
+	}
+}
+
 const rootElement = document.getElementById("frame-master-debug-root");
 
 if (!rootElement) {
@@ -36,6 +42,7 @@ void Promise.all([
 	import("./ErrorBoundary"),
 ])
 	.then(([{ createRoot }, { default: DebugApp }, { default: ErrorBoundary }]) => {
+		window.__FM_DEBUG_BOOTED = true;
 		createRoot(root).render(
 			<ErrorBoundary>
 				<DebugApp />
