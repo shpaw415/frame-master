@@ -69,6 +69,8 @@ export interface BuildTraceFile {
 
 export interface BuildTraceBuildSummary {
 	id: string;
+	pipelineId?: string;
+	pipelineLabel?: string;
 	sequence: number;
 	status: BuildTraceBuildStatus;
 	startedAt: number;
@@ -99,6 +101,7 @@ export interface BuildTraceSession {
 	options: BuildTraceSessionOptions;
 	builds: BuildTraceBuild[];
 	buildList: BuildTraceBuildSummary[];
+	pipelines?: Array<{ id: string; label: string }>;
 }
 
 type TraceMutationBase = {

@@ -105,6 +105,18 @@ type Requirement = Partial<{
 // biome-ignore lint/suspicious/noEmptyInterface: plugin authors extend this via module augmentation.
 export interface GlobalPluginContextMap {}
 
+declare module "./types" {
+	interface GlobalPluginContextMap {
+		/** @deprecated Use `getBuildPipeline(id)` from `frame-master/plugin`. */
+		"build-unifier": Partial<{
+			builders: Record<string, Promise<Builder>>;
+			getBuilder: (pluginName: string) => Promise<Builder>;
+			build_config: Record<string, BuildOptionsPlugin[]>;
+			setBuildConfig: (pluginName: string, config: BuildOptionsPlugin) => void;
+		}>;
+	}
+}
+
 export type PluginContextKey = keyof GlobalPluginContextMap | (string & {});
 
 export type PluginGlobalContext<
@@ -131,6 +143,18 @@ export type PreBuildContextDefaultValues = { route: string };
 
 export type PluginOptions = {
 	HTMLRewrite?: unknown;
+};
+
+/** Debug UI metadata declared by a plugin wrapper. */
+export type DebugUIOptions = {
+	pipeline?: {
+		/** Stable identifier shown in `frame-master debug build`. */
+		id: string;
+		/** Optional human-readable name for the pipeline selector. */
+		label?: string;
+		/** Names of the wrapped plugins that participate in this pipeline. */
+		plugins: string[];
+	};
 };
 
 /**
@@ -482,6 +506,8 @@ export type FrameMasterPlugin<
 	version: string;
 }> &
 	Partial<{
+		/** Debug UI metadata, normally supplied by `buildPipeline()`. */
+		debugUIOptions: DebugUIOptions;
 		/**
 		 * Virtual modules owned by this plugin. Frame-Master resolves these modules
 		 * for all plugin build configurations, allowing other plugins to import them.

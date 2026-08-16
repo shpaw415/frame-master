@@ -28,6 +28,8 @@ type FrameMasterConfig = {
    */
   pluginsOptions?: Partial<{
     disableHttpServerOptionsConflictWarning?: boolean;
+    /** Skip plugin requirements during runtime initialization. */
+    skipRequirementsCheck?: boolean;
   }>;
 };
 ```
