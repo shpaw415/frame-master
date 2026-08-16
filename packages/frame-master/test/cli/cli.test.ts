@@ -13,11 +13,43 @@ import { join } from "node:path";
 
 const TEST_DIR = join(tmpdir(), `frame-master-cli-test-${Date.now()}`);
 const CLI_PATH = join(__dirname, "..", "..", "bin", "index.ts");
+const DEBUG_HOST = "127.0.0.1";
+
+function collectStream(stream: ReadableStream<Uint8Array>) {
+	const chunks: string[] = [];
+	const decoder = new TextDecoder();
+	void (async () => {
+		const reader = stream.getReader();
+		while (true) {
+			const { done, value } = await reader.read();
+			if (done) break;
+			if (value) chunks.push(decoder.decode(value));
+		}
+	})();
+	return () => chunks.join("");
+}
+
+function spawnDebugCli(args: string[], cwd: string) {
+	const proc = Bun.spawn(["bun", CLI_PATH, ...args], {
+		cwd,
+		stdout: "pipe",
+		stderr: "pipe",
+		env: { ...process.env, NODE_ENV: "development" },
+	});
+	const getStdout = collectStream(proc.stdout);
+	const getStderr = collectStream(proc.stderr);
+	return {
+		proc,
+		diagnostics: () =>
+			`stdout=${JSON.stringify(getStdout())} stderr=${JSON.stringify(getStderr())}`,
+	};
+}
 
 async function waitForJson<T>(
 	url: string,
 	assertion: (value: T) => boolean,
 	timeoutMs = 10000,
+	diagnostics?: () => string,
 ) {
 	const startedAt = Date.now();
 	let lastValue: T | null = null;
@@ -39,7 +71,9 @@ async function waitForJson<T>(
 	}
 
 	throw new Error(
-		`Timed out waiting for JSON assertion at ${url}: ${JSON.stringify(lastValue)}`,
+		`Timed out waiting for JSON assertion at ${url}: ${JSON.stringify(lastValue)}${
+			diagnostics ? ` ${diagnostics()}` : ""
+		}`,
 	);
 }
 
@@ -47,6 +81,7 @@ async function waitForText(
 	url: string,
 	assertion: (value: string) => boolean,
 	timeoutMs = 10000,
+	diagnostics?: () => string,
 ) {
 	const startedAt = Date.now();
 	let lastValue = "";
@@ -65,7 +100,11 @@ async function waitForText(
 		await new Promise((resolve) => setTimeout(resolve, 100));
 	}
 
-	throw new Error(`Timed out waiting for text assertion at ${url}: ${lastValue}`);
+	throw new Error(
+		`Timed out waiting for text assertion at ${url}: ${lastValue}${
+			diagnostics ? ` ${diagnostics()}` : ""
+		}`,
+	);
 }
 
 async function cleanupTestDir(directory: string) {
@@ -499,45 +538,52 @@ export default {
 `,
 			);
 
-			const proc = Bun.spawn(
-				["bun", CLI_PATH, "debug", "build", "--no-watch", "--port", "3311"],
-				{
-					cwd: projectPath,
-					stdout: "pipe",
-					stderr: "pipe",
-					env: { ...process.env, NODE_ENV: "development" },
-				},
+			const { proc, diagnostics } = spawnDebugCli(
+				["debug", "build", "--no-watch", "--port", "3311"],
+				projectPath,
 			);
 
 			try {
 				const ui = await waitForText(
-					"http://localhost:3311/",
+					`http://${DEBUG_HOST}:3311/`,
 					(value) =>
 						value.includes('src="/chunk-') && value.includes("data-cfasync="),
+					10000,
+					diagnostics,
 				);
 				const scriptPath = ui.match(/src="\/(chunk-[^"]+\.js)"/)?.[1];
 				if (!scriptPath) {
 					throw new Error("Expected debug UI to reference a bundled script");
 				}
-				const scriptResponse = await fetch(`http://localhost:3311/${scriptPath}`);
+				const scriptResponse = await fetch(
+					`http://${DEBUG_HOST}:3311/${scriptPath}`,
+				);
 				const builds = await waitForJson<
 					Array<{ id: string; fileCount: number }>
 				>(
-					"http://localhost:3311/api/builds",
+					`http://${DEBUG_HOST}:3311/api/builds`,
 					(value) => value.length === 1 && (value[0]?.fileCount ?? 0) > 0,
+					10000,
+					diagnostics,
 				);
 				const session = await waitForJson<{ buildList: Array<{ id: string }> }>(
-					"http://localhost:3311/api/session",
+					`http://${DEBUG_HOST}:3311/api/session`,
 					(value) => value.buildList.length === 1,
+					10000,
+					diagnostics,
 				);
 				const registry = await waitForJson<
 					Array<{ name: string; metrics: { interventions: number } }>
-				>("http://localhost:3311/api/registry", (value) =>
-					value.some(
-						(entry) =>
-							entry.name === "append-debug-marker" &&
-							entry.metrics.interventions > 0,
-					),
+				>(
+					`http://${DEBUG_HOST}:3311/api/registry`,
+					(value) =>
+						value.some(
+							(entry) =>
+								entry.name === "append-debug-marker" &&
+								entry.metrics.interventions > 0,
+						),
+					10000,
+					diagnostics,
 				);
 				const firstBuild = builds[0];
 				if (!firstBuild) {
@@ -546,12 +592,14 @@ export default {
 				const build = await waitForJson<{
 					files: Array<{ steps: Array<{ kind: string }> }>;
 				}>(
-					`http://localhost:3311/api/builds/${firstBuild.id}`,
+					`http://${DEBUG_HOST}:3311/api/builds/${firstBuild.id}`,
 					(value) =>
 						value.files.length > 0 &&
 						(value.files[0]?.steps ?? []).some(
 							(step) => step.kind === "final-output",
 						),
+					10000,
+					diagnostics,
 				);
 				const firstSessionBuild = session.buildList[0];
 				const firstFile = build.files[0];
@@ -618,14 +666,9 @@ export default {
 `,
 			);
 
-			const proc = Bun.spawn(
-				["bun", CLI_PATH, "debug", "build", "--port", "3312"],
-				{
-					cwd: projectPath,
-					stdout: "pipe",
-					stderr: "pipe",
-					env: { ...process.env, NODE_ENV: "development" },
-				},
+			const { proc, diagnostics } = spawnDebugCli(
+				["debug", "build", "--port", "3312"],
+				projectPath,
 			);
 
 			const messages: Array<{ type: string }> = [];
@@ -633,11 +676,13 @@ export default {
 
 			try {
 				await waitForJson<Array<{ id: string }>>(
-					"http://localhost:3312/api/builds",
+					`http://${DEBUG_HOST}:3312/api/builds`,
 					(value) => value.length === 1,
+					10000,
+					diagnostics,
 				);
 
-				ws = new WebSocket("ws://localhost:3312/ws");
+				ws = new WebSocket(`ws://${DEBUG_HOST}:3312/ws`);
 				ws.onmessage = (event) => {
 					messages.push(JSON.parse(event.data));
 				};
@@ -660,8 +705,10 @@ export default {
 				});
 
 				const initialBuilds = await waitForJson<Array<{ sequence: number }>>(
-					"http://localhost:3312/api/builds",
+					`http://${DEBUG_HOST}:3312/api/builds`,
 					(value) => value.length >= 1,
+					10000,
+					diagnostics,
 				);
 				const initialSequence = initialBuilds[0]?.sequence ?? 0;
 
@@ -671,10 +718,11 @@ export default {
 				);
 
 				const builds = await waitForJson<Array<{ sequence: number }>>(
-					"http://localhost:3312/api/builds",
+					`http://${DEBUG_HOST}:3312/api/builds`,
 					(value) =>
 						value.length >= 2 && (value[0]?.sequence ?? 0) > initialSequence,
 					15000,
+					diagnostics,
 				);
 
 				expect(builds.length).toBeGreaterThanOrEqual(2);
@@ -725,10 +773,8 @@ export default {
 `,
 			);
 
-			const proc = Bun.spawn(
+			const { proc, diagnostics } = spawnDebugCli(
 				[
-					"bun",
-					CLI_PATH,
 					"debug",
 					"build",
 					"--no-watch",
@@ -737,23 +783,22 @@ export default {
 					"--save-trace",
 					"artifacts/trace.json",
 				],
-				{
-					cwd: projectPath,
-					stdout: "pipe",
-					stderr: "pipe",
-					env: { ...process.env, NODE_ENV: "development" },
-				},
+				projectPath,
 			);
 
 			try {
 				await waitForJson<{ buildList: Array<{ id: string }> }>(
-					"http://localhost:3313/api/session",
+					`http://${DEBUG_HOST}:3313/api/session`,
 					(value) => value.buildList.length === 1,
+					10000,
+					diagnostics,
 				);
 
 				await waitForJson<Array<{ id: string }>>(
-					"http://localhost:3313/api/builds",
+					`http://${DEBUG_HOST}:3313/api/builds`,
 					() => existsSync(tracePath),
+					10000,
+					diagnostics,
 				);
 
 				const savedTrace = JSON.parse(await Bun.file(tracePath).text()) as {

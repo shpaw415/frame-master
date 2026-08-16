@@ -4,7 +4,6 @@ import {
 	dirname,
 	isAbsolute,
 	join,
-	normalize,
 	relative,
 	resolve,
 } from "node:path";
@@ -16,7 +15,11 @@ import type {
 } from "frame-master/build/debug-trace";
 import { pluginLoader } from "../../src/plugins";
 import { createWatcher, type FileSystemWatcher } from "../../src/server/watch";
-import { serveDebugUiAsset } from "./ui-assets";
+import {
+	isDebugUiIndexHtml,
+	serveDebugUiAsset,
+	toDebugUiPathname,
+} from "./ui-assets";
 import type { DebugBuildMessage, DebugRegistryEntry } from "./types";
 
 type DebugPipelineBuilder = { id: string; label: string; builder: Builder };
@@ -55,8 +58,8 @@ export class DebugBuildServer {
 	async start(HTMLEntrypoint: string) {
 		const buildFiles = await this.prepareFrontendAssets([HTMLEntrypoint]);
 
-		const htmlBuildAsset = buildFiles.find(
-			(asset) => asset.pathname === normalize("/index.html"),
+		const htmlBuildAsset = buildFiles.find((asset) =>
+			isDebugUiIndexHtml(asset.pathname),
 		);
 		if (!htmlBuildAsset) {
 			console.error("Debug UI build is missing /index.html");
@@ -66,7 +69,7 @@ export class DebugBuildServer {
 		const routes = Object.assign(
 			{},
 			...buildFiles.map((asset) => ({
-				[normalize(asset.pathname).replaceAll("\\", "/")]: () =>
+				[toDebugUiPathname(asset.pathname)]: () =>
 					serveDebugUiAsset(asset.pathname) ??
 					new Response("Not found", { status: 404 }),
 			})),
@@ -644,19 +647,18 @@ export class DebugTraceViewServer {
 		const htmlEntrypoint = join(__dirname, "./ui/src/index.html");
 		const buildFiles = await this.prepareFrontendAssets([htmlEntrypoint]);
 
-		const htmlBuildAsset = buildFiles.find(
-			(asset) => asset.pathname === normalize("/index.html"),
+		const htmlBuildAsset = buildFiles.find((asset) =>
+			isDebugUiIndexHtml(asset.pathname),
 		);
 		if (!htmlBuildAsset) {
 			console.error("Debug trace viewer build is missing /index.html");
 			process.exit(1);
 		}
 
-
 		const routes = Object.assign(
 			{},
 			...buildFiles.map((asset) => ({
-				[normalize(asset.pathname).replaceAll("\\", "/")]: () =>
+				[toDebugUiPathname(asset.pathname)]: () =>
 					serveDebugUiAsset(asset.pathname) ??
 					new Response("Not found", { status: 404 }),
 			})),

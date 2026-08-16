@@ -1,14 +1,26 @@
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, win32 } from "node:path";
 import {
 	isDebugUiAssetName,
+	isDebugUiIndexHtml,
 	rewriteDebugUiHtml,
 	serveDebugUiAsset,
+	toDebugUiPathname,
 } from "../src/debug/ui-assets";
 
 describe("debug UI assets", () => {
+	test("treats POSIX and Windows index.html paths as the debug UI entry", () => {
+		expect(isDebugUiIndexHtml("/index.html")).toBe(true);
+		expect(isDebugUiIndexHtml("\\index.html")).toBe(true);
+		expect(isDebugUiIndexHtml(win32.normalize("/index.html"))).toBe(true);
+		expect(toDebugUiPathname(win32.join("\\", "chunk-abc.js"))).toBe(
+			"/chunk-abc.js",
+		);
+		expect(isDebugUiIndexHtml("/chunk-abc.js")).toBe(false);
+	});
+
 	test("rewrites relative chunks and opts module scripts out of Rocket Loader", () => {
 		const html = rewriteDebugUiHtml(`<!DOCTYPE html>
 <html>

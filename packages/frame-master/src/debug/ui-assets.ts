@@ -44,6 +44,15 @@ export function isDebugUiAssetName(name: string) {
 	return DEBUG_ASSET_NAME.test(name);
 }
 
+export function toDebugUiPathname(pathname: string) {
+	const posix = pathname.replaceAll("\\", "/");
+	return posix.startsWith("/") ? posix : `/${posix}`;
+}
+
+export function isDebugUiIndexHtml(pathname: string) {
+	return toDebugUiPathname(pathname) === "/index.html";
+}
+
 export function rewriteDebugUiHtml(html: string) {
 	let next = html
 		.replaceAll('href="./', 'href="/')
