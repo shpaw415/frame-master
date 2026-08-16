@@ -31,6 +31,8 @@ import Toolbar from "@shpaw415/mui-lite/Toolbar";
 import Typography from "@shpaw415/mui-lite/Typography";
 import {
 	CloudUpload,
+	ChevronDown,
+	ChevronRight,
 	Download,
 	Menu,
 	Moon,
@@ -73,11 +75,53 @@ const VIRTUAL_MODULE_NAMESPACE = "frame-master-virtual-module";
 // ── Left-panel tab registry ───────────────────────────────────────────────────
 // Add new entries here to extend the menu.
 type LeftTabKey = "builds" | "files" | "info";
+type DrawerSectionKey =
+	| "files"
+	| "steps"
+	| "registry"
+	| "step"
+	| "session";
+
 const LEFT_TABS: { key: LeftTabKey; label: string }[] = [
 	{ key: "builds", label: "builds" },
 	{ key: "files", label: "files" },
 	{ key: "info", label: "info" },
 ];
+
+function DrawerSectionHeader({
+	expanded,
+	label,
+	onToggle,
+}: {
+	expanded: boolean;
+	label: string;
+	onToggle: () => void;
+}) {
+	return (
+		<>
+			<ListItemButton
+				aria-expanded={expanded}
+				onClick={onToggle}
+				sx={{ minHeight: 40, px: 2, py: 0.5 }}
+			>
+				<ListItemText
+					primary={label}
+					SlotProps={{
+						primary: {
+							sx: {
+								fontSize: "0.75rem",
+								letterSpacing: "0.08em",
+								textTransform: "uppercase",
+							},
+						},
+					}}
+				/>
+				{expanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+			</ListItemButton>
+			<Divider />
+		</>
+	);
+}
 
 async function fetchJson<T>(path: string): Promise<T> {
 	const response = await fetch(path);
@@ -192,6 +236,15 @@ export default function DebugApp() {
 	const [state, setState] = useState(createInitialDebugUIState);
 	const [theme, setTheme] = useState<"dark" | "light">("dark");
 	const [leftTab, setLeftTab] = useState<LeftTabKey>("builds");
+	const [expandedSections, setExpandedSections] = useState<
+		Record<DrawerSectionKey, boolean>
+	>({
+		files: true,
+		steps: true,
+		registry: true,
+		step: true,
+		session: true,
+	});
 	const [pipelineFilter, setPipelineFilter] = useState("all");
 	const [fileNameFilter, setFileNameFilter] = useState("");
 	const [fileTypeFilter, setFileTypeFilter] = useState("all");
@@ -255,6 +308,12 @@ export default function DebugApp() {
 	);
 	const deferredRegistry = useDeferredValue(state.registry);
 	const deferredWatcherEvents = useDeferredValue(state.watcherEvents);
+	const toggleSection = (section: DrawerSectionKey) => {
+		setExpandedSections((current) => ({
+			...current,
+			[section]: !current[section],
+		}));
+	};
 	const deferredFileNameFilter = useDeferredValue(fileNameFilter.trim().toLowerCase());
 	const availableFileTypes = [
 		...new Set(
@@ -606,9 +665,13 @@ export default function DebugApp() {
 					{/* Tab: files + steps */}
 					{leftTab === "files" && (
 						<Box sx={{ display: "flex", minHeight: 0, flex: 1, flexDirection: "column", overflow: "hidden" }}>
-							<Box sx={{ display: "flex", minHeight: 0, flex: "1 1 50%", flexDirection: "column", overflow: "hidden" }}>
-								<Typography sx={{ px: 2, py: 1 }} variant="overline">Files</Typography>
-								<Divider />
+							<DrawerSectionHeader
+								expanded={expandedSections.files}
+								label="Files"
+								onToggle={() => toggleSection("files")}
+							/>
+							{expandedSections.files && (
+								<Box sx={{ display: "flex", minHeight: 0, flex: "1 1 50%", flexDirection: "column", overflow: "hidden" }}>
 								<Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0, 1fr)", sm: "minmax(0, 1fr) minmax(132px, 0.4fr)" }, gap: 1.5, p: 1.5 }}>
 									<TextField
 										variant="outlined"
@@ -668,11 +731,15 @@ export default function DebugApp() {
 									)}
 								</Box>
 							</Box>
+							)}
 
-							<Divider />
-							<Box sx={{ display: "flex", minHeight: 0, flex: "1 1 50%", flexDirection: "column", overflow: "hidden" }}>
-								<Typography sx={{ px: 2, py: 1 }} variant="overline">Steps</Typography>
-								<Divider />
+							<DrawerSectionHeader
+								expanded={expandedSections.steps}
+								label="Steps"
+								onToggle={() => toggleSection("steps")}
+							/>
+							{expandedSections.steps && (
+								<Box sx={{ display: "flex", minHeight: 0, flex: "1 1 50%", flexDirection: "column", overflow: "hidden" }}>
 								<Box sx={{ flex: 1, overflowY: "auto" }}>
 									{selectedFile?.steps.length ? (
 										selectedFile.steps.map((step) => {
@@ -713,14 +780,19 @@ export default function DebugApp() {
 									)}
 								</Box>
 							</Box>
+							)}
 						</Box>
 					)}
 
 					{/* Tab: info (registry + step details + session) */}
 					{leftTab === "info" && (
 						<Box sx={{ display: "flex", minHeight: 0, flex: 1, flexDirection: "column", overflow: "hidden" }}>
-							<Typography sx={{ px: 2, py: 1 }} variant="overline">Registry</Typography>
-							<Divider />
+							<DrawerSectionHeader
+								expanded={expandedSections.registry}
+								label="Registry"
+								onToggle={() => toggleSection("registry")}
+							/>
+							{expandedSections.registry && (
 							<Box sx={{ flex: 1, overflowY: "auto" }}>
 								{deferredRegistry.map((plugin) => (
 									<Box key={plugin.name} sx={{ p: 1.5, borderBottom: 1, borderColor: "divider" }}>
@@ -737,10 +809,14 @@ export default function DebugApp() {
 									</Box>
 								))}
 							</Box>
+							)}
 
-							<Divider />
-							<Typography sx={{ px: 2, py: 1 }} variant="overline">Step</Typography>
-							<Divider />
+							<DrawerSectionHeader
+								expanded={expandedSections.step}
+								label="Step"
+								onToggle={() => toggleSection("step")}
+							/>
+							{expandedSections.step && (
 							<Box sx={{ p: 1.5 }}>
 								{selectedStep ? (
 									<Box sx={{ display: "grid", gap: 0.5 }}>
@@ -777,14 +853,19 @@ export default function DebugApp() {
 									<Typography color="textSecondary" variant="caption">no step selected</Typography>
 								)}
 							</Box>
+							)}
 
-							<Divider />
-							<Typography sx={{ px: 2, py: 1 }} variant="overline">Session</Typography>
-							<Divider />
+							<DrawerSectionHeader
+								expanded={expandedSections.session}
+								label="Session"
+								onToggle={() => toggleSection("session")}
+							/>
+							{expandedSections.session && (
 							<Box sx={{ display: "grid", gridTemplateColumns: "48px minmax(0, 1fr)", gap: 1, p: 1.5 }}>
 								<Typography color="textSecondary" variant="caption">started</Typography><Typography variant="caption">{state.session ? new Date(state.session.startedAt).toLocaleTimeString() : "pending"}</Typography>
 								<Typography color="textSecondary" variant="caption">trace</Typography><Typography sx={{ overflowWrap: "anywhere" }} variant="caption">{state.lastSavedTracePath ?? "not saved"}</Typography>
 							</Box>
+							)}
 						</Box>
 					)}
 				</Drawer>
