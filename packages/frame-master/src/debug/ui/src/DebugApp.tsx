@@ -385,7 +385,6 @@ export default function DebugApp() {
 			theme={debugTheme}
 			data-theme={theme}
 		>
-			<CssBaseline />
 			<Box sx={{ display: "flex", height: "100vh", minWidth: 0, flexDirection: "column", overflow: "hidden", bgcolor: "background.default" }}>
 			{/* ── Top bar ── */}
 			<AppBar position="static" elevation={0}>
@@ -477,18 +476,13 @@ export default function DebugApp() {
 
 			{/* ── Main 2-column layout ── */}
 			<Box sx={{ display: "flex", minHeight: 0, flex: 1, overflow: "hidden" }}>
-				{/* Left panel — tabbed */}
-				{mobileNavigationOpen && (
-					<Box Element="button" type="button" onClick={() => setMobileNavigationOpen(false)} aria-label="Close debug navigation" sx={{ position: "fixed", zIndex: 1200, inset: 0, display: { xs: "block", md: "none" }, border: 0, bgcolor: "rgba(0, 0, 0, 0.48)" }} />
-				)}
 				<Box sx={{ display: { xs: "contents", md: "flex" }, width: { md: 280, lg: 304 }, flex: "0 0 auto", minWidth: 0 }}>
 				<Drawer
 					open={isDesktopDrawer || mobileNavigationOpen}
 					variant={isDesktopDrawer ? "permanent" : "temporary"}
-					disablePortal={isDesktopDrawer}
 					width={304}
 					minifiedWidth={280}
-					sx={{ display: "flex", position: { xs: "fixed", md: "relative" }, zIndex: { xs: 1201, md: "auto" }, inset: { xs: "0 auto 0 0", md: "auto" }, width: { xs: "min(88vw, 336px)", md: "100%" }, height: "100%", flexDirection: "column", overflow: "hidden", borderRadius: 0, boxShadow: { xs: "0 8px 24px rgba(0, 0, 0, 0.28)", md: "none" } }}
+					onClose={() => setMobileNavigationOpen(false)}
 				>
 					<Box sx={{ display: { xs: "flex", md: "none" }, justifyContent: "flex-end", p: 1 }}>
 						<IconButton type="button" onClick={() => setMobileNavigationOpen(false)} aria-label="Close debug navigation">
