@@ -146,7 +146,6 @@ export default {
 				},
 			},
 		},
-	],
 		...buildPipeline({
 			id: "preview",
 			label: "Preview pipeline",
@@ -180,4 +179,5 @@ export default {
 					},
 			],
 		}),
+	],
 } satisfies FrameMasterConfig;

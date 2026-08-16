@@ -62,8 +62,6 @@ export class DebugBuildServer {
 			process.exit(1);
 		}
 
-		const htmlAsset = Bun.file(htmlBuildAsset.assetPath);
-
 		const routes = Object.assign(
 			{},
 			...buildFiles.map((asset) => ({
@@ -77,8 +75,6 @@ export class DebugBuildServer {
 			port: this.options.port,
 			development: false,
 			routes: {
-				"/": htmlAsset,
-				...routes,
 				"/ws": async (req, server) => {
 					if (server.upgrade(req)) {
 						return new Response("Success", { status: 101 });
@@ -87,13 +83,15 @@ export class DebugBuildServer {
 				},
 				"/api/session": () => Response.json(this.getSession()),
 				"/api/builds": () => Response.json(this.listBuilds()),
+				"/api/builds/*": (req, server) => this.handleRequest(req, server),
 				"/api/export": () =>
 					new Response(JSON.stringify(this.getSession(), null, 2), {
 						headers: { "Content-Type": "application/json; charset=utf-8" },
 					}),
 				"/api/registry": () => Response.json(this.projectRegistry()),
+				...routes,
+				"/": htmlBuildAsset ? Bun.file(htmlBuildAsset.assetPath) : new Response("Not found", { status: 404 }),
 			},
-			fetch: this.handleRequest.bind(this),
 			websocket: {
 				open: (ws) => {
 					this.wsClients.add(ws);
@@ -417,6 +415,7 @@ export class DebugBuildServer {
 			return {
 				pathname: publicAssetPath(assetsDir, out.path),
 				assetPath: out.path,
+				file: out,
 			};
 		});
 	}
@@ -647,7 +646,6 @@ export class DebugTraceViewServer {
 			process.exit(1);
 		}
 
-		const htmlAsset = Bun.file(htmlBuildAsset.assetPath);
 
 		const routes = Object.assign(
 			{},
@@ -677,20 +675,20 @@ export class DebugTraceViewServer {
 			port: this.options.port,
 			development: false,
 			routes: {
-				"/": htmlAsset,
-				...routes,
 				// No WebSocket — view-only, no live rebuild
 				"/ws": () =>
 					new Response("Not available in view mode", { status: 404 }),
 				"/api/session": () => Response.json(session),
 				"/api/builds": () => Response.json(buildList),
+				"/api/builds/*": (req) => this.handleRequest(req, session),
 				"/api/export": () =>
 					new Response(JSON.stringify(session, null, 2), {
 						headers: { "Content-Type": "application/json; charset=utf-8" },
 					}),
 				"/api/registry": () => Response.json([]),
+				...routes,
+				"/": htmlBuildAsset ? Bun.file(htmlBuildAsset.assetPath) : new Response("Not found", { status: 404 }),
 			},
-			fetch: (req) => this.handleRequest(req, session),
 		});
 
 		this.logStartup(absoluteTracePath);

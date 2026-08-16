@@ -8,6 +8,7 @@ import {
 	buildPipeline,
 	configureBuildPipelines,
 	getBuildPipeline,
+	getBuildPipelines,
 	initializeBuildPipelines,
 } from "../src/build/pipelines";
 import {
@@ -112,6 +113,9 @@ describe("builder", () => {
 
 		expect(defaultCalls).toEqual(["default"]);
 		expect(pipelineCalls).toEqual(["pipeline", "before"]);
+		expect(getBuildPipelines().map((pipeline) => pipeline.id)).toEqual([
+			"pipeline",
+		]);
 	});
 
 	test("should merge configs", async () => {
