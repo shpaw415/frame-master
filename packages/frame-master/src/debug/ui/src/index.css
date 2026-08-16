@@ -434,13 +434,25 @@ body {
 }
 
 .debug-pipeline-filter {
-	max-width: 160px;
+	min-width: 0;
 	border: 1px solid var(--debug-border);
 	border-radius: 8px;
 	background: var(--debug-panel);
 	color: var(--debug-text);
 	font: 500 12px "Roboto Flex", "Roboto", system-ui, sans-serif;
 	padding: 6px 8px;
+}
+
+.debug-pipeline-selector {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	gap: 8px;
+	align-items: center;
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--debug-border);
+	background: color-mix(in srgb, var(--debug-surface) 88%, var(--debug-accent));
+	font: 500 12px "Roboto Flex", "Roboto", system-ui, sans-serif;
+	color: var(--debug-muted);
 }
 
 .debug-file-type-filter:hover {

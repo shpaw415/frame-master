@@ -380,21 +380,6 @@ export default function DebugApp() {
 					<Box className="debug-toolbar-status">
 						<Typography variant="caption">{window.location.host}</Typography>
 						<Chip size="small">{deferredBuildList.length} builds</Chip>
-						{(state.session?.pipelines?.length ?? 0) > 1 && (
-							<select
-								className="debug-pipeline-filter"
-								value={pipelineFilter}
-								onChange={(event) => setPipelineFilter(event.target.value)}
-								aria-label="Filter builds by pipeline"
-							>
-								<option value="all">All pipelines</option>
-								{state.session?.pipelines?.map((pipeline) => (
-									<option key={pipeline.id} value={pipeline.id}>
-										{pipeline.label}
-									</option>
-								))}
-							</select>
-						)}
 						<Chip size="small">{deferredRegistry.length} plugins</Chip>
 						<Chip size="small">watch {String(state.session?.options.watch ?? false)}</Chip>
 						<Chip size="small" color={state.connection === "open" ? "success" : "warning"}>
@@ -492,6 +477,35 @@ export default function DebugApp() {
 					{/* Tab: builds + watch feed */}
 					{leftTab === "builds" && (
 						<>
+							{(state.session?.pipelines?.length ?? 0) > 1 && (
+								<div className="debug-pipeline-selector">
+									<label htmlFor="debug-pipeline">Pipeline</label>
+									<select
+										id="debug-pipeline"
+										className="debug-pipeline-filter"
+										value={pipelineFilter}
+										onChange={(event) => {
+											const pipelineId = event.target.value;
+											setPipelineFilter(pipelineId);
+											const nextBuild = deferredBuildList.find(
+												(build) => pipelineId === "all" || build.pipelineId === pipelineId,
+											);
+											if (nextBuild) {
+												startTransition(() => {
+													setState((current) => selectBuild(current, nextBuild.id));
+												});
+											}
+										}}
+									>
+										<option value="all">All pipelines</option>
+										{state.session?.pipelines?.map((pipeline) => (
+											<option key={pipeline.id} value={pipeline.id}>
+												{pipeline.label}
+											</option>
+										))}
+									</select>
+								</div>
+							)}
 							<div className="flex-1 overflow-y-auto">
 								{visibleBuildList.length === 0 ? (
 									<div className="px-3 py-6 text-xs t-faint text-center">
