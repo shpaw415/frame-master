@@ -11,8 +11,18 @@ import AppBar from "@shpaw415/mui-lite/AppBar";
 import Box from "@shpaw415/mui-lite/Box";
 import Button from "@shpaw415/mui-lite/Button";
 import Chip from "@shpaw415/mui-lite/Chip";
+import CssBaseline from "@shpaw415/mui-lite/CssBaseline";
+import Divider from "@shpaw415/mui-lite/Divider";
+import Drawer from "@shpaw415/mui-lite/Drawer";
 import IconButton from "@shpaw415/mui-lite/IconButton";
+import {
+	List,
+	ListItemButton,
+	ListItemText,
+	ListSubheader,
+} from "@shpaw415/mui-lite/List";
 import Paper from "@shpaw415/mui-lite/Paper";
+import Select from "@shpaw415/mui-lite/Select";
 import { Tab } from "@shpaw415/mui-lite/Tabs";
 import Tabs from "@shpaw415/mui-lite/Tabs";
 import { DefaultTheme, ThemeProvider } from "@shpaw415/mui-lite/theme";
@@ -27,6 +37,7 @@ import {
 	RefreshCw,
 	Search,
 	Sun,
+	X,
 } from "lucide-react";
 import type {
 	BuildTraceBuild,
@@ -122,15 +133,15 @@ function statusColor(status: BuildTraceBuildStatus) {
 
 function StepErrorPanel({ error }: { error: BuildTraceStepError }) {
 	return (
-		<Box className="debug-error-panel">
+		<Box sx={{ display: "flex", height: "100%", flexDirection: "column", gap: 2, overflow: "auto", p: 3 }}>
 			{/* Error type + message */}
-			<Alert severity="error" className="debug-error-alert">
+			<Alert severity="error">
 				<strong>{error.name}</strong>: {error.message}
 			</Alert>
 
 			{/* Stack trace */}
 			{error.stack && (
-				<Paper variant="outlined" className="debug-error-detail">
+				<Paper variant="outlined" sx={{ p: 2 }}>
 					<Typography variant="overline">Stack trace</Typography>
 					<pre>
 						{/* Strip the first line of the stack if it duplicates name+message */}
@@ -145,7 +156,7 @@ function StepErrorPanel({ error }: { error: BuildTraceStepError }) {
 
 			{/* Cause chain */}
 			{error.cause && (
-				<Paper variant="outlined" className="debug-error-detail">
+				<Paper variant="outlined" sx={{ p: 2 }}>
 					<Typography variant="overline">Caused by</Typography>
 					<pre>
 						{error.cause}
@@ -155,16 +166,16 @@ function StepErrorPanel({ error }: { error: BuildTraceStepError }) {
 
 			{/* Extra properties */}
 			{error.extra && Object.keys(error.extra).length > 0 && (
-				<Paper variant="outlined" className="debug-error-detail">
+				<Paper variant="outlined" sx={{ p: 2 }}>
 					<Typography variant="overline">Extra</Typography>
-					<div className="debug-key-value-list">
+					<Box sx={{ display: "grid", gridTemplateColumns: "minmax(96px, max-content) minmax(0, 1fr)", gap: 1, mt: 1 }}>
 						{Object.entries(error.extra).map(([k, v]) => (
-							<div key={k} className="flex gap-2">
-								<span className="t-faint shrink-0 w-24 truncate">{k}</span>
-								<span className="t-dim break-all">{v}</span>
-							</div>
+							<Box key={k} sx={{ display: "contents" }}>
+								<Typography variant="caption" sx={{ color: "text.secondary" }}>{k}</Typography>
+								<Typography variant="caption" sx={{ overflowWrap: "anywhere" }}>{v}</Typography>
+							</Box>
 						))}
-					</div>
+					</Box>
 				</Paper>
 			)}
 		</Box>
@@ -175,9 +186,13 @@ export default function DebugApp() {
 	const [state, setState] = useState(createInitialDebugUIState);
 	const [theme, setTheme] = useState<"dark" | "light">("dark");
 	const [leftTab, setLeftTab] = useState<LeftTabKey>("builds");
+	const [pipelineFilter, setPipelineFilter] = useState("all");
 	const [fileNameFilter, setFileNameFilter] = useState("");
 	const [fileTypeFilter, setFileTypeFilter] = useState("all");
 	const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
+	const [isDesktopDrawer, setIsDesktopDrawer] = useState(
+		() => window.matchMedia("(min-width: 900px)").matches,
+	);
 	const socketRef = useRef<WebSocket | null>(null);
 	const importFileRef = useRef<HTMLInputElement | null>(null);
 
@@ -210,6 +225,17 @@ export default function DebugApp() {
 		}
 	}, [theme]);
 
+	useEffect(() => {
+		const query = window.matchMedia("(min-width: 900px)");
+		const updateDrawerVariant = () => {
+			setIsDesktopDrawer(query.matches);
+			if (query.matches) setMobileNavigationOpen(false);
+		};
+		updateDrawerVariant();
+		query.addEventListener("change", updateDrawerVariant);
+		return () => query.removeEventListener("change", updateDrawerVariant);
+	}, []);
+
 	const selectedBuild = getSelectedBuild(state);
 	const selectedFile = getSelectedFile(state);
 	const selectedStep = getSelectedStep(state);
@@ -218,6 +244,9 @@ export default function DebugApp() {
 	);
 
 	const deferredBuildList = useDeferredValue(state.buildList);
+	const visibleBuildList = deferredBuildList.filter(
+		(build) => pipelineFilter === "all" || build.pipelineId === pipelineFilter,
+	);
 	const deferredRegistry = useDeferredValue(state.registry);
 	const deferredWatcherEvents = useDeferredValue(state.watcherEvents);
 	const deferredFileNameFilter = useDeferredValue(fileNameFilter.trim().toLowerCase());
@@ -354,26 +383,25 @@ export default function DebugApp() {
 	return (
 		<ThemeProvider
 			theme={debugTheme}
-			className="debug-theme"
 			data-theme={theme}
 		>
-			<div className="debug-app" data-theme={theme}>
+			<Box sx={{ display: "flex", height: "100vh", minWidth: 0, flexDirection: "column", overflow: "hidden", bgcolor: "background.default" }}>
 			{/* ── Top bar ── */}
-			<AppBar className="debug-app-bar" position="static">
-				<Toolbar className="debug-toolbar">
+			<AppBar position="static" elevation={0}>
+				<Toolbar sx={{ display: "flex", minHeight: { xs: 56, sm: 64 }, gap: { xs: 1, sm: 2 }, alignItems: "center", flexWrap: { xs: "wrap", md: "nowrap" }, overflow: "hidden" }}>
 					<IconButton
 						type="button"
-						className="debug-navigation-trigger"
-						onClick={() => setMobileNavigationOpen(true)}
+						sx={{ display: { xs: "inline-flex", md: "none" } }}
+						onClick={() => setMobileNavigationOpen(c => !c)}
 						aria-label="Open debug navigation"
 					>
 						<Menu size={20} />
 					</IconButton>
-					<Box className="debug-product-title">
+					<Box sx={{ display: "flex", minWidth: 0, flex: { xs: 1, sm: "0 0 auto" }, flexDirection: "column" }}>
 						<Typography variant="subtitle1">Frame Master</Typography>
-						<Typography variant="caption">Build debugger</Typography>
+						<Typography sx={{ display: { xs: "none", sm: "block" } }} variant="caption">Build debugger</Typography>
 					</Box>
-					<Box className="debug-toolbar-status">
+					<Box sx={{ display: { xs: "none", md: "flex" }, minWidth: 0, flex: 1, gap: 1, alignItems: "center", overflow: "hidden" }}>
 						<Typography variant="caption">{window.location.host}</Typography>
 						<Chip size="small">{deferredBuildList.length} builds</Chip>
 						<Chip size="small">{deferredRegistry.length} plugins</Chip>
@@ -382,7 +410,7 @@ export default function DebugApp() {
 							{state.connection}
 						</Chip>
 					</Box>
-					<Box className="debug-toolbar-actions">
+					<Box sx={{ display: "flex", gap: 1, alignItems: "center", justifyContent: "flex-end" }}>
 						<Button
 							type="button"
 							onClick={() =>
@@ -392,6 +420,7 @@ export default function DebugApp() {
 							}
 							variant="contained"
 							size="small"
+							sx={{ display: { xs: "none", md: "inline-flex" } }}
 							startIcon={<RefreshCw size={15} />}
 							disabled={!isLive}
 							title={isLive ? "Trigger a new build" : "Unavailable while viewing a saved trace"}
@@ -403,6 +432,7 @@ export default function DebugApp() {
 							download="frame-master-debug-trace.json"
 							variant="outlined"
 							size="small"
+							sx={{ display: { xs: "none", md: "inline-flex" } }}
 							startIcon={<Download size={15} />}
 						>
 							Export
@@ -412,6 +442,7 @@ export default function DebugApp() {
 							onClick={() => importFileRef.current?.click()}
 							variant="outlined"
 							size="small"
+							sx={{ display: { xs: "none", md: "inline-flex" } }}
 							startIcon={<CloudUpload size={15} />}
 							title="Import a debug-trace.json file"
 						>
@@ -421,11 +452,12 @@ export default function DebugApp() {
 							ref={importFileRef}
 							type="file"
 							accept=".json,application/json"
-							className="hidden"
+							style={{ display: "none" }}
 							onChange={handleImportFile}
 						/>
 						<IconButton
 							type="button"
+							sx={{ display: { xs: "none", md: "inline-flex" } }}
 							onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
 							title="Toggle light/dark theme"
 							aria-label="Toggle light and dark theme"
@@ -433,25 +465,30 @@ export default function DebugApp() {
 							{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
 						</IconButton>
 					</Box>
+					<Box sx={{ display: { xs: "flex", md: "none" }, width: { xs: "100%", md: "auto" }, gap: 0.5, alignItems: "center", justifyContent: "flex-end", flexWrap: "wrap", pb: { xs: 1, md: 0 } }}>
+						<Button type="button" onClick={() => socketRef.current?.send(JSON.stringify({ type: "trigger-rebuild" }))} disabled={!isLive} size="small" startIcon={<RefreshCw size={16} />}>Build</Button>
+						<Button href="/api/export" download="frame-master-debug-trace.json" size="small" startIcon={<Download size={16} />}>Export</Button>
+						<Button type="button" onClick={() => importFileRef.current?.click()} size="small" startIcon={<CloudUpload size={16} />}>Import</Button>
+						<Button type="button" onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} size="small" startIcon={theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}>Theme</Button>
+					</Box>
 				</Toolbar>
 			</AppBar>
 
 			{/* ── Main 2-column layout ── */}
-			<div className="debug-workspace">
-				{mobileNavigationOpen && (
-					<button
-						type="button"
-						className="debug-navigation-backdrop"
-						onClick={() => setMobileNavigationOpen(false)}
-						aria-label="Close debug navigation"
-					/>
-				)}
-				{/* Left panel — tabbed */}
-				<Paper
-					variant="outlined"
-					square
-					className={`debug-sidebar${mobileNavigationOpen ? " debug-sidebar-open" : ""}`}
+			<Box sx={{ display: "flex", minHeight: 0, flex: 1, overflow: "hidden" }}>
+				<Box sx={{ display: { xs: "contents", md: "flex" }, width: { md: 280, lg: 304 }, flex: "0 0 auto", minWidth: 0 }}>
+				<Drawer
+					open={isDesktopDrawer || mobileNavigationOpen}
+					variant={isDesktopDrawer ? "permanent" : "temporary"}
+					width={304}
+					minifiedWidth={280}
+					onClose={() => setMobileNavigationOpen(false)}
 				>
+					<Box sx={{ display: { xs: "flex", md: "none" }, justifyContent: "flex-end", p: 1 }}>
+						<IconButton type="button" onClick={() => setMobileNavigationOpen(false)} aria-label="Close debug navigation">
+							<X size={20} />
+						</IconButton>
+					</Box>
 					{/* Tab bar */}
 					<Tabs
 						value={leftTab}
@@ -473,18 +510,47 @@ export default function DebugApp() {
 					{/* Tab: builds + watch feed */}
 					{leftTab === "builds" && (
 						<>
-							<div className="flex-1 overflow-y-auto">
-								{deferredBuildList.length === 0 ? (
-									<div className="px-3 py-6 text-xs t-faint text-center">
-										no builds yet
-									</div>
+							{(state.session?.pipelines?.length ?? 0) > 1 && (
+								<Box sx={{ p: 1.5 }}>
+									<Select
+										name="debug-pipeline"
+										label="Pipeline"
+										value={pipelineFilter}
+										onSelect={(pipelineId) => {
+											setPipelineFilter(pipelineId);
+											const nextBuild = deferredBuildList.find(
+												(build) => pipelineId === "all" || build.pipelineId === pipelineId,
+											);
+											if (nextBuild) {
+												startTransition(() => {
+													setState((current) => selectBuild(current, nextBuild.id));
+												});
+											}
+										}}
+									>
+										{[
+											<option key="all" value="all">All pipelines</option>,
+											...(state.session?.pipelines ?? []).map((pipeline) => (
+												<option key={pipeline.id} value={pipeline.id}>
+													{pipeline.label}
+												</option>
+											)),
+										]}
+									</Select>
+								</Box>
+							)}
+							<Box sx={{ flex: 1, overflowY: "auto" }}>
+								{visibleBuildList.length === 0 ? (
+									<Typography align="center" color="textSecondary" sx={{ p: 3 }} variant="caption">no builds yet</Typography>
 								) : (
-									deferredBuildList.map((build) => {
+									<List disablePadding>
+										{visibleBuildList.map((build) => {
 										const isSelected = state.selectedBuildId === build.id;
 										return (
-											<button
+											<ListItemButton
 												key={build.id}
-												type="button"
+												selected={isSelected}
+												sx={{ borderBottom: 1, borderColor: "divider" }}
 												onClick={() => {
 													startTransition(() => {
 														setState((current) =>
@@ -492,95 +558,80 @@ export default function DebugApp() {
 														);
 													});
 												}}
-												className={`w-full px-3 py-2.5 text-left border-b transition-colors t-hover${
-													isSelected ? " t-selected" : ""
-												}`}
 											>
-												<div className="flex items-center justify-between gap-2">
-													<span
-														className={`text-xs font-medium ${isSelected ? "t-accent" : "t-text"}`}
-													>
-														#{build.sequence}
-													</span>
+												<Box sx={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+													<Typography variant="body2">#{build.sequence}</Typography>
 													<Chip size="small" color={statusColor(build.status)}>
 														{statusLabel(build.status)}
 													</Chip>
-												</div>
-												<div className="mt-1 text-xs t-dim">
-													{new Date(build.startedAt).toLocaleTimeString()}
-												</div>
-												<div className="mt-0.5 text-xs t-faint">
-													{build.fileCount}f · {build.stepCount}s ·{" "}
-													{build.outputCount}o
-												</div>
-											</button>
+												</Box>
+												<Typography variant="caption" color="textSecondary">{new Date(build.startedAt).toLocaleTimeString()}</Typography>
+											{build.pipelineLabel && (
+												<Typography variant="caption" color="primary">{build.pipelineLabel}</Typography>
+											)}
+												<Typography variant="caption" color="textSecondary">{build.fileCount} files · {build.stepCount} steps · {build.outputCount} outputs</Typography>
+											</ListItemButton>
 										);
-									})
+										})}
+									</List>
 								)}
-							</div>
-							<div className="t-section-label border-t border-b shrink-0">
-								watch feed
-							</div>
-							<div className="max-h-40 overflow-y-auto shrink-0">
+							</Box>
+							<Divider />
+							<Typography sx={{ px: 2, py: 1 }} variant="overline">Watch feed</Typography>
+							<Divider />
+							<Box sx={{ maxHeight: 160, overflowY: "auto", flexShrink: 0 }}>
 								{deferredWatcherEvents.length === 0 ? (
-									<div className="px-3 py-3 text-xs t-faint text-center">
-										no events
-									</div>
+									<Typography align="center" color="textSecondary" sx={{ p: 2 }} variant="caption">no events</Typography>
 								) : (
 									deferredWatcherEvents.map((event) => (
-										<div
+										<Box
 											key={`${event.eventType}:${event.filePath}`}
-											className="border-b px-3 py-2"
+											sx={{ p: 1.5, borderBottom: 1, borderColor: "divider" }}
 										>
-											<div className="text-xs t-faint">{event.eventType}</div>
-											<div className="mt-0.5 text-xs t-dim break-all">
-												{event.filePath}
-											</div>
-										</div>
+											<Typography variant="caption" color="textSecondary">{event.eventType}</Typography>
+											<Typography variant="caption" sx={{ display: "block", overflowWrap: "anywhere" }}>{event.filePath}</Typography>
+										</Box>
 									))
 								)}
-							</div>
+							</Box>
 						</>
 					)}
 
 					{/* Tab: files + steps */}
 					{leftTab === "files" && (
-						<div className="flex flex-col flex-1 overflow-hidden">
-							<div
-								className="flex flex-col overflow-hidden"
-								style={{ flex: "1 1 50%" }}
-							>
-								<div className="t-section-label border-b shrink-0">files</div>
-								<div className="debug-file-filters">
+						<Box sx={{ display: "flex", minHeight: 0, flex: 1, flexDirection: "column", overflow: "hidden" }}>
+							<Box sx={{ display: "flex", minHeight: 0, flex: "1 1 50%", flexDirection: "column", overflow: "hidden" }}>
+								<Typography sx={{ px: 2, py: 1 }} variant="overline">Files</Typography>
+								<Divider />
+								<Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0, 1fr)", sm: "minmax(0, 1fr) minmax(132px, 0.4fr)" }, gap: 1.5, p: 1.5 }}>
 									<TextField
-										className="debug-file-search"
 										variant="outlined"
 										label="Find files"
 										value={fileNameFilter}
 										onChange={(event) => setFileNameFilter(event.target.value)}
 										startIcon={<Search size={16} />}
 									/>
-									<select
-										className="debug-file-type-filter"
+									<Select
+										name="debug-file-type"
+										label="File type"
 										value={fileTypeFilter}
-										onChange={(event) => setFileTypeFilter(event.target.value)}
-										aria-label="Filter files by type"
+										onSelect={setFileTypeFilter}
 									>
-										<option value="all">All types</option>
-										{availableFileTypes.map((loader) => (
-											<option key={loader} value={loader}>
-												{loader}
-											</option>
-										))}
-									</select>
-								</div>
-								<div className="flex-1 overflow-y-auto">
+										{[
+											<option key="all" value="all">All types</option>,
+											...availableFileTypes.map((loader) => (
+												<option key={loader} value={loader}>{loader}</option>
+											)),
+										]}
+									</Select>
+								</Box>
+								<Box sx={{ flex: 1, overflowY: "auto" }}>
 									{selectedBuild?.files.length ? (
 										filteredFiles.length ? (
 											filteredFiles.map((file) => {
 											const isSelected = selectedFile?.id === file.id;
 											return (
-												<button
+												<ListItemButton
 													key={file.id}
 													type="button"
 													onClick={() => {
@@ -592,46 +643,36 @@ export default function DebugApp() {
 														);
 														});
 													}}
-													className={`w-full px-3 py-2 text-left border-b transition-colors t-hover${
-														isSelected ? " t-selected" : ""
-													}`}
+													selected={isSelected}
+													sx={{ borderBottom: 1, borderColor: "divider" }}
 												>
-													<div
-														className={`text-xs break-all ${isSelected ? "t-text" : "t-muted"}`}
-													>
-														{file.path}
-													</div>
-													<div className="mt-0.5 text-xs t-faint">
-														{file.steps.length}s · {file.finalLoader ?? "?"} ·{" "}
-														{file.finalSize}b
-													</div>
-												</button>
+													<ListItemText
+														primary={file.path}
+														secondary={`${file.steps.length} steps · ${file.finalLoader ?? "?"} · ${file.finalSize} bytes`}
+														SlotProps={{ primary: { sx: { overflowWrap: "anywhere", fontSize: "0.75rem" } }, secondary: { sx: { fontSize: "0.6875rem" } } }}
+													/>
+												</ListItemButton>
 											);
 											})
 										) : (
-											<div className="px-3 py-6 text-xs t-faint text-center">
-												no files match these filters
-											</div>
+											<Typography align="center" color="textSecondary" sx={{ p: 3 }} variant="caption">no files match these filters</Typography>
 										)
 									) : (
-										<div className="px-3 py-6 text-xs t-faint text-center">
-											select a build
-										</div>
+										<Typography align="center" color="textSecondary" sx={{ p: 3 }} variant="caption">select a build</Typography>
 									)}
-								</div>
-							</div>
+								</Box>
+							</Box>
 
-							<div
-								className="flex flex-col overflow-hidden border-t"
-								style={{ flex: "1 1 50%" }}
-							>
-								<div className="t-section-label border-b shrink-0">steps</div>
-								<div className="flex-1 overflow-y-auto">
+							<Divider />
+							<Box sx={{ display: "flex", minHeight: 0, flex: "1 1 50%", flexDirection: "column", overflow: "hidden" }}>
+								<Typography sx={{ px: 2, py: 1 }} variant="overline">Steps</Typography>
+								<Divider />
+								<Box sx={{ flex: 1, overflowY: "auto" }}>
 									{selectedFile?.steps.length ? (
 										selectedFile.steps.map((step) => {
 											const isSelected = selectedStep?.id === step.id;
 											return (
-												<button
+											<ListItemButton
 													key={step.id}
 													type="button"
 													onClick={() => {
@@ -641,101 +682,62 @@ export default function DebugApp() {
 														);
 														});
 													}}
-													className={`w-full px-3 py-2 text-left border-b transition-colors t-hover${
-														isSelected ? " t-selected" : ""
-													}`}
-												>
-													<div className="flex items-center justify-between gap-2">
-														<span
-															className={`text-xs font-medium ${step.error ? "t-err" : isSelected ? "t-accent" : "t-muted"}`}
-														>
-															{step.pluginName ?? "core"}
-															{step.error && (
-																<span className="ml-1 t-badge t-badge-err">
-																	{step.error.name}
-																</span>
-															)}
-														</span>
-														<span className="text-xs t-dim">
-															{formatDuration(step.durationMs)}
-														</span>
-													</div>
-													<div className="mt-0.5 text-xs t-faint">
-														{step.kind} · {step.loaderBefore ?? "-"} →{" "}
-														{step.loaderAfter ?? "-"} · order {step.order}
-													</div>
-													<div className="mt-0.5 text-xs t-faint">
-														{step.sizeBefore}b → {step.sizeAfter}b
-													</div>
-													{step.error && (
-														<div
-															className="mt-1 text-xs t-err truncate"
-															title={step.error.message}
-														>
-															{step.error.message}
-														</div>
-													)}
-												</button>
+												selected={isSelected}
+												sx={{ borderBottom: 1, borderColor: "divider" }}
+											>
+												<Box sx={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+													<Typography color={step.error ? "error" : isSelected ? "primary" : "textSecondary"} variant="body2">
+														{step.pluginName ?? "core"}
+														{step.error && (
+															<Chip color="error" label={step.error.name} size="small" sx={{ ml: 1 }} />
+														)}
+													</Typography>
+													<Typography color="textSecondary" variant="caption">{formatDuration(step.durationMs)}</Typography>
+												</Box>
+												<Typography color="textSecondary" variant="caption">{step.kind} · {step.loaderBefore ?? "-"} → {step.loaderAfter ?? "-"} · order {step.order}</Typography>
+												<Typography color="textSecondary" variant="caption">{step.sizeBefore} bytes → {step.sizeAfter} bytes</Typography>
+												{step.error && (
+													<Typography color="error" noWrap title={step.error.message} variant="caption">{step.error.message}</Typography>
+												)}
+											</ListItemButton>
 											);
 										})
 									) : (
-										<div className="px-3 py-6 text-xs t-faint text-center">
-											select a file
-										</div>
+										<Typography align="center" color="textSecondary" sx={{ p: 3 }} variant="caption">select a file</Typography>
 									)}
-								</div>
-							</div>
-						</div>
+								</Box>
+							</Box>
+						</Box>
 					)}
 
 					{/* Tab: info (registry + step details + session) */}
 					{leftTab === "info" && (
-						<div className="flex flex-col flex-1 overflow-hidden">
-							<div className="t-section-label border-b shrink-0">registry</div>
-							<div className="flex-1 overflow-y-auto">
+						<Box sx={{ display: "flex", minHeight: 0, flex: 1, flexDirection: "column", overflow: "hidden" }}>
+							<Typography sx={{ px: 2, py: 1 }} variant="overline">Registry</Typography>
+							<Divider />
+							<Box sx={{ flex: 1, overflowY: "auto" }}>
 								{deferredRegistry.map((plugin) => (
-									<div key={plugin.name} className="border-b px-3 py-2.5">
-										<div className="flex items-center justify-between gap-2">
-											<span className="text-xs t-text font-medium truncate">
-												{plugin.name}
-											</span>
-											<span className="text-xs t-faint shrink-0">
-												p{plugin.priority}
-											</span>
-										</div>
-										<div className="text-xs t-dim mt-0.5">
-											v{plugin.version}
-										</div>
-										<div className="mt-1.5 flex items-center gap-2 text-xs">
-											<span className="t-muted">
-												{plugin.metrics.interventions} hits
-											</span>
-											<span className="t-faint">·</span>
-											<span className="t-muted">
-												{formatDuration(plugin.metrics.totalMs)}
-											</span>
-										</div>
-										<div className="mt-0.5 text-xs t-faint">
-											{plugin.metrics.fileCount}f · {plugin.metrics.buildCount}b
-											· {formatDuration(plugin.metrics.onLoadMs)}
-										</div>
+									<Box key={plugin.name} sx={{ p: 1.5, borderBottom: 1, borderColor: "divider" }}>
+										<Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+											<Typography noWrap variant="body2">{plugin.name}</Typography>
+											<Typography color="textSecondary" variant="caption">p{plugin.priority}</Typography>
+										</Box>
+										<Typography color="textSecondary" variant="caption">v{plugin.version}</Typography>
+										<Typography color="textSecondary" variant="caption">{plugin.metrics.interventions} hits · {formatDuration(plugin.metrics.totalMs)}</Typography>
+										<Typography color="textSecondary" variant="caption">{plugin.metrics.fileCount} files · {plugin.metrics.buildCount} builds · {formatDuration(plugin.metrics.onLoadMs)}</Typography>
 										{plugin.dependencies.length > 0 && (
-											<div className="mt-1 text-xs t-faint">
-												{plugin.dependencies
-													.map((d) => `${d.name}${d.satisfied ? "" : " !"}`)
-													.join(", ")}
-											</div>
+											<Typography color="textSecondary" sx={{ mt: 1 }} variant="caption">{plugin.dependencies.map((d) => `${d.name}${d.satisfied ? "" : " !"}`).join(", ")}</Typography>
 										)}
-									</div>
+									</Box>
 								))}
-							</div>
+							</Box>
 
-							<div className="t-section-label border-t border-b shrink-0">
-								step
-							</div>
-							<div className="border-b px-3 py-2.5 shrink-0">
+							<Divider />
+							<Typography sx={{ px: 2, py: 1 }} variant="overline">Step</Typography>
+							<Divider />
+							<Box sx={{ p: 1.5 }}>
 								{selectedStep ? (
-									<div className="space-y-1 text-xs">
+									<Box sx={{ display: "grid", gap: 0.5 }}>
 										{(
 											[
 												["kind", selectedStep.kind],
@@ -750,110 +752,77 @@ export default function DebugApp() {
 												],
 											] as const
 										).map(([k, v]) => (
-											<div key={k} className="flex gap-2">
-												<span className="t-faint w-10 shrink-0">{k}</span>
-												<span className="t-dim">{v}</span>
-											</div>
+											<Box key={k} sx={{ display: "grid", gridTemplateColumns: "48px minmax(0, 1fr)", gap: 1 }}>
+												<Typography color="textSecondary" variant="caption">{k}</Typography>
+												<Typography variant="caption">{v}</Typography>
+											</Box>
 										))}
 										{selectedStep.error && (
-											<div className="flex gap-2 mt-1">
-												<span className="t-faint w-10 shrink-0">error</span>
-												<span className="t-err break-all">
-													{selectedStep.error.name}:{" "}
-													{selectedStep.error.message}
-												</span>
-											</div>
+											<Box sx={{ display: "grid", gridTemplateColumns: "48px minmax(0, 1fr)", gap: 1 }}><Typography color="textSecondary" variant="caption">error</Typography><Typography color="error" sx={{ overflowWrap: "anywhere" }} variant="caption">{selectedStep.error.name}: {selectedStep.error.message}</Typography></Box>
 										)}
-									</div>
+									</Box>
 								) : (
-									<span className="text-xs t-faint">no step selected</span>
+									<Typography color="textSecondary" variant="caption">no step selected</Typography>
 								)}
-							</div>
+							</Box>
 
-							<div className="t-section-label border-b shrink-0">session</div>
-							<div className="px-3 py-2.5 text-xs shrink-0">
-								<div className="flex gap-2">
-									<span className="t-faint w-12 shrink-0">started</span>
-									<span className="t-dim">
-										{state.session
-											? new Date(state.session.startedAt).toLocaleTimeString()
-											: "pending"}
-									</span>
-								</div>
-								<div className="flex gap-2 mt-1">
-									<span className="t-faint w-12 shrink-0">trace</span>
-									<span className="t-dim break-all">
-										{state.lastSavedTracePath ?? "not saved"}
-									</span>
-								</div>
-							</div>
-						</div>
+							<Divider />
+							<Typography sx={{ px: 2, py: 1 }} variant="overline">Session</Typography>
+							<Divider />
+							<Box sx={{ display: "grid", gridTemplateColumns: "48px minmax(0, 1fr)", gap: 1, p: 1.5 }}>
+								<Typography color="textSecondary" variant="caption">started</Typography><Typography variant="caption">{state.session ? new Date(state.session.startedAt).toLocaleTimeString() : "pending"}</Typography>
+								<Typography color="textSecondary" variant="caption">trace</Typography><Typography sx={{ overflowWrap: "anywhere" }} variant="caption">{state.lastSavedTracePath ?? "not saved"}</Typography>
+							</Box>
+						</Box>
 					)}
-				</Paper>
+				</Drawer>
+				</Box>
 
 				{/* Center — diff editor (full height) */}
-				<div className="flex flex-1 flex-col overflow-hidden">
+				<Box sx={{ display: "flex", minWidth: 0, flex: 1, flexDirection: "column", overflow: "hidden" }}>
 					{/* Build summary bar */}
-					<div className="t-surface border-b px-4 py-2 flex items-center gap-3 text-xs shrink-0">
+					<Box sx={{ display: "flex", flexShrink: 0, flexWrap: "wrap", gap: 1.5, alignItems: "center", borderBottom: 1, borderColor: "divider", p: 1.5 }}>
 						{selectedSummary ? (
 							<>
-								<span className="t-text font-medium">
-									build #{selectedSummary.sequence}
-								</span>
+								<Typography variant="body2">build #{selectedSummary.sequence}</Typography>
 								<Chip size="small" color={statusColor(selectedSummary.status)}>
 									{statusLabel(selectedSummary.status)}
 								</Chip>
-								<span className="t-dim">
-									{formatDuration(selectedSummary.durationMs)}
-								</span>
-								<span className="t-dim">{selectedSummary.fileCount} files</span>
-								<span className="t-dim">{selectedSummary.stepCount} steps</span>
-								<div className="flex gap-2 ml-2 min-w-0">
+								<Typography color="textSecondary" variant="caption">{formatDuration(selectedSummary.durationMs)}</Typography>
+								<Typography color="textSecondary" variant="caption">{selectedSummary.fileCount} files</Typography>
+								<Typography color="textSecondary" variant="caption">{selectedSummary.stepCount} steps</Typography>
+								<Box sx={{ display: "flex", minWidth: 0, gap: 1 }}>
 									{selectedSummary.entrypoints?.map((ep) => (
-										<span key={ep} className="t-faint truncate">
-											{ep}
-										</span>
+										<Typography key={ep} color="textSecondary" noWrap variant="caption">{ep}</Typography>
 									))}
-								</div>
+								</Box>
 							</>
 						) : (
-							<span className="t-faint">no build selected</span>
+							<Typography color="textSecondary" variant="caption">no build selected</Typography>
 						)}
-					</div>
+					</Box>
 
 					{/* Diff info bar */}
-					<div className="t-surface border-b px-3 py-1.5 flex items-center gap-2 text-xs shrink-0">
-						<span className="t-dim">diff</span>
+					<Box sx={{ display: "flex", flexShrink: 0, flexWrap: "wrap", gap: 1, alignItems: "center", borderBottom: 1, borderColor: "divider", px: 2, py: 1 }}>
+						<Typography color="textSecondary" variant="caption">diff</Typography>
 						{selectedStep ? (
 							<>
-								<span className="t-faint">·</span>
-								<span className="t-dim">
-									{selectedStep.pluginName ?? "core"}
-								</span>
-								<span className="t-faint">·</span>
-								<span className="t-dim">{selectedLanguage}</span>
-								<span className="t-faint">·</span>
-								<span className="t-faint">
-									{selectedStep.sizeBefore}b → {selectedStep.sizeAfter}b
-								</span>
+								<Typography variant="caption">{selectedStep.pluginName ?? "core"}</Typography>
+								<Typography color="textSecondary" variant="caption">{selectedLanguage}</Typography>
+								<Typography color="textSecondary" variant="caption">{selectedStep.sizeBefore} bytes → {selectedStep.sizeAfter} bytes</Typography>
 								{selectedFile && (
 									<>
-										<span className="t-faint">·</span>
-										<span className="t-faint truncate max-w-xs">
-											{selectedFile.path}
-										</span>
+										<Typography color="textSecondary" noWrap sx={{ maxWidth: 320 }} variant="caption">{selectedFile.path}</Typography>
 									</>
 								)}
 							</>
 						) : (
-							<span className="t-faint">
-								select a build → open files tab → pick file and step
-							</span>
+							<Typography color="textSecondary" variant="caption">select a build → open files tab → pick file and step</Typography>
 						)}
-					</div>
+					</Box>
 
 					{/* Monaco diff — takes all remaining height */}
-					<div className="flex-1 overflow-hidden">
+					<Box sx={{ flex: 1, overflow: "hidden" }}>
 						{selectedStep?.error ? (
 							<StepErrorPanel error={selectedStep.error} />
 						) : (
@@ -861,14 +830,13 @@ export default function DebugApp() {
 								language={selectedLanguage}
 								original={snapshotText(beforeSnapshot)}
 								modified={snapshotText(afterSnapshot)}
-								className="h-full"
 								theme={theme}
 							/>
 						)}
-					</div>
-				</div>
-			</div>
-			</div>
+					</Box>
+				</Box>
+			</Box>
+			</Box>
 		</ThemeProvider>
 	);
 }

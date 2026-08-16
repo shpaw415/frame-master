@@ -3,7 +3,7 @@ import { isAbsolute, join } from "node:path";
 import { cwd } from "node:process";
 import chalk from "chalk";
 import type { FrameMasterConfig } from "frame-master/server/type";
-import { type PluginLoader, pluginLoader } from "../plugins";
+import type { PluginLoader } from "../plugins";
 import { chainPlugins } from "../plugins/plugin-chaining";
 import type { BuildOptionsPlugin } from "../plugins/types";
 import { getConfig } from "../server/config";
@@ -1119,7 +1119,14 @@ export async function createBuilder(
 	_config: FrameMasterConfig,
 	_pluginLoader: PluginLoader,
 ) {
-	const plugin = _pluginLoader.getPluginByName("build");
+	const pipelinePluginNames = new Set(
+		_pluginLoader
+			.getPluginByName("debugUIOptions")
+			.flatMap((entry) => entry.pluginParent.pipeline?.plugins ?? []),
+	);
+	const plugin = _pluginLoader
+		.getPluginByName("build")
+		.filter((entry) => !pipelinePluginNames.has(entry.name));
 	const logIsEnabled = plugin.some((p) => p.pluginParent.enableLoging === true);
 
 	return await Builder.createBuilder({
@@ -1155,7 +1162,7 @@ export async function InitBuilder(
 		);
 	}
 
-	const _pluginLoader = loaders?.pluginLoader ?? pluginLoader;
+	const _pluginLoader = loaders?.pluginLoader ?? (await import("../plugins/plugin-loader")).pluginLoader;
 
 	if (!_pluginLoader) {
 		throw new Error("Plugin loader not initialized. Cannot create builder.");

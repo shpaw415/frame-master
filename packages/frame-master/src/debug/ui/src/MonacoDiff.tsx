@@ -105,17 +105,15 @@ export default function MonacoDiff({
 	original,
 	modified,
 	language,
-	className,
 	theme,
 }: {
 	original: string;
 	modified: string;
 	language?: string;
-	className?: string;
 	theme?: "dark" | "light";
 }) {
 	return (
-		<div className={className ?? "h-105"} style={{ height: "100%" }}>
+		<div style={{ height: "100%" }}>
 			<DiffEditor
 				original={original}
 				modified={modified}

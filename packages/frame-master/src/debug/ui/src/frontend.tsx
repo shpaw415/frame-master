@@ -1,6 +1,4 @@
 import { createRoot } from "react-dom/client";
-import "@shpaw415/mui-lite/style.css";
-import "./index.css";
 import DebugApp from "./DebugApp";
 
 const rootElement = document.getElementById("frame-master-debug-root");

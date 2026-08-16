@@ -1,6 +1,10 @@
 import cluster from "node:cluster";
 import type Builder from "../build";
 import { getBuilder, InitBuilder, reloadBuilder } from "../build";
+import {
+	configureBuildPipelines,
+	initializeBuildPipelines,
+} from "../build/pipelines";
 import type { PluginLoader } from "../plugins";
 import { InitPluginLoader, pluginLoader, reloadPluginLoader } from "../plugins";
 import { mergeGlobalPluginContext } from "../plugins/utils";
@@ -25,6 +29,7 @@ async function syncRuntimeLoaders(loaders?: InitProps["loaders"]) {
 	const activeBuilder = await InitBuilder(
 		loaders as unknown as { builder: Builder },
 	);
+	await configureBuildPipelines(fmConfig, activePluginLoader);
 
 	return {
 		fmConfig,
@@ -52,6 +57,7 @@ export async function InitAll(bypass?: InitProps) {
 		return runtimeLoaders;
 	}
 	await runCreateContextHooks(bypass?.loaders);
+	await initializeBuildPipelines();
 	await runOnStartMainPlugins(bypass?.loaders);
 	await runFileSystemWatcherPlugin(undefined, bypass?.loaders);
 	await startConfigWatcher();
@@ -64,7 +70,12 @@ export async function InitBuild() {
 	await InitConfig();
 	InitPluginLoader();
 	await InitBuilder();
+	const config = getConfig();
+	const loader = pluginLoader;
+	if (!config || !loader) throw new Error("Frame Master configuration not initialized.");
+	await configureBuildPipelines(config, loader);
 	await runCreateContextHooks();
+	await initializeBuildPipelines();
 	inited = true;
 }
 
@@ -73,7 +84,12 @@ export async function InitCLIPlugins() {
 	await InitConfig();
 	InitPluginLoader();
 	await InitBuilder();
+	const config = getConfig();
+	const loader = pluginLoader;
+	if (!config || !loader) throw new Error("Frame Master configuration not initialized.");
+	await configureBuildPipelines(config, loader);
 	await runCreateContextHooks();
+	await initializeBuildPipelines();
 	inited = true;
 }
 
@@ -112,6 +128,7 @@ export async function reinitAll(): Promise<void> {
 
 	// 4. Re-run createContext hooks
 	await runCreateContextHooks();
+	await initializeBuildPipelines();
 
 	// 5. Re-run serverStart hooks
 	await runOnStartMainPlugins();

@@ -32,6 +32,8 @@ export type DebugStreamFile = {
 	finalSize: number;
 };
 
+export type DebugPipeline = { id: string; label: string };
+
 export type DebugRegistryDependency = {
 	name: string;
 	requiredVersion: string;
