@@ -52,6 +52,10 @@ export default {
 	HTTPServer: {
 		port: Number(process.env.PORT || 3000),
 	},
+	// The docs app carries plugins with staged Frame Master v4 migrations.
+	pluginsOptions: {
+		skipRequirementsCheck: true,
+	},
 	plugins: [
 		ApplyReact({
 			route: "src/pages",

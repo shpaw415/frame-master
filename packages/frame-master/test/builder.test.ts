@@ -5,10 +5,18 @@ import type { BunPlugin } from "bun";
 import type { FrameMasterConfig } from "frame-master/server/type";
 import { createBuilder } from "../src/build";
 import {
+	buildPipeline,
+	configureBuildPipelines,
+	getBuildPipeline,
+	getBuildPipelines,
+	initializeBuildPipelines,
+} from "../src/build/pipelines";
+import {
 	type BuildTraceSession,
 	BuildTraceSessionStore,
 } from "../src/build/debug-trace";
 import { PluginLoader } from "../src/plugins";
+import { getGlobalPluginContext } from "../src/plugins/utils";
 
 const TEMP_DIR = ".test-temp";
 const TEXT_ENTRYPOINT = join(TEMP_DIR, "entry.txt");
@@ -62,6 +70,54 @@ afterEach(() => {
 });
 
 describe("builder", () => {
+	test("keeps debug UI pipeline fragments isolated and exposes legacy context", async () => {
+		const defaultCalls: string[] = [];
+		const pipelineCalls: string[] = [];
+		const pipelinePlugin = {
+			name: "pipeline-plugin",
+			version: "1.0.0",
+			build: {
+				buildConfig: {
+					outdir: `${TEMP_DIR}/pipeline`,
+					entrypoints: [TEXT_ENTRYPOINT],
+					plugins: [{ name: "pipeline-plugin", setup: () => { pipelineCalls.push("pipeline"); } }],
+				},
+			},
+		};
+		const config: FrameMasterConfig = {
+			HTTPServer: { port: 0 },
+			plugins: [
+				{
+					name: "default-plugin",
+					version: "1.0.0",
+					build: {
+						buildConfig: {
+							outdir: `${TEMP_DIR}/default`,
+							entrypoints: [TEXT_ENTRYPOINT],
+							plugins: [{ name: "default-plugin", setup: () => { defaultCalls.push("default"); } }],
+						},
+					},
+				},
+				...buildPipeline({ id: "pipeline", label: "Pipeline", plugins: [pipelinePlugin] }),
+			],
+		};
+		const loader = new PluginLoader(config);
+		await configureBuildPipelines(config, loader);
+		getGlobalPluginContext("build-unifier")?.setBuildConfig?.("pipeline-plugin", {
+			beforeBuild: () => { pipelineCalls.push("before"); },
+		});
+		await initializeBuildPipelines();
+		const coreBuilder = await createBuilder(config, loader);
+		await coreBuilder.build();
+		await (await getBuildPipeline("pipeline").getBuilder("pipeline-plugin")).build();
+
+		expect(defaultCalls).toEqual(["default"]);
+		expect(pipelineCalls).toEqual(["pipeline", "before"]);
+		expect(getBuildPipelines().map((pipeline) => pipeline.id)).toEqual([
+			"pipeline",
+		]);
+	});
+
 	test("should merge configs", async () => {
 		const fmConfig: FrameMasterConfig = {
 			HTTPServer: {
@@ -295,6 +351,75 @@ describe("builder", () => {
 		expect(build?.snapshots[file?.finalSnapshotId as string]?.text).toContain(
 			"[trace-b:final]",
 		);
+	});
+
+	test("should trace declared virtual module source and chained transforms", async () => {
+		const entrypoint = join(TEMP_DIR, "virtual-entry.ts");
+		writeFileSync(
+			entrypoint,
+			`import { value } from "@test/debug-virtual"; console.log(value);`,
+		);
+		const fmConfig: FrameMasterConfig = {
+			HTTPServer: { port: 3000 },
+			pluginsOptions: { entrypoints: [entrypoint] },
+			plugins: [
+				{
+					name: "debug-virtual-provider",
+					version: "0",
+					virtualModules: {
+						"@test/debug-virtual": {
+							contents: `export const value = "declared";`,
+							loader: "ts",
+							injectRuntime: false,
+						},
+					},
+				},
+				{
+					name: "debug-virtual-transformer",
+					version: "0",
+					build: {
+						buildConfig: {
+							outdir: `${TEMP_DIR}/build-debug-virtual`,
+							plugins: [
+								{
+									name: "debug-virtual-transform",
+									setup(build) {
+										build.onLoad({ filter: /^@test\/debug-virtual$/ }, (args) => ({
+											contents: `${args.__chainedContents}\nexport const transformed = true;`,
+											loader: "ts",
+										}));
+									},
+								},
+							],
+						},
+					},
+				},
+			],
+		};
+
+		const builder = await createBuilder(fmConfig, new PluginLoader(fmConfig));
+		builder.startDebugSession({ watch: false, includeTextSnapshots: true });
+
+		const result = await builder.build();
+		const build = builder.getDebugSession()?.builds[0];
+		const virtualFile = build?.files.find(
+			(file) => file.path === "@test/debug-virtual",
+		);
+
+		expect(result.success).toBeTrue();
+		expect(virtualFile?.namespace).toBe("frame-master-virtual-module");
+		expect(virtualFile?.steps.map((step) => [step.kind, step.pluginName])).toEqual([
+			["source", undefined],
+			["onLoad", "frame-master-virtual-modules"],
+			["onLoad", "debug-virtual-transform"],
+			["final-output", undefined],
+		]);
+		expect(
+			build?.snapshots[virtualFile?.initialSnapshotId as string]?.text,
+		).toBe(`export const value = "declared";`);
+		expect(
+			build?.snapshots[virtualFile?.finalSnapshotId as string]?.text,
+		).toContain("export const transformed = true;");
 	});
 
 	test("should disable text snapshots by default in debug sessions", async () => {

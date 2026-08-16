@@ -68,9 +68,13 @@ The debug UI is meant for build-level diagnosis:
 
 - Build history — each captured build, status, duration, entrypoints, and output counts
 - File pipeline — every traced file, loader transitions, and final loader/size
+- File filters — search traced file paths by name and narrow the list by final loader type
 - Plugin interventions — `onLoad` and `finally` steps with execution order and timings
 - Snapshots — before/after content snapshots for traced transformations
+- Virtual modules — plugin-declared `virtualModules` source content, the managed provider load, and every downstream transformation
 - Plugin registry metrics — plugin priority, dependency constraints, loader coverage, and total intervention time
+- Material diagnostic workspace — adaptive tabs, status chips, and a high-contrast diff surface for desktop and narrow screens
+- Mobile navigation drawer — keeps the diff workspace visible until you open Builds, Files, or Info
 
 ### HTTP Endpoints
 
@@ -119,6 +123,33 @@ In view mode, the UI is read-only:
 - No live rebuilds
 - No active WebSocket stream
 - `/api/export` returns the loaded trace file contents
+
+## Build Pipelines
+
+Wrap isolated, inspectable build pipelines with `buildPipeline()`.
+Each pipeline has its own builder and appears in the debug UI's pipeline filter,
+with its build history, files, and transforms preserved in exported traces.
+
+```ts
+import { buildPipeline, getBuildPipeline } from "frame-master/plugin";
+
+export default {
+  HTTPServer: { port: 3000 },
+  plugins: [
+    ...buildPipeline({
+      id: "functions",
+      label: "Cloudflare Functions",
+      plugins: [actionsPlugin, ssrPlugin],
+    }),
+  ],
+};
+```
+
+Pipeline plugins can use `getBuildPipeline("functions")` to register a build
+fragment or await the isolated builder. The existing
+`getGlobalPluginContext("build-unifier")` `setBuildConfig` and `getBuilder`
+methods remain available for legacy build-unifier consumers.
+- The rebuild action is disabled while the saved trace is open
 
 ## Recommended Workflow
 

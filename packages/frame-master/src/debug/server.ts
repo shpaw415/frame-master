@@ -16,7 +16,10 @@ import type {
 } from "frame-master/build/debug-trace";
 import { pluginLoader } from "../../src/plugins";
 import { createWatcher, type FileSystemWatcher } from "../../src/server/watch";
+import { serveDebugUiAsset } from "./ui-assets";
 import type { DebugBuildMessage, DebugRegistryEntry } from "./types";
+
+type DebugPipelineBuilder = { id: string; label: string; builder: Builder };
 
 type DebugBuildOptions = {
 	port: number;
@@ -30,17 +33,23 @@ function mkdirIfNeeded(path: string) {
 	}
 }
 
+function publicAssetPath(assetsDir: string, assetPath: string): string {
+	return `/${relative(assetsDir, assetPath).replaceAll("\\", "/")}`;
+}
+
 export class DebugBuildServer {
 	private wsClients = new Set<Bun.ServerWebSocket<unknown>>();
 	private server: Bun.Server<undefined> | null = null;
 	private watcher: FileSystemWatcher | null = null;
 	private unsubscribeTrace: (() => void) | null = null;
+	private pipelineUnsubscribers: Array<() => void> = [];
 	private rebuildQueued = false;
 	private stopped = false;
 
 	constructor(
 		private builder: Builder,
 		private options: DebugBuildOptions,
+		private pipelines: DebugPipelineBuilder[] = [],
 	) {}
 
 	async start(HTMLEntrypoint: string) {
@@ -54,14 +63,12 @@ export class DebugBuildServer {
 			process.exit(1);
 		}
 
-		const htmlAsset = Bun.file(htmlBuildAsset.assetPath);
-
 		const routes = Object.assign(
 			{},
 			...buildFiles.map((asset) => ({
-				[normalize(asset.pathname).replaceAll("\\", "/")]: Bun.file(
-					asset.assetPath,
-				),
+				[normalize(asset.pathname).replaceAll("\\", "/")]: () =>
+					serveDebugUiAsset(asset.pathname) ??
+					new Response("Not found", { status: 404 }),
 			})),
 		);
 
@@ -69,33 +76,38 @@ export class DebugBuildServer {
 			port: this.options.port,
 			development: false,
 			routes: {
-				"/": htmlAsset,
-				...routes,
 				"/ws": async (req, server) => {
 					if (server.upgrade(req)) {
 						return new Response("Success", { status: 101 });
 					}
 					return new Response("Upgrade failed", { status: 500 });
 				},
-				"/api/session": () => Response.json(this.builder.getDebugSession()),
-				"/api/builds": () => Response.json(this.builder.listDebugBuilds()),
+				"/api/session": () => Response.json(this.getSession()),
+				"/api/builds": () => Response.json(this.listBuilds()),
+				"/api/builds/*": (req, server) => this.handleRequest(req, server),
 				"/api/export": () =>
-					new Response(this.builder.exportDebugTrace(), {
+					new Response(JSON.stringify(this.getSession(), null, 2), {
 						headers: { "Content-Type": "application/json; charset=utf-8" },
 					}),
 				"/api/registry": () => Response.json(this.projectRegistry()),
+				...routes,
+				"/": () =>
+					serveDebugUiAsset("/index.html") ??
+					new Response("Not found", { status: 404 }),
 			},
-			fetch: this.handleRequest.bind(this),
+			fetch: (req) =>
+				serveDebugUiAsset(new URL(req.url).pathname) ??
+				new Response("Not found", { status: 404 }),
 			websocket: {
 				open: (ws) => {
 					this.wsClients.add(ws);
 					this.send(ws, {
 						type: "session-init",
-						data: this.builder.getDebugSession(),
+						data: this.getSession(),
 					});
 					this.send(ws, {
 						type: "build-list-updated",
-						data: this.builder.listDebugBuilds(),
+						data: this.listBuilds(),
 					});
 					this.send(ws, {
 						type: "registry-updated",
@@ -112,8 +124,13 @@ export class DebugBuildServer {
 		});
 
 		this.unsubscribeTrace = this.builder.onDebugEvent((event) => {
-			this.handleTraceEvent(event);
+			this.handleTraceEvent(event, "default", "Default build");
 		});
+		this.pipelineUnsubscribers = this.pipelines.map((pipeline) =>
+			pipeline.builder.onDebugEvent((event) =>
+				this.handleTraceEvent(event, pipeline.id, pipeline.label),
+			),
+		);
 
 		if (this.options.watch) {
 			this.watcher = await createWatcher({
@@ -142,6 +159,8 @@ export class DebugBuildServer {
 		this.stopped = true;
 		this.unsubscribeTrace?.();
 		this.unsubscribeTrace = null;
+		for (const unsubscribe of this.pipelineUnsubscribers) unsubscribe();
+		this.pipelineUnsubscribers = [];
 		this.watcher?.stop();
 		this.watcher = null;
 		this.server?.stop();
@@ -153,16 +172,14 @@ export class DebugBuildServer {
 
 		const buildMatch = url.pathname.match(/^\/api\/builds\/([^/]+)$/);
 		if (buildMatch?.[1]) {
-			return Response.json(this.builder.getDebugBuild(buildMatch[1]));
+			return Response.json(this.getBuild(buildMatch[1]));
 		}
 
 		const snapshotMatch = url.pathname.match(
 			/^\/api\/builds\/([^/]+)\/snapshots\/([^/]+)$/,
 		);
 		if (snapshotMatch?.[1] && snapshotMatch[2]) {
-			return Response.json(
-				this.builder.getDebugSnapshot(snapshotMatch[1], snapshotMatch[2]),
-			);
+			return Response.json(this.getSnapshot(snapshotMatch[1], snapshotMatch[2]));
 		}
 
 		return new Response("Not found", { status: 404 });
@@ -183,7 +200,7 @@ export class DebugBuildServer {
 				case "request-build-list":
 					this.send(ws, {
 						type: "build-list-updated",
-						data: this.builder.listDebugBuilds(),
+						data: this.listBuilds(),
 					});
 					break;
 				case "request-registry":
@@ -196,7 +213,7 @@ export class DebugBuildServer {
 					this.send(ws, {
 						type: "build-details",
 						data: payload.buildId
-							? this.builder.getDebugBuild(payload.buildId)
+							? this.getBuild(payload.buildId)
 							: null,
 					});
 					break;
@@ -208,10 +225,7 @@ export class DebugBuildServer {
 							snapshotId: payload.snapshotId ?? "",
 							snapshot:
 								payload.buildId && payload.snapshotId
-									? this.builder.getDebugSnapshot(
-											payload.buildId,
-											payload.snapshotId,
-										)
+									? this.getSnapshot(payload.buildId, payload.snapshotId)
 									: null,
 						},
 					});
@@ -219,7 +233,7 @@ export class DebugBuildServer {
 				case "request-export":
 					this.send(ws, {
 						type: "trace-export",
-						data: this.builder.exportDebugTrace(),
+						data: JSON.stringify(this.getSession(), null, 2),
 					});
 					break;
 				case "trigger-rebuild":
@@ -234,16 +248,26 @@ export class DebugBuildServer {
 		}
 	}
 
-	private handleTraceEvent(event: BuildTraceStoreEvent) {
+	private handleTraceEvent(
+		event: BuildTraceStoreEvent,
+		pipelineId: string,
+		pipelineLabel: string,
+	) {
+		const annotate = <T extends { id: string }>(build: T) => ({
+			...build,
+			id: `${pipelineId}:${build.id}`,
+			pipelineId,
+			pipelineLabel,
+		});
 		switch (event.type) {
 			case "build-started":
-				this.broadcast({ type: "build-start", data: event.build });
+				this.broadcast({ type: "build-start", data: annotate(event.build) });
 				break;
 			case "build-completed":
 				this.broadcast({
 					type:
 						event.build.status === "error" ? "build-error" : "build-complete",
-					data: event.build,
+					data: annotate(event.build),
 				});
 				this.broadcast({
 					type: "registry-updated",
@@ -251,13 +275,13 @@ export class DebugBuildServer {
 				});
 				break;
 			case "build-list-updated":
-				this.broadcast({ type: "build-list-updated", data: event.buildList });
+				this.broadcast({ type: "build-list-updated", data: this.listBuilds() });
 				break;
 			case "step-updated":
 				this.broadcast({
 					type: "step-appended",
 					data: {
-						buildId: event.buildId,
+						buildId: `${pipelineId}:${event.buildId}`,
 						file: this.projectFile(event.file),
 						step: this.projectStep(event.step),
 					},
@@ -282,16 +306,72 @@ export class DebugBuildServer {
 
 	private async runBuild() {
 		const result = await this.builder.build();
+		await Promise.all(this.pipelines.map(async (pipeline) => pipeline.builder.build()));
 		if (this.options.saveTrace) {
 			const savePath = this.resolveTracePath();
 			const finalSavePath = this.shouldWriteTraceInsideRepo(savePath)
 				? join(this.getDebugTraceDirectory(), basename(savePath))
 				: savePath;
 			mkdirIfNeeded(dirname(finalSavePath));
-			await Bun.write(finalSavePath, this.builder.exportDebugTrace());
+			await Bun.write(finalSavePath, JSON.stringify(this.getSession(), null, 2));
 			this.broadcast({ type: "trace-saved", data: { path: finalSavePath } });
 		}
 		return result;
+	}
+
+	private getSession() {
+		const stubBuilder = this.builder as Partial<Builder>;
+		if (!stubBuilder.getDebugSession) {
+			return JSON.parse(stubBuilder.exportDebugTrace?.() ?? "null") as BuildTraceSession;
+		}
+		const session = this.builder.getDebugSession();
+		if (!session) return null;
+		const builds = this.listBuilds()
+			.map((summary) => this.getBuild(summary.id))
+			.filter((build) => build !== null) as BuildTraceBuild[];
+		return {
+			...session,
+			builds,
+			buildList: this.listBuilds(),
+			pipelines: [
+				{ id: "default", label: "Default build" },
+				...this.pipelines.map(({ id, label }) => ({ id, label })),
+			],
+		};
+	}
+
+	private listBuilds() {
+		return [
+			...this.annotateBuilds("default", "Default build", this.builder.listDebugBuilds()),
+			...this.pipelines.flatMap((pipeline) =>
+				this.annotateBuilds(pipeline.id, pipeline.label, pipeline.builder.listDebugBuilds()),
+			),
+		].sort((left, right) => right.startedAt - left.startedAt);
+	}
+
+	private annotateBuilds(pipelineId: string, pipelineLabel: string, builds: ReturnType<Builder["listDebugBuilds"]>) {
+		return builds.map((build) => ({ ...build, id: `${pipelineId}:${build.id}`, pipelineId, pipelineLabel }));
+	}
+
+	private resolvePipelineBuild(id: string) {
+		const separator = id.indexOf(":");
+		const pipelineId = separator === -1 ? "default" : id.slice(0, separator);
+		const buildId = separator === -1 ? id : id.slice(separator + 1);
+		const pipeline = pipelineId === "default"
+			? { id: pipelineId, label: "Default build", builder: this.builder }
+			: this.pipelines.find((entry) => entry.id === pipelineId);
+		return pipeline ? { ...pipeline, buildId } : null;
+	}
+
+	private getBuild(id: string) {
+		const resolved = this.resolvePipelineBuild(id);
+		const build = resolved?.builder.getDebugBuild(resolved.buildId);
+		return build && resolved ? { ...build, id, pipelineId: resolved.id, pipelineLabel: resolved.label } : null;
+	}
+
+	private getSnapshot(buildId: string, snapshotId: string) {
+		const resolved = this.resolvePipelineBuild(buildId);
+		return resolved?.builder.getDebugSnapshot(resolved.buildId, snapshotId) ?? null;
 	}
 
 	private resolveTracePath() {
@@ -339,8 +419,9 @@ export class DebugBuildServer {
 		});
 		return result.outputs.map((out) => {
 			return {
-				pathname: normalize(out.path.split(assetsDir).at(1) as string),
+				pathname: publicAssetPath(assetsDir, out.path),
 				assetPath: out.path,
+				file: out,
 			};
 		});
 	}
@@ -571,14 +652,13 @@ export class DebugTraceViewServer {
 			process.exit(1);
 		}
 
-		const htmlAsset = Bun.file(htmlBuildAsset.assetPath);
 
 		const routes = Object.assign(
 			{},
 			...buildFiles.map((asset) => ({
-				[normalize(asset.pathname).replaceAll("\\", "/")]: Bun.file(
-					asset.assetPath,
-				),
+				[normalize(asset.pathname).replaceAll("\\", "/")]: () =>
+					serveDebugUiAsset(asset.pathname) ??
+					new Response("Not found", { status: 404 }),
 			})),
 		);
 
@@ -601,20 +681,25 @@ export class DebugTraceViewServer {
 			port: this.options.port,
 			development: false,
 			routes: {
-				"/": htmlAsset,
-				...routes,
 				// No WebSocket — view-only, no live rebuild
 				"/ws": () =>
 					new Response("Not available in view mode", { status: 404 }),
 				"/api/session": () => Response.json(session),
 				"/api/builds": () => Response.json(buildList),
+				"/api/builds/*": (req) => this.handleRequest(req, session),
 				"/api/export": () =>
 					new Response(JSON.stringify(session, null, 2), {
 						headers: { "Content-Type": "application/json; charset=utf-8" },
 					}),
 				"/api/registry": () => Response.json([]),
+				...routes,
+				"/": () =>
+					serveDebugUiAsset("/index.html") ??
+					new Response("Not found", { status: 404 }),
 			},
-			fetch: (req) => this.handleRequest(req, session),
+			fetch: (req) =>
+				serveDebugUiAsset(new URL(req.url).pathname) ??
+				new Response("Not found", { status: 404 }),
 		});
 
 		this.logStartup(absoluteTracePath);
@@ -659,7 +744,7 @@ export class DebugTraceViewServer {
 			target: "browser",
 		});
 		return result.outputs.map((out) => ({
-			pathname: normalize(out.path.split(assetsDir).at(1) as string),
+			pathname: publicAssetPath(assetsDir, out.path),
 			assetPath: out.path,
 		}));
 	}

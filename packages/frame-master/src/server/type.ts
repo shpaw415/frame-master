@@ -17,6 +17,14 @@ export type FrameMasterConfig = {
 	pluginsOptions?: Partial<{
 		disableHttpServerOptionsConflictWarning?: boolean;
 		/**
+		 * Skip plugin runtime requirement checks during plugin-loader initialization.
+		 *
+		 * This does not affect `frame-master plugin validate`.
+		 *
+		 * @default false
+		 */
+		skipRequirementsCheck?: boolean;
+		/**
 		 * Disable automatic onLoad handler chaining for build and runtime plugins.
 		 *
 		 * When enabled (default), multiple plugins with onLoad handlers for the same

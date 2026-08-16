@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { Command } from "commander";
 import { InitBuild } from "frame-master/server/init";
+import { getBuildPipelines } from "frame-master/plugin";
 import { DebugBuildServer, DebugTraceViewServer } from "../../src/debug/server";
 import { ensureNodeEnv } from "../share";
 
@@ -39,12 +40,22 @@ const debugBuildCommand = new Command("build")
 				saveTracePath:
 					typeof options.saveTrace === "string" ? options.saveTrace : undefined,
 			});
+			const pipelines = await Promise.all(
+				getBuildPipelines().map(async (pipeline) => {
+					const pipelineBuilder = await pipeline.getBuilder();
+					pipelineBuilder.startDebugSession({
+						watch: options.watch,
+						includeTextSnapshots: true,
+					});
+					return { id: pipeline.id, label: pipeline.label, builder: pipelineBuilder };
+				}),
+			);
 
 			const server = new DebugBuildServer(builder, {
 				port: Number(options.port),
 				watch: options.watch,
 				saveTrace: options.saveTrace,
-			});
+			}, pipelines);
 
 			await server.startWithDefaultUI();
 			process.on("SIGINT", async () => {

@@ -43,6 +43,31 @@ async function waitForJson<T>(
 	);
 }
 
+async function waitForText(
+	url: string,
+	assertion: (value: string) => boolean,
+	timeoutMs = 10000,
+) {
+	const startedAt = Date.now();
+	let lastValue = "";
+
+	while (Date.now() - startedAt < timeoutMs) {
+		try {
+			const response = await fetch(url);
+			if (response.ok) {
+				lastValue = await response.text();
+				if (assertion(lastValue)) return lastValue;
+			}
+		} catch {
+			// Server may still be booting.
+		}
+
+		await new Promise((resolve) => setTimeout(resolve, 100));
+	}
+
+	throw new Error(`Timed out waiting for text assertion at ${url}: ${lastValue}`);
+}
+
 async function cleanupTestDir(directory: string) {
 	// Best-effort only: Windows runners often hold locks on node_modules /
 	// killed child trees long enough that a hard failure flakes CI.
@@ -485,6 +510,16 @@ export default {
 			);
 
 			try {
+				const ui = await waitForText(
+					"http://localhost:3311/",
+					(value) =>
+						value.includes('src="/chunk-') && value.includes("data-cfasync="),
+				);
+				const scriptPath = ui.match(/src="\/(chunk-[^"]+\.js)"/)?.[1];
+				if (!scriptPath) {
+					throw new Error("Expected debug UI to reference a bundled script");
+				}
+				const scriptResponse = await fetch(`http://localhost:3311/${scriptPath}`);
 				const builds = await waitForJson<
 					Array<{ id: string; fileCount: number }>
 				>(
@@ -525,6 +560,7 @@ export default {
 				}
 
 				expect(builds).toHaveLength(1);
+				expect(scriptResponse.ok).toBe(true);
 				expect(
 					registry.some((entry) => entry.name === "debug-trace-plugin"),
 				).toBe(true);

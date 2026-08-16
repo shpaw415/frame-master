@@ -1,10 +1,11 @@
 import { DiffEditor, type Monaco } from "@monaco-editor/react";
+import { useEffect, useState } from "react";
 
 const THEME_DARK = "fm-dark";
 const THEME_LIGHT = "fm-light";
+const COMPACT_QUERY = "(max-width: 899px)";
 
 function registerThemes(monaco: Monaco) {
-	// One Dark Pro (dark)
 	monaco.editor.defineTheme(THEME_DARK, {
 		base: "vs-dark",
 		inherit: true,
@@ -55,7 +56,6 @@ function registerThemes(monaco: Monaco) {
 		},
 	});
 
-	// One Dark Pro light adaptation
 	monaco.editor.defineTheme(THEME_LIGHT, {
 		base: "vs",
 		inherit: true,
@@ -105,17 +105,35 @@ export default function MonacoDiff({
 	original,
 	modified,
 	language,
-	className,
 	theme,
 }: {
 	original: string;
 	modified: string;
 	language?: string;
-	className?: string;
 	theme?: "dark" | "light";
 }) {
+	const [compact, setCompact] = useState(
+		() => window.matchMedia(COMPACT_QUERY).matches,
+	);
+
+	useEffect(() => {
+		const query = window.matchMedia(COMPACT_QUERY);
+		const update = () => setCompact(query.matches);
+		update();
+		query.addEventListener("change", update);
+		return () => query.removeEventListener("change", update);
+	}, []);
+
 	return (
-		<div className={className ?? "h-105"} style={{ height: "100%" }}>
+		<div
+			style={{
+				height: "100%",
+				minHeight: 0,
+				minWidth: 0,
+				overflow: "hidden",
+				touchAction: "pan-x pan-y",
+			}}
+		>
 			<DiffEditor
 				original={original}
 				modified={modified}
@@ -123,18 +141,48 @@ export default function MonacoDiff({
 				theme={theme === "light" ? THEME_LIGHT : THEME_DARK}
 				height="100%"
 				options={{
+					automaticLayout: true,
 					readOnly: true,
+					domReadOnly: true,
+					originalEditable: false,
 					renderSideBySide: false,
 					useInlineViewWhenSpaceIsLimited: true,
+					enableSplitViewResizing: false,
+					renderOverviewRuler: !compact,
+					renderIndicators: !compact,
 					fontFamily: "'IBM Plex Mono', 'Fira Code', monospace",
 					fontLigatures: true,
-					fontSize: 15,
-					lineHeight: 20,
-					padding: { top: 14, bottom: 14 },
+					fontSize: compact ? 13 : 15,
+					lineHeight: compact ? 18 : 20,
+					padding: compact
+						? { top: 8, bottom: 8 }
+						: { top: 14, bottom: 14 },
 					minimap: { enabled: false },
 					scrollBeyondLastLine: false,
 					wordWrap: "on",
 					diffWordWrap: "on",
+					wrappingStrategy: "advanced",
+					fixedOverflowWidgets: true,
+					contextmenu: !compact,
+					mouseWheelZoom: false,
+					smoothScrolling: true,
+					links: !compact,
+					parameterHints: { enabled: false },
+					folding: !compact,
+					glyphMargin: false,
+					lineDecorationsWidth: compact ? 4 : 10,
+					lineNumbers: compact ? "off" : "on",
+					lineNumbersMinChars: compact ? 1 : 4,
+					renderLineHighlight: compact ? "none" : "line",
+					overviewRulerBorder: false,
+					overviewRulerLanes: compact ? 0 : 3,
+					hideCursorInOverviewRuler: true,
+					scrollbar: {
+						alwaysConsumeMouseWheel: false,
+						horizontalScrollbarSize: compact ? 6 : 10,
+						verticalScrollbarSize: compact ? 6 : 10,
+						useShadows: false,
+					},
 				}}
 				beforeMount={registerThemes}
 			/>
