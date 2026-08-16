@@ -360,6 +360,10 @@ body {
 }
 
 .debug-sidebar {
+	--debug-sidebar-surface: color-mix(in srgb, var(--debug-surface) 78%, #000);
+	--debug-sidebar-raised: color-mix(in srgb, var(--debug-surface) 90%, var(--debug-accent));
+	--debug-sidebar-hover: color-mix(in srgb, var(--debug-accent) 14%, var(--debug-surface));
+	--debug-sidebar-selected: color-mix(in srgb, var(--debug-accent) 25%, var(--debug-surface));
 	display: flex;
 	width: 288px;
 	flex: 0 0 288px;
@@ -368,13 +372,26 @@ body {
 	border: 0 !important;
 	border-right: 1px solid var(--debug-border) !important;
 	border-radius: 0 !important;
-	background: var(--debug-surface) !important;
+	background: var(--debug-sidebar-surface) !important;
 }
 
 .debug-sidebar .MUI_Tabs {
 	flex-shrink: 0;
-	border-bottom: 1px solid var(--debug-border);
-	background: color-mix(in srgb, var(--debug-surface) 88%, var(--debug-accent));
+	min-height: 52px;
+	border-bottom: 1px solid color-mix(in srgb, var(--debug-border) 75%, var(--debug-accent));
+	background: var(--debug-sidebar-raised);
+}
+
+.debug-sidebar .MUI_Tab {
+	min-height: 52px;
+	color: color-mix(in srgb, var(--debug-text) 70%, var(--debug-muted));
+	font-weight: 650;
+	letter-spacing: .02em;
+}
+
+.debug-sidebar .MUI_Tab[aria-selected="true"] {
+	color: var(--debug-text);
+	background: color-mix(in srgb, var(--debug-accent) 13%, transparent);
 }
 
 .debug-file-filters {
@@ -449,8 +466,8 @@ body {
 	gap: 8px;
 	align-items: center;
 	padding: 8px 12px;
-	border-bottom: 1px solid var(--debug-border);
-	background: color-mix(in srgb, var(--debug-surface) 88%, var(--debug-accent));
+	border-bottom: 1px solid color-mix(in srgb, var(--debug-border) 80%, var(--debug-accent));
+	background: var(--debug-sidebar-raised);
 	font: 500 12px "Roboto Flex", "Roboto", system-ui, sans-serif;
 	color: var(--debug-muted);
 }
@@ -511,6 +528,35 @@ body {
 .debug-app .t-section-label {
 	color: var(--debug-muted);
 	background: color-mix(in srgb, var(--debug-surface) 92%, var(--debug-accent));
+}
+
+.debug-sidebar .t-section-label {
+	padding: 8px 12px;
+	border-color: color-mix(in srgb, var(--debug-border) 80%, var(--debug-accent));
+	background: var(--debug-sidebar-raised);
+	color: color-mix(in srgb, var(--debug-text) 72%, var(--debug-muted));
+	letter-spacing: .09em;
+}
+
+.debug-sidebar .t-hover:hover {
+	background: var(--debug-sidebar-hover);
+}
+
+.debug-sidebar .t-selected {
+	background: var(--debug-sidebar-selected);
+	box-shadow: inset 3px 0 var(--debug-accent), inset 0 1px color-mix(in srgb, var(--debug-accent) 32%, transparent), inset 0 -1px color-mix(in srgb, var(--debug-accent) 20%, transparent);
+}
+
+.debug-sidebar .border-b,
+.debug-sidebar .border-t {
+	border-color: color-mix(in srgb, var(--debug-border) 82%, var(--debug-accent));
+}
+
+.debug-theme[data-theme="light"] .debug-sidebar {
+	--debug-sidebar-surface: #f4f7fb;
+	--debug-sidebar-raised: #e8eef8;
+	--debug-sidebar-hover: #dbeafe;
+	--debug-sidebar-selected: #cfe0fb;
 }
 
 @media (max-width: 900px) {
