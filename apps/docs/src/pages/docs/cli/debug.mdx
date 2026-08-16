@@ -122,6 +122,35 @@ In view mode, the UI is read-only:
 - No live rebuilds
 - No active WebSocket stream
 - `/api/export` returns the loaded trace file contents
+
+## Build Pipelines
+
+Declare isolated, inspectable build pipelines through `debugUIOptions.pipelines`.
+Each pipeline has its own builder and appears in the debug UI's pipeline filter,
+with its build history, files, and transforms preserved in exported traces.
+
+```ts
+import { getBuildPipeline } from "frame-master/plugin";
+
+export default {
+  HTTPServer: { port: 3000 },
+  plugins: [],
+  debugUIOptions: {
+    pipelines: [
+      {
+        id: "functions",
+        label: "Cloudflare Functions",
+        plugins: [actionsPlugin, ssrPlugin],
+      },
+    ],
+  },
+};
+```
+
+Pipeline plugins can use `getBuildPipeline("functions")` to register a build
+fragment or await the isolated builder. The existing
+`getGlobalPluginContext("build-unifier")` `setBuildConfig` and `getBuilder`
+methods remain available for legacy build-unifier consumers.
 - The rebuild action is disabled while the saved trace is open
 
 ## Recommended Workflow

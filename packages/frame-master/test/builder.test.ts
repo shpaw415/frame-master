@@ -5,10 +5,16 @@ import type { BunPlugin } from "bun";
 import type { FrameMasterConfig } from "frame-master/server/type";
 import { createBuilder } from "../src/build";
 import {
+	configureBuildPipelines,
+	getBuildPipeline,
+	initializeBuildPipelines,
+} from "../src/build/pipelines";
+import {
 	type BuildTraceSession,
 	BuildTraceSessionStore,
 } from "../src/build/debug-trace";
 import { PluginLoader } from "../src/plugins";
+import { getGlobalPluginContext } from "../src/plugins/utils";
 
 const TEMP_DIR = ".test-temp";
 const TEXT_ENTRYPOINT = join(TEMP_DIR, "entry.txt");
@@ -62,6 +68,54 @@ afterEach(() => {
 });
 
 describe("builder", () => {
+	test("keeps debug UI pipeline fragments isolated and exposes legacy context", async () => {
+		const defaultCalls: string[] = [];
+		const pipelineCalls: string[] = [];
+		const pipelinePlugin = {
+			name: "pipeline-plugin",
+			version: "1.0.0",
+			build: {
+				buildConfig: {
+					outdir: `${TEMP_DIR}/pipeline`,
+					entrypoints: [TEXT_ENTRYPOINT],
+					plugins: [{ name: "pipeline-plugin", setup: () => { pipelineCalls.push("pipeline"); } }],
+				},
+			},
+		};
+		const config: FrameMasterConfig = {
+			HTTPServer: { port: 0 },
+			plugins: [
+				{
+					name: "default-plugin",
+					version: "1.0.0",
+					build: {
+						buildConfig: {
+							outdir: `${TEMP_DIR}/default`,
+							entrypoints: [TEXT_ENTRYPOINT],
+							plugins: [{ name: "default-plugin", setup: () => { defaultCalls.push("default"); } }],
+						},
+					},
+				},
+				pipelinePlugin,
+			],
+			debugUIOptions: {
+				pipelines: [{ id: "pipeline", label: "Pipeline", plugins: [pipelinePlugin] }],
+			},
+		};
+		const loader = new PluginLoader(config);
+		await configureBuildPipelines(config, loader);
+		getGlobalPluginContext("build-unifier")?.setBuildConfig?.("pipeline-plugin", {
+			beforeBuild: () => { pipelineCalls.push("before"); },
+		});
+		await initializeBuildPipelines();
+		const coreBuilder = await createBuilder(config, loader);
+		await coreBuilder.build();
+		await (await getBuildPipeline("pipeline").getBuilder("pipeline-plugin")).build();
+
+		expect(defaultCalls).toEqual(["default"]);
+		expect(pipelineCalls).toEqual(["pipeline", "before"]);
+	});
+
 	test("should merge configs", async () => {
 		const fmConfig: FrameMasterConfig = {
 			HTTPServer: {

@@ -105,6 +105,18 @@ type Requirement = Partial<{
 // biome-ignore lint/suspicious/noEmptyInterface: plugin authors extend this via module augmentation.
 export interface GlobalPluginContextMap {}
 
+declare module "./types" {
+	interface GlobalPluginContextMap {
+		/** @deprecated Use `getBuildPipeline(id)` from `frame-master/plugin`. */
+		"build-unifier": Partial<{
+			builders: Record<string, Promise<Builder>>;
+			getBuilder: (pluginName: string) => Promise<Builder>;
+			build_config: Record<string, BuildOptionsPlugin[]>;
+			setBuildConfig: (pluginName: string, config: BuildOptionsPlugin) => void;
+		}>;
+	}
+}
+
 export type PluginContextKey = keyof GlobalPluginContextMap | (string & {});
 
 export type PluginGlobalContext<

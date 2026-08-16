@@ -175,6 +175,7 @@ export default function DebugApp() {
 	const [state, setState] = useState(createInitialDebugUIState);
 	const [theme, setTheme] = useState<"dark" | "light">("dark");
 	const [leftTab, setLeftTab] = useState<LeftTabKey>("builds");
+	const [pipelineFilter, setPipelineFilter] = useState("all");
 	const [fileNameFilter, setFileNameFilter] = useState("");
 	const [fileTypeFilter, setFileTypeFilter] = useState("all");
 	const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
@@ -218,6 +219,9 @@ export default function DebugApp() {
 	);
 
 	const deferredBuildList = useDeferredValue(state.buildList);
+	const visibleBuildList = deferredBuildList.filter(
+		(build) => pipelineFilter === "all" || build.pipelineId === pipelineFilter,
+	);
 	const deferredRegistry = useDeferredValue(state.registry);
 	const deferredWatcherEvents = useDeferredValue(state.watcherEvents);
 	const deferredFileNameFilter = useDeferredValue(fileNameFilter.trim().toLowerCase());
@@ -376,6 +380,21 @@ export default function DebugApp() {
 					<Box className="debug-toolbar-status">
 						<Typography variant="caption">{window.location.host}</Typography>
 						<Chip size="small">{deferredBuildList.length} builds</Chip>
+						{(state.session?.pipelines?.length ?? 0) > 1 && (
+							<select
+								className="debug-pipeline-filter"
+								value={pipelineFilter}
+								onChange={(event) => setPipelineFilter(event.target.value)}
+								aria-label="Filter builds by pipeline"
+							>
+								<option value="all">All pipelines</option>
+								{state.session?.pipelines?.map((pipeline) => (
+									<option key={pipeline.id} value={pipeline.id}>
+										{pipeline.label}
+									</option>
+								))}
+							</select>
+						)}
 						<Chip size="small">{deferredRegistry.length} plugins</Chip>
 						<Chip size="small">watch {String(state.session?.options.watch ?? false)}</Chip>
 						<Chip size="small" color={state.connection === "open" ? "success" : "warning"}>
@@ -474,12 +493,12 @@ export default function DebugApp() {
 					{leftTab === "builds" && (
 						<>
 							<div className="flex-1 overflow-y-auto">
-								{deferredBuildList.length === 0 ? (
+								{visibleBuildList.length === 0 ? (
 									<div className="px-3 py-6 text-xs t-faint text-center">
 										no builds yet
 									</div>
 								) : (
-									deferredBuildList.map((build) => {
+									visibleBuildList.map((build) => {
 										const isSelected = state.selectedBuildId === build.id;
 										return (
 											<button
@@ -506,9 +525,14 @@ export default function DebugApp() {
 														{statusLabel(build.status)}
 													</Chip>
 												</div>
-												<div className="mt-1 text-xs t-dim">
-													{new Date(build.startedAt).toLocaleTimeString()}
+											<div className="mt-1 text-xs t-dim">
+												{new Date(build.startedAt).toLocaleTimeString()}
+											</div>
+											{build.pipelineLabel && (
+												<div className="mt-0.5 text-xs t-accent">
+													{build.pipelineLabel}
 												</div>
+											)}
 												<div className="mt-0.5 text-xs t-faint">
 													{build.fileCount}f · {build.stepCount}s ·{" "}
 													{build.outputCount}o

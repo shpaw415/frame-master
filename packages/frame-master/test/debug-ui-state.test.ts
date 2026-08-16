@@ -27,6 +27,8 @@ function buildSummary(id: string, sequence: number): BuildTraceBuildSummary {
 		startedAt: 1000 + sequence,
 		completedAt: 1005 + sequence,
 		durationMs: 5,
+		pipelineId: "default",
+		pipelineLabel: "Default build",
 		entrypoints: ["src/index.ts"],
 		fileCount: 1,
 		stepCount: 1,

@@ -1,5 +1,14 @@
 import type { FrameMasterPlugin } from "../plugins/types";
 
+export type DebugBuildPipeline = {
+	/** Stable identifier shown in `frame-master debug build`. */
+	id: string;
+	/** Optional human-readable name for the debug UI. */
+	label?: string;
+	/** Plugins whose build fragments belong to this isolated pipeline. */
+	plugins: FrameMasterPlugin<any>[];
+};
+
 export type FrameMasterConfig = {
 	/**
 	 * HTTP server config
@@ -14,6 +23,14 @@ export type FrameMasterConfig = {
 	 * Frame-Master Plugins to load
 	 */
 	plugins: FrameMasterPlugin<any>[];
+	/**
+	 * Optional build pipelines surfaced by the debug UI. Pipeline plugins are
+	 * isolated from the default builder while retaining the build-unifier global
+	 * context contract for existing plugin consumers.
+	 */
+	debugUIOptions?: {
+		pipelines: DebugBuildPipeline[];
+	};
 	pluginsOptions?: Partial<{
 		disableHttpServerOptionsConflictWarning?: boolean;
 		/**
