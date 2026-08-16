@@ -37,6 +37,7 @@ import {
 	RefreshCw,
 	Search,
 	Sun,
+	X,
 } from "lucide-react";
 import type {
 	BuildTraceBuild,
@@ -391,7 +392,7 @@ export default function DebugApp() {
 				<Toolbar sx={{ display: "flex", minHeight: { xs: 56, sm: 64 }, gap: { xs: 1, sm: 2 }, alignItems: "center", flexWrap: { xs: "wrap", md: "nowrap" }, overflow: "hidden" }}>
 					<IconButton
 						type="button"
-						sx={{ display: { xs: "inline-flex", sm: "none" } }}
+						sx={{ display: { xs: "inline-flex", md: "none" } }}
 						onClick={() => setMobileNavigationOpen(c => !c)}
 						aria-label="Open debug navigation"
 					>
@@ -478,15 +479,21 @@ export default function DebugApp() {
 			<Box sx={{ display: "flex", minHeight: 0, flex: 1, overflow: "hidden" }}>
 				{/* Left panel — tabbed */}
 				{mobileNavigationOpen && (
-					<Box Element="button" type="button" onClick={() => setMobileNavigationOpen(false)} aria-label="Close debug navigation" sx={{ position: "fixed", zIndex: 1200, inset: 0, display: { xs: "block", sm: "none" }, border: 0, bgcolor: "rgba(0, 0, 0, 0.48)" }} />
+					<Box Element="button" type="button" onClick={() => setMobileNavigationOpen(false)} aria-label="Close debug navigation" sx={{ position: "fixed", zIndex: 1200, inset: 0, display: { xs: "block", md: "none" }, border: 0, bgcolor: "rgba(0, 0, 0, 0.48)" }} />
 				)}
+				<Box sx={{ display: { xs: "contents", md: "flex" }, width: { md: 280, lg: 304 }, flex: "0 0 auto", minWidth: 0 }}>
 				<Drawer
 					open={isDesktopDrawer || mobileNavigationOpen}
 					variant={isDesktopDrawer ? "permanent" : "temporary"}
 					width={304}
 					minifiedWidth={280}
-					sx={{ display: "flex", position: { xs: "fixed", md: "relative" }, zIndex: { xs: 1201, md: "auto" }, inset: { xs: "0 auto 0 0", md: "auto" }, width: { xs: "min(88vw, 336px)", md: 280, lg: 304 }, flex: "0 0 auto", flexDirection: "column", overflow: "hidden", borderRadius: 0, boxShadow: { xs: "0 8px 24px rgba(0, 0, 0, 0.28)", md: "none" } }}
+					sx={{ display: "flex", position: { xs: "fixed", md: "relative" }, zIndex: { xs: 1201, md: "auto" }, inset: { xs: "0 auto 0 0", md: "auto" }, width: { xs: "min(88vw, 336px)", md: "100%" }, height: "100%", flexDirection: "column", overflow: "hidden", borderRadius: 0, boxShadow: { xs: "0 8px 24px rgba(0, 0, 0, 0.28)", md: "none" } }}
 				>
+					<Box sx={{ display: { xs: "flex", md: "none" }, justifyContent: "flex-end", p: 1 }}>
+						<IconButton type="button" onClick={() => setMobileNavigationOpen(false)} aria-label="Close debug navigation">
+							<X size={20} />
+						</IconButton>
+					</Box>
 					{/* Tab bar */}
 					<Tabs
 						value={leftTab}
@@ -774,6 +781,7 @@ export default function DebugApp() {
 						</Box>
 					)}
 				</Drawer>
+				</Box>
 
 				{/* Center — diff editor (full height) */}
 				<Box sx={{ display: "flex", minWidth: 0, flex: 1, flexDirection: "column", overflow: "hidden" }}>
