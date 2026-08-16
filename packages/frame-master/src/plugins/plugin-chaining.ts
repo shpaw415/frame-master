@@ -5,6 +5,10 @@ import type {
 	BuildTraceStepError,
 } from "../build/debug-trace";
 import { verboseLog } from "../utils";
+import {
+	type VirtualModuleRegistry,
+	VIRTUAL_MODULE_NAMESPACE,
+} from "./virtual-modules";
 
 type OnLoadArgs = Parameters<OnLoadCallback>[0];
 type OnLoadResult = Awaited<ReturnType<OnLoadCallback>>;
@@ -126,13 +130,19 @@ export class PluginProxy {
 	private suffix: string;
 	private formatedSuffix: string;
 	private trace: BuildTraceCollector | null;
+	private virtualModuleRegistry: VirtualModuleRegistry | undefined;
 
 	constructor(
-		opt: { suffix?: string; trace?: BuildTraceCollector | null } = {},
+		opt: {
+			suffix?: string;
+			trace?: BuildTraceCollector | null;
+			virtualModuleRegistry?: VirtualModuleRegistry;
+		} = {},
 	) {
 		this.suffix = opt.suffix ?? "";
 		this.formatedSuffix = this.suffix ? `:${this.suffix}` : "";
 		this.trace = opt.trace ?? null;
+		this.virtualModuleRegistry = opt.virtualModuleRegistry;
 	}
 
 	/**
@@ -868,6 +878,16 @@ export class PluginProxy {
 	> {
 		if (!this.trace) return args;
 		if (args.__traceSourceContents !== undefined) return args;
+		if (args.namespace === VIRTUAL_MODULE_NAMESPACE) {
+			const module = this.virtualModuleRegistry?.getModule(args.path);
+			if (module) {
+				return {
+					...args,
+					__traceSourceContents: module.contents,
+					__traceSourceLoader: module.loader,
+				};
+			}
+		}
 
 		const inferredLoader = this.inferLoaderFromPath(args.path);
 		const isFileNamespace = !args.namespace || args.namespace === "file";
@@ -1021,7 +1041,11 @@ export function createPluginProxy(): PluginProxy {
  */
 export function chainPlugins(
 	plugins: BunPlugin[],
-	opt?: { suffix?: string; trace?: BuildTraceCollector | null },
+	opt?: {
+		suffix?: string;
+		trace?: BuildTraceCollector | null;
+		virtualModuleRegistry?: VirtualModuleRegistry;
+	},
 ): BunPlugin {
 	const proxy = new PluginProxy(opt);
 	proxy.addPlugins(plugins);

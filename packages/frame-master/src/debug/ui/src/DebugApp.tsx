@@ -35,6 +35,8 @@ import {
 } from "../../state";
 import MonacoDiff from "./MonacoDiff";
 
+const VIRTUAL_MODULE_NAMESPACE = "frame-master-virtual-module";
+
 // ── Left-panel tab registry ───────────────────────────────────────────────────
 // Add new entries here to extend the menu.
 type LeftTabKey = "builds" | "files" | "info";
@@ -96,6 +98,10 @@ function statusBadge(status: BuildTraceBuildStatus) {
 	if (status === "success") return "t-badge-ok";
 	if (status === "error") return "t-badge-err";
 	return "t-badge-run";
+}
+
+function isVirtualModule(namespace?: string) {
+	return namespace === VIRTUAL_MODULE_NAMESPACE;
 }
 
 function StepErrorPanel({ error }: { error: BuildTraceStepError }) {
@@ -515,12 +521,15 @@ export default function DebugApp() {
 														isSelected ? " t-selected" : ""
 													}`}
 												>
-													<div
-														className={`text-xs break-all ${isSelected ? "t-text" : "t-muted"}`}
-													>
-														{file.path}
-													</div>
-													<div className="mt-0.5 text-xs t-faint">
+											<div
+													className={`text-xs break-all ${isSelected ? "t-text" : "t-muted"}`}
+											>
+													{file.path}
+												</div>
+												{isVirtualModule(file.namespace) && (
+													<div className="mt-0.5 text-xs t-accent">virtual module</div>
+												)}
+												<div className="mt-0.5 text-xs t-faint">
 														{file.steps.length}s · {file.finalLoader ?? "?"} ·{" "}
 														{file.finalSize}b
 													</div>
@@ -651,8 +660,14 @@ export default function DebugApp() {
 								{selectedStep ? (
 									<div className="space-y-1 text-xs">
 										{(
-											[
-												["kind", selectedStep.kind],
+												[
+													["kind", selectedStep.kind],
+													[
+														"source",
+														isVirtualModule(selectedFile?.namespace)
+															? "plugin virtual module"
+															: "file system",
+													],
 												["plugin", selectedStep.pluginName ?? "core"],
 												[
 													"loader",

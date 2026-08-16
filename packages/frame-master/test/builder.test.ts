@@ -297,6 +297,75 @@ describe("builder", () => {
 		);
 	});
 
+	test("should trace declared virtual module source and chained transforms", async () => {
+		const entrypoint = join(TEMP_DIR, "virtual-entry.ts");
+		writeFileSync(
+			entrypoint,
+			`import { value } from "@test/debug-virtual"; console.log(value);`,
+		);
+		const fmConfig: FrameMasterConfig = {
+			HTTPServer: { port: 3000 },
+			pluginsOptions: { entrypoints: [entrypoint] },
+			plugins: [
+				{
+					name: "debug-virtual-provider",
+					version: "0",
+					virtualModules: {
+						"@test/debug-virtual": {
+							contents: `export const value = "declared";`,
+							loader: "ts",
+							injectRuntime: false,
+						},
+					},
+				},
+				{
+					name: "debug-virtual-transformer",
+					version: "0",
+					build: {
+						buildConfig: {
+							outdir: `${TEMP_DIR}/build-debug-virtual`,
+							plugins: [
+								{
+									name: "debug-virtual-transform",
+									setup(build) {
+										build.onLoad({ filter: /^@test\/debug-virtual$/ }, (args) => ({
+											contents: `${args.__chainedContents}\nexport const transformed = true;`,
+											loader: "ts",
+										}));
+									},
+								},
+							],
+						},
+					},
+				},
+			],
+		};
+
+		const builder = await createBuilder(fmConfig, new PluginLoader(fmConfig));
+		builder.startDebugSession({ watch: false, includeTextSnapshots: true });
+
+		const result = await builder.build();
+		const build = builder.getDebugSession()?.builds[0];
+		const virtualFile = build?.files.find(
+			(file) => file.path === "@test/debug-virtual",
+		);
+
+		expect(result.success).toBeTrue();
+		expect(virtualFile?.namespace).toBe("frame-master-virtual-module");
+		expect(virtualFile?.steps.map((step) => [step.kind, step.pluginName])).toEqual([
+			["source", undefined],
+			["onLoad", "frame-master-virtual-modules"],
+			["onLoad", "debug-virtual-transform"],
+			["final-output", undefined],
+		]);
+		expect(
+			build?.snapshots[virtualFile?.initialSnapshotId as string]?.text,
+		).toBe(`export const value = "declared";`);
+		expect(
+			build?.snapshots[virtualFile?.finalSnapshotId as string]?.text,
+		).toContain("export const transformed = true;");
+	});
+
 	test("should disable text snapshots by default in debug sessions", async () => {
 		const executionOrder: string[] = [];
 		const fmConfig: FrameMasterConfig = {

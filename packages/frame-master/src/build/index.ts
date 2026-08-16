@@ -3,7 +3,11 @@ import { isAbsolute, join } from "node:path";
 import { cwd } from "node:process";
 import chalk from "chalk";
 import type { FrameMasterConfig } from "frame-master/server/type";
-import { type PluginLoader, pluginLoader } from "../plugins";
+import {
+	type PluginLoader,
+	pluginLoader,
+	type VirtualModuleRegistry,
+} from "../plugins";
 import { chainPlugins } from "../plugins/plugin-chaining";
 import type { BuildOptionsPlugin } from "../plugins/types";
 import { getConfig } from "../server/config";
@@ -33,6 +37,7 @@ export type BuilderProps = {
 	 */
 	baseEntrypoints?: string[];
 	virtualModulePlugin?: Bun.BunPlugin | null;
+	virtualModuleRegistry?: VirtualModuleRegistry;
 };
 
 const DEFAULT_BUILD_DIR = ".frame-master/build";
@@ -53,6 +58,7 @@ export class Builder {
 	private disableOnLoadChaining: boolean = false;
 	private baseEntrypoints: string[];
 	private virtualModulePlugin: Bun.BunPlugin | null;
+	private virtualModuleRegistry: VirtualModuleRegistry | undefined;
 
 	readonly isLogEnabled: boolean;
 	public outputs: Bun.BuildArtifact[] | null = null;
@@ -78,6 +84,7 @@ export class Builder {
 		this.disableOnLoadChaining = props.disableOnLoadChaining ?? false;
 		this.baseEntrypoints = props.baseEntrypoints ?? [];
 		this.virtualModulePlugin = props.virtualModulePlugin ?? null;
+		this.virtualModuleRegistry = props.virtualModuleRegistry;
 	}
 
 	private async init() {
@@ -632,6 +639,7 @@ export class Builder {
 				chainPlugins(plugins, {
 					suffix: "build",
 					trace: this.debugSession,
+					virtualModuleRegistry: this.virtualModuleRegistry,
 				}),
 			],
 		};
@@ -1122,14 +1130,14 @@ export async function createBuilder(
 	const plugin = _pluginLoader.getPluginByName("build");
 	const logIsEnabled = plugin.some((p) => p.pluginParent.enableLoging === true);
 
+	const virtualModuleRegistry = _pluginLoader.getVirtualModuleRegistry();
 	return await Builder.createBuilder({
 		enableLogging: logIsEnabled,
 		disableOnLoadChaining: _config?.pluginsOptions?.disableOnLoadChaining,
 		buildConfigs: plugin.map((p) => p.pluginParent),
 		baseEntrypoints: _config?.pluginsOptions?.entrypoints,
-		virtualModulePlugin: _pluginLoader
-			.getVirtualModuleRegistry()
-			.createPlugin(),
+		virtualModulePlugin: virtualModuleRegistry.createPlugin(),
+		virtualModuleRegistry,
 	});
 }
 
