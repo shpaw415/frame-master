@@ -1,4 +1,5 @@
 import type { FrameMasterConfig } from "frame-master/server/type";
+import { buildPipeline } from "frame-master/plugin";
 
 export default {
 	HTTPServer: {
@@ -146,12 +147,10 @@ export default {
 			},
 		},
 	],
-	debugUIOptions: {
-		pipelines: [
-			{
-				id: "preview",
-				label: "Preview pipeline",
-				plugins: [
+		...buildPipeline({
+			id: "preview",
+			label: "Preview pipeline",
+			plugins: [
 					{
 						name: "debug-ui-demo-preview",
 						version: "1.0.0",
@@ -179,8 +178,6 @@ export default {
 							},
 						},
 					},
-				],
-			},
-		],
-	},
+			],
+		}),
 } satisfies FrameMasterConfig;

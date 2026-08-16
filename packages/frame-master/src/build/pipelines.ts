@@ -1,6 +1,6 @@
 import type { FrameMasterConfig } from "../server/type";
 import type { PluginLoader } from "../plugins/plugin-loader";
-import type { BuildOptionsPlugin } from "../plugins/types";
+import type { BuildOptionsPlugin, FrameMasterPlugin } from "../plugins/types";
 import type { Builder } from "./index";
 
 export type BuildPipeline = {
@@ -12,6 +12,34 @@ export type BuildPipeline = {
 	initialize(): Promise<void>;
 };
 
+/**
+ * Wrap plugins in an isolated build pipeline that is automatically surfaced in
+ * the debug UI. Additional options can be added without changing app config.
+ */
+export type BuildPipelineOptions = {
+	id: string;
+	label?: string;
+	plugins: FrameMasterPlugin[];
+};
+
+export function buildPipeline(options: BuildPipelineOptions): FrameMasterPlugin[] {
+	if (options.plugins.length === 0) {
+		throw new Error("A build pipeline must contain at least one plugin.");
+	}
+	const pluginNames = options.plugins.map((plugin) => plugin.name);
+	return [
+		...options.plugins,
+		{
+			name: `frame-master-build-pipeline:${options.id}`,
+			version: "1.0.0",
+			priority: Math.max(...options.plugins.map((plugin) => plugin.priority ?? 1000)) + 1,
+			debugUIOptions: {
+				pipeline: { id: options.id, label: options.label, plugins: pluginNames },
+			},
+		},
+	];
+}
+
 class CoreBuildPipeline implements BuildPipeline {
 	readonly pluginNames: string[];
 	private configs: BuildOptionsPlugin[];
@@ -22,7 +50,7 @@ class CoreBuildPipeline implements BuildPipeline {
 	constructor(
 		readonly id: string,
 		readonly label: string,
-		plugins: FrameMasterConfig["plugins"],
+		plugins: FrameMasterPlugin[],
 		private config: FrameMasterConfig,
 		private pluginLoader: PluginLoader,
 	) {
@@ -65,13 +93,18 @@ let pipelines = new Map<string, CoreBuildPipeline>();
 
 export async function configureBuildPipelines(config: FrameMasterConfig, pluginLoader: PluginLoader): Promise<void> {
 	pipelines = new Map();
-	for (const pipeline of config.debugUIOptions?.pipelines ?? []) {
+	for (const entry of pluginLoader.getPluginByName("debugUIOptions")) {
+		const pipeline = entry.pluginParent.pipeline;
+		if (!pipeline) continue;
 		if (pipelines.has(pipeline.id)) throw new Error(`Duplicate debug build pipeline: ${pipeline.id}`);
-		pipelines.set(pipeline.id, new CoreBuildPipeline(pipeline.id, pipeline.label ?? pipeline.id, pipeline.plugins, config, pluginLoader));
+		const plugins = pluginLoader
+			.getPlugins()
+			.filter((plugin) => pipeline.plugins.includes(plugin.name));
+		pipelines.set(pipeline.id, new CoreBuildPipeline(pipeline.id, pipeline.label ?? pipeline.id, plugins, config, pluginLoader));
 	}
 	const { getGlobalPluginContext, setGlobalPluginContext } = await import("../plugins/utils");
 	const legacy = getGlobalPluginContext("build-unifier") ?? {};
-	if (!config.debugUIOptions?.pipelines.length) return;
+	if (pipelines.size === 0) return;
 	setGlobalPluginContext("build-unifier", {
 		...legacy,
 		setBuildConfig(pluginName, buildConfig) {

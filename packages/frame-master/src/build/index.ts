@@ -1120,9 +1120,9 @@ export async function createBuilder(
 	_pluginLoader: PluginLoader,
 ) {
 	const pipelinePluginNames = new Set(
-		_config.debugUIOptions?.pipelines.flatMap((pipeline) =>
-			pipeline.plugins.map((plugin) => plugin.name),
-		) ?? [],
+		_pluginLoader
+			.getPluginByName("debugUIOptions")
+			.flatMap((entry) => entry.pluginParent.pipeline?.plugins ?? []),
 	);
 	const plugin = _pluginLoader
 		.getPluginByName("build")

@@ -5,6 +5,7 @@ import type { BunPlugin } from "bun";
 import type { FrameMasterConfig } from "frame-master/server/type";
 import { createBuilder } from "../src/build";
 import {
+	buildPipeline,
 	configureBuildPipelines,
 	getBuildPipeline,
 	initializeBuildPipelines,
@@ -96,11 +97,8 @@ describe("builder", () => {
 						},
 					},
 				},
-				pipelinePlugin,
+				...buildPipeline({ id: "pipeline", label: "Pipeline", plugins: [pipelinePlugin] }),
 			],
-			debugUIOptions: {
-				pipelines: [{ id: "pipeline", label: "Pipeline", plugins: [pipelinePlugin] }],
-			},
 		};
 		const loader = new PluginLoader(config);
 		await configureBuildPipelines(config, loader);

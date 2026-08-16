@@ -125,25 +125,22 @@ In view mode, the UI is read-only:
 
 ## Build Pipelines
 
-Declare isolated, inspectable build pipelines through `debugUIOptions.pipelines`.
+Wrap isolated, inspectable build pipelines with `buildPipeline()`.
 Each pipeline has its own builder and appears in the debug UI's pipeline filter,
 with its build history, files, and transforms preserved in exported traces.
 
 ```ts
-import { getBuildPipeline } from "frame-master/plugin";
+import { buildPipeline, getBuildPipeline } from "frame-master/plugin";
 
 export default {
   HTTPServer: { port: 3000 },
-  plugins: [],
-  debugUIOptions: {
-    pipelines: [
-      {
-        id: "functions",
-        label: "Cloudflare Functions",
-        plugins: [actionsPlugin, ssrPlugin],
-      },
-    ],
-  },
+  plugins: [
+    ...buildPipeline({
+      id: "functions",
+      label: "Cloudflare Functions",
+      plugins: [actionsPlugin, ssrPlugin],
+    }),
+  ],
 };
 ```
 

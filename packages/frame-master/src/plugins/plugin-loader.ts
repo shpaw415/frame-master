@@ -28,10 +28,7 @@ export class PluginLoader {
 				"Frame Master config has not been loaded. Call loadConfig() before InitPluginLoader().",
 			);
 		}
-		this.Plugins = [
-			...(config.plugins ?? []),
-			...(config.debugUIOptions?.pipelines.flatMap((pipeline) => pipeline.plugins) ?? []),
-		];
+		this.Plugins = config.plugins ?? [];
 
 		this.Plugins = this.Plugins.sort((a, b) => {
 			return (a?.priority ?? 1000) - (b?.priority ?? 1000);

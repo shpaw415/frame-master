@@ -3,7 +3,7 @@ export * from "./plugin-loader";
 export * from "./types";
 export * from "./utils";
 export * from "./virtual-modules";
-export { getBuildPipeline, getBuildPipelines } from "../build/pipelines";
+export { buildPipeline, getBuildPipeline, getBuildPipelines } from "../build/pipelines";
 
 // Type augmentation for Bun's OnLoadArgs - makes __chainedContents globally available
 import "./bun-plugin-chaining.d.ts";

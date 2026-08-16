@@ -145,6 +145,18 @@ export type PluginOptions = {
 	HTMLRewrite?: unknown;
 };
 
+/** Debug UI metadata declared by a plugin wrapper. */
+export type DebugUIOptions = {
+	pipeline?: {
+		/** Stable identifier shown in `frame-master debug build`. */
+		id: string;
+		/** Optional human-readable name for the pipeline selector. */
+		label?: string;
+		/** Names of the wrapped plugins that participate in this pipeline. */
+		plugins: string[];
+	};
+};
+
 /**
  * A virtual source module declared by a Frame-Master plugin.
  *
@@ -494,6 +506,8 @@ export type FrameMasterPlugin<
 	version: string;
 }> &
 	Partial<{
+		/** Debug UI metadata, normally supplied by `buildPipeline()`. */
+		debugUIOptions: DebugUIOptions;
 		/**
 		 * Virtual modules owned by this plugin. Frame-Master resolves these modules
 		 * for all plugin build configurations, allowing other plugins to import them.
