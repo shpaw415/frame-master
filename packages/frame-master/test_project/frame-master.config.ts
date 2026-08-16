@@ -146,4 +146,41 @@ export default {
 			},
 		},
 	],
+	debugUIOptions: {
+		pipelines: [
+			{
+				id: "preview",
+				label: "Preview pipeline",
+				plugins: [
+					{
+						name: "debug-ui-demo-preview",
+						version: "1.0.0",
+						build: {
+							buildConfig: {
+								entrypoints: ["./src/admin.ts"],
+								outdir: ".frame-master/debug-pipeline-preview",
+								format: "esm",
+								plugins: [
+									{
+										name: "preview-pipeline-marker",
+										setup(build) {
+											build.onLoad({ filter: /\.ts$/ }, async (args) => {
+												const source =
+													(args.__chainedContents as string) ??
+													(await Bun.file(args.path).text());
+												return {
+													contents: `const __debugPipeline = "preview";\n${source}\nconsole.log(__debugPipeline);`,
+													loader: "ts",
+												};
+											});
+										},
+									},
+								],
+							},
+						},
+					},
+				],
+			},
+		],
+	},
 } satisfies FrameMasterConfig;
