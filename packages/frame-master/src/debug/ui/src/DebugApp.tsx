@@ -485,6 +485,7 @@ export default function DebugApp() {
 				<Drawer
 					open={isDesktopDrawer || mobileNavigationOpen}
 					variant={isDesktopDrawer ? "permanent" : "temporary"}
+					disablePortal={isDesktopDrawer}
 					width={304}
 					minifiedWidth={280}
 					sx={{ display: "flex", position: { xs: "fixed", md: "relative" }, zIndex: { xs: 1201, md: "auto" }, inset: { xs: "0 auto 0 0", md: "auto" }, width: { xs: "min(88vw, 336px)", md: "100%" }, height: "100%", flexDirection: "column", overflow: "hidden", borderRadius: 0, boxShadow: { xs: "0 8px 24px rgba(0, 0, 0, 0.28)", md: "none" } }}
