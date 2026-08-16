@@ -5,13 +5,13 @@ import {
 	useEffectEvent,
 	useRef,
 	useState,
+	type ReactNode,
 } from "react";
 import Alert from "@shpaw415/mui-lite/Alert";
 import AppBar from "@shpaw415/mui-lite/AppBar";
 import Box from "@shpaw415/mui-lite/Box";
 import Button from "@shpaw415/mui-lite/Button";
 import Chip from "@shpaw415/mui-lite/Chip";
-import CssBaseline from "@shpaw415/mui-lite/CssBaseline";
 import Divider from "@shpaw415/mui-lite/Divider";
 import Drawer from "@shpaw415/mui-lite/Drawer";
 import IconButton from "@shpaw415/mui-lite/IconButton";
@@ -19,7 +19,6 @@ import {
 	List,
 	ListItemButton,
 	ListItemText,
-	ListSubheader,
 } from "@shpaw415/mui-lite/List";
 import Paper from "@shpaw415/mui-lite/Paper";
 import Select from "@shpaw415/mui-lite/Select";
@@ -31,6 +30,8 @@ import Toolbar from "@shpaw415/mui-lite/Toolbar";
 import Typography from "@shpaw415/mui-lite/Typography";
 import {
 	CloudUpload,
+	ChevronDown,
+	ChevronRight,
 	Download,
 	Menu,
 	Moon,
@@ -68,14 +69,118 @@ import {
 } from "../../state";
 import MonacoDiff from "./MonacoDiff";
 
+const VIRTUAL_MODULE_NAMESPACE = "frame-master-virtual-module";
+
 // ── Left-panel tab registry ───────────────────────────────────────────────────
 // Add new entries here to extend the menu.
 type LeftTabKey = "builds" | "files" | "info";
+type DrawerSectionKey =
+	| "files"
+	| "steps"
+	| "registry"
+	| "step"
+	| "session"
+	| "watch";
+
 const LEFT_TABS: { key: LeftTabKey; label: string }[] = [
-	{ key: "builds", label: "builds" },
-	{ key: "files", label: "files" },
-	{ key: "info", label: "info" },
+	{ key: "builds", label: "Builds" },
+	{ key: "files", label: "Files" },
+	{ key: "info", label: "Info" },
 ];
+
+const DRAWER_LIST_ITEM_SX = {
+	alignSelf: "stretch",
+	boxSizing: "border-box",
+	display: "flex",
+	flex: "0 0 auto",
+	flexGrow: 0,
+	minWidth: 0,
+	width: "100%",
+} as const;
+
+const SECTION_HEADER_SX = {
+	alignItems: "center",
+	alignSelf: "stretch",
+	flex: "0 0 40px",
+	flexGrow: 0,
+	flexShrink: 0,
+	height: 40,
+	maxHeight: 40,
+	minHeight: 40,
+	px: 2,
+	py: 0,
+	width: "100%",
+} as const;
+
+function DrawerSection({
+	children,
+	count,
+	expanded,
+	grow = true,
+	label,
+	onToggle,
+}: {
+	children?: ReactNode;
+	count?: number | string;
+	expanded: boolean;
+	grow?: boolean;
+	label: string;
+	onToggle: () => void;
+}) {
+	return (
+		<Box
+			sx={{
+				display: "flex",
+				flex: expanded && grow ? "1 1 0" : "0 0 auto",
+				flexDirection: "column",
+				minHeight: 0,
+				overflow: "hidden",
+			}}
+		>
+			<Box sx={{ flex: "0 0 auto", flexShrink: 0 }}>
+			<ListItemButton
+				aria-expanded={expanded}
+				onClick={onToggle}
+				sx={SECTION_HEADER_SX}
+			>
+				<ListItemText
+					primary={label}
+					SlotProps={{
+						primary: {
+							sx: {
+								fontSize: "0.75rem",
+								fontWeight: 600,
+								letterSpacing: "0.08em",
+								textTransform: "uppercase",
+							},
+						},
+					}}
+				/>
+				{count != null && (
+					<Typography color="textSecondary" sx={{ mr: 1, flexShrink: 0 }} variant="caption">
+						{count}
+					</Typography>
+				)}
+				{expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+			</ListItemButton>
+			<Divider />
+			</Box>
+			{expanded && (
+				<Box
+					sx={{
+						display: "flex",
+						flex: grow ? 1 : "0 0 auto",
+						flexDirection: "column",
+						minHeight: 0,
+						overflow: grow ? "hidden" : "visible",
+					}}
+				>
+					{children}
+				</Box>
+			)}
+		</Box>
+	);
+}
 
 async function fetchJson<T>(path: string): Promise<T> {
 	const response = await fetch(path);
@@ -129,6 +234,10 @@ function statusColor(status: BuildTraceBuildStatus) {
 	if (status === "success") return "success" as const;
 	if (status === "error") return "error" as const;
 	return "warning" as const;
+}
+
+function isVirtualModule(namespace?: string) {
+	return namespace === VIRTUAL_MODULE_NAMESPACE;
 }
 
 function StepErrorPanel({ error }: { error: BuildTraceStepError }) {
@@ -186,6 +295,16 @@ export default function DebugApp() {
 	const [state, setState] = useState(createInitialDebugUIState);
 	const [theme, setTheme] = useState<"dark" | "light">("dark");
 	const [leftTab, setLeftTab] = useState<LeftTabKey>("builds");
+	const [expandedSections, setExpandedSections] = useState<
+		Record<DrawerSectionKey, boolean>
+	>({
+		files: true,
+		steps: true,
+		registry: true,
+		step: true,
+		session: false,
+		watch: false,
+	});
 	const [pipelineFilter, setPipelineFilter] = useState("all");
 	const [fileNameFilter, setFileNameFilter] = useState("");
 	const [fileTypeFilter, setFileTypeFilter] = useState("all");
@@ -249,6 +368,12 @@ export default function DebugApp() {
 	);
 	const deferredRegistry = useDeferredValue(state.registry);
 	const deferredWatcherEvents = useDeferredValue(state.watcherEvents);
+	const toggleSection = (section: DrawerSectionKey) => {
+		setExpandedSections((current) => ({
+			...current,
+			[section]: !current[section],
+		}));
+	};
 	const deferredFileNameFilter = useDeferredValue(fileNameFilter.trim().toLowerCase());
 	const availableFileTypes = [
 		...new Set(
@@ -483,13 +608,20 @@ export default function DebugApp() {
 					width={304}
 					minifiedWidth={280}
 					onClose={() => setMobileNavigationOpen(false)}
+					sx={{
+						display: "flex",
+						height: "100%",
+						maxHeight: "100%",
+						minHeight: 0,
+						flexDirection: "column",
+						overflow: "hidden",
+					}}
 				>
-					<Box sx={{ display: { xs: "flex", md: "none" }, justifyContent: "flex-end", p: 1 }}>
+					<Box sx={{ display: { xs: "flex", md: "none" }, flexShrink: 0, justifyContent: "flex-end", p: 1 }}>
 						<IconButton type="button" onClick={() => setMobileNavigationOpen(false)} aria-label="Close debug navigation">
 							<X size={20} />
 						</IconButton>
 					</Box>
-					{/* Tab bar */}
 					<Tabs
 						value={leftTab}
 						onChange={(_, value) => {
@@ -497,6 +629,7 @@ export default function DebugApp() {
 						}}
 						variant="fullWidth"
 						aria-label="Debug navigation"
+						sx={{ flexShrink: 0 }}
 					>
 						{LEFT_TABS.map((tab) => (
 							<Tab
@@ -507,11 +640,10 @@ export default function DebugApp() {
 						))}
 					</Tabs>
 
-					{/* Tab: builds + watch feed */}
 					{leftTab === "builds" && (
-						<>
+						<Box sx={{ display: "flex", minHeight: 0, flex: 1, flexDirection: "column", overflow: "hidden" }}>
 							{(state.session?.pipelines?.length ?? 0) > 1 && (
-								<Box sx={{ p: 1.5 }}>
+								<Box sx={{ flexShrink: 0, p: 1.5 }}>
 									<Select
 										name="debug-pipeline"
 										label="Pipeline"
@@ -539,7 +671,7 @@ export default function DebugApp() {
 									</Select>
 								</Box>
 							)}
-							<Box sx={{ flex: 1, overflowY: "auto" }}>
+							<Box sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
 								{visibleBuildList.length === 0 ? (
 									<Typography align="center" color="textSecondary" sx={{ p: 3 }} variant="caption">no builds yet</Typography>
 								) : (
@@ -550,7 +682,7 @@ export default function DebugApp() {
 											<ListItemButton
 												key={build.id}
 												selected={isSelected}
-												sx={{ borderBottom: 1, borderColor: "divider" }}
+												sx={{ ...DRAWER_LIST_ITEM_SX, alignItems: "flex-start", flexDirection: "column", borderBottom: 1, borderColor: "divider" }}
 												onClick={() => {
 													startTransition(() => {
 														setState((current) =>
@@ -576,34 +708,41 @@ export default function DebugApp() {
 									</List>
 								)}
 							</Box>
-							<Divider />
-							<Typography sx={{ px: 2, py: 1 }} variant="overline">Watch feed</Typography>
-							<Divider />
-							<Box sx={{ maxHeight: 160, overflowY: "auto", flexShrink: 0 }}>
-								{deferredWatcherEvents.length === 0 ? (
-									<Typography align="center" color="textSecondary" sx={{ p: 2 }} variant="caption">no events</Typography>
-								) : (
-									deferredWatcherEvents.map((event) => (
-										<Box
-											key={`${event.eventType}:${event.filePath}`}
-											sx={{ p: 1.5, borderBottom: 1, borderColor: "divider" }}
-										>
-											<Typography variant="caption" color="textSecondary">{event.eventType}</Typography>
-											<Typography variant="caption" sx={{ display: "block", overflowWrap: "anywhere" }}>{event.filePath}</Typography>
-										</Box>
-									))
-								)}
-							</Box>
-						</>
+							<DrawerSection
+								count={deferredWatcherEvents.length}
+								expanded={expandedSections.watch}
+								grow={false}
+								label="Watch feed"
+								onToggle={() => toggleSection("watch")}
+							>
+								<Box sx={{ maxHeight: 160, overflowY: "auto" }}>
+									{deferredWatcherEvents.length === 0 ? (
+										<Typography align="center" color="textSecondary" sx={{ p: 2 }} variant="caption">no events</Typography>
+									) : (
+										deferredWatcherEvents.map((event) => (
+											<Box
+												key={`${event.eventType}:${event.filePath}`}
+												sx={{ p: 1.5, borderBottom: 1, borderColor: "divider" }}
+											>
+												<Typography variant="caption" color="textSecondary">{event.eventType}</Typography>
+												<Typography variant="caption" sx={{ display: "block", overflowWrap: "anywhere" }}>{event.filePath}</Typography>
+											</Box>
+										))
+									)}
+								</Box>
+							</DrawerSection>
+						</Box>
 					)}
 
-					{/* Tab: files + steps */}
 					{leftTab === "files" && (
 						<Box sx={{ display: "flex", minHeight: 0, flex: 1, flexDirection: "column", overflow: "hidden" }}>
-							<Box sx={{ display: "flex", minHeight: 0, flex: "1 1 50%", flexDirection: "column", overflow: "hidden" }}>
-								<Typography sx={{ px: 2, py: 1 }} variant="overline">Files</Typography>
-								<Divider />
-								<Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0, 1fr)", sm: "minmax(0, 1fr) minmax(132px, 0.4fr)" }, gap: 1.5, p: 1.5 }}>
+							<DrawerSection
+								count={selectedBuild ? filteredFiles.length : undefined}
+								expanded={expandedSections.files}
+								label="Files"
+								onToggle={() => toggleSection("files")}
+							>
+								<Box sx={{ display: "grid", flexShrink: 0, gridTemplateColumns: { xs: "minmax(0, 1fr)", sm: "minmax(0, 1fr) minmax(132px, 0.4fr)" }, gap: 1.5, p: 1.5 }}>
 									<TextField
 										variant="outlined"
 										label="Find files"
@@ -625,7 +764,7 @@ export default function DebugApp() {
 										]}
 									</Select>
 								</Box>
-								<Box sx={{ flex: 1, overflowY: "auto" }}>
+								<Box sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
 									{selectedBuild?.files.length ? (
 										filteredFiles.length ? (
 											filteredFiles.map((file) => {
@@ -644,14 +783,14 @@ export default function DebugApp() {
 														});
 													}}
 													selected={isSelected}
-													sx={{ borderBottom: 1, borderColor: "divider" }}
+													sx={{ ...DRAWER_LIST_ITEM_SX, borderBottom: 1, borderColor: "divider" }}
 												>
-													<ListItemText
-														primary={file.path}
-														secondary={`${file.steps.length} steps · ${file.finalLoader ?? "?"} · ${file.finalSize} bytes`}
-														SlotProps={{ primary: { sx: { overflowWrap: "anywhere", fontSize: "0.75rem" } }, secondary: { sx: { fontSize: "0.6875rem" } } }}
-													/>
-												</ListItemButton>
+														<ListItemText
+															primary={file.path}
+															secondary={`${isVirtualModule(file.namespace) ? "Virtual module · " : ""}${file.steps.length} steps · ${file.finalLoader ?? "?"} · ${file.finalSize} bytes`}
+															SlotProps={{ primary: { sx: { overflowWrap: "anywhere", fontSize: "0.75rem" } }, secondary: { sx: { fontSize: "0.6875rem" } } }}
+														/>
+													</ListItemButton>
 											);
 											})
 										) : (
@@ -661,13 +800,15 @@ export default function DebugApp() {
 										<Typography align="center" color="textSecondary" sx={{ p: 3 }} variant="caption">select a build</Typography>
 									)}
 								</Box>
-							</Box>
+							</DrawerSection>
 
-							<Divider />
-							<Box sx={{ display: "flex", minHeight: 0, flex: "1 1 50%", flexDirection: "column", overflow: "hidden" }}>
-								<Typography sx={{ px: 2, py: 1 }} variant="overline">Steps</Typography>
-								<Divider />
-								<Box sx={{ flex: 1, overflowY: "auto" }}>
+							<DrawerSection
+								count={selectedFile?.steps.length}
+								expanded={expandedSections.steps}
+								label="Steps"
+								onToggle={() => toggleSection("steps")}
+							>
+								<Box sx={{ display: "flex", flex: 1, flexDirection: "column", minHeight: 0, overflowY: "auto", width: "100%" }}>
 									{selectedFile?.steps.length ? (
 										selectedFile.steps.map((step) => {
 											const isSelected = selectedStep?.id === step.id;
@@ -683,7 +824,7 @@ export default function DebugApp() {
 														});
 													}}
 												selected={isSelected}
-												sx={{ borderBottom: 1, borderColor: "divider" }}
+												sx={{ ...DRAWER_LIST_ITEM_SX, alignItems: "flex-start", flexDirection: "column", borderBottom: 1, borderColor: "divider" }}
 											>
 												<Box sx={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
 													<Typography color={step.error ? "error" : isSelected ? "primary" : "textSecondary"} variant="body2">
@@ -706,73 +847,95 @@ export default function DebugApp() {
 										<Typography align="center" color="textSecondary" sx={{ p: 3 }} variant="caption">select a file</Typography>
 									)}
 								</Box>
-							</Box>
+							</DrawerSection>
 						</Box>
 					)}
 
-					{/* Tab: info (registry + step details + session) */}
 					{leftTab === "info" && (
 						<Box sx={{ display: "flex", minHeight: 0, flex: 1, flexDirection: "column", overflow: "hidden" }}>
-							<Typography sx={{ px: 2, py: 1 }} variant="overline">Registry</Typography>
-							<Divider />
-							<Box sx={{ flex: 1, overflowY: "auto" }}>
-								{deferredRegistry.map((plugin) => (
-									<Box key={plugin.name} sx={{ p: 1.5, borderBottom: 1, borderColor: "divider" }}>
-										<Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
-											<Typography noWrap variant="body2">{plugin.name}</Typography>
-											<Typography color="textSecondary" variant="caption">p{plugin.priority}</Typography>
-										</Box>
-										<Typography color="textSecondary" variant="caption">v{plugin.version}</Typography>
-										<Typography color="textSecondary" variant="caption">{plugin.metrics.interventions} hits · {formatDuration(plugin.metrics.totalMs)}</Typography>
-										<Typography color="textSecondary" variant="caption">{plugin.metrics.fileCount} files · {plugin.metrics.buildCount} builds · {formatDuration(plugin.metrics.onLoadMs)}</Typography>
-										{plugin.dependencies.length > 0 && (
-											<Typography color="textSecondary" sx={{ mt: 1 }} variant="caption">{plugin.dependencies.map((d) => `${d.name}${d.satisfied ? "" : " !"}`).join(", ")}</Typography>
-										)}
-									</Box>
-								))}
-							</Box>
-
-							<Divider />
-							<Typography sx={{ px: 2, py: 1 }} variant="overline">Step</Typography>
-							<Divider />
-							<Box sx={{ p: 1.5 }}>
-								{selectedStep ? (
-									<Box sx={{ display: "grid", gap: 0.5 }}>
-										{(
-											[
-												["kind", selectedStep.kind],
-												["plugin", selectedStep.pluginName ?? "core"],
-												[
-													"loader",
-													`${selectedStep.loaderBefore ?? "-"} → ${selectedStep.loaderAfter ?? "-"}`,
-												],
-												[
-													"size",
-													`${selectedStep.sizeBefore}b → ${selectedStep.sizeAfter}b`,
-												],
-											] as const
-										).map(([k, v]) => (
-											<Box key={k} sx={{ display: "grid", gridTemplateColumns: "48px minmax(0, 1fr)", gap: 1 }}>
-												<Typography color="textSecondary" variant="caption">{k}</Typography>
-												<Typography variant="caption">{v}</Typography>
+							<DrawerSection
+								count={deferredRegistry.length}
+								expanded={expandedSections.registry}
+								label="Registry"
+								onToggle={() => toggleSection("registry")}
+							>
+								<Box sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+									{deferredRegistry.length === 0 ? (
+										<Typography align="center" color="textSecondary" sx={{ p: 3 }} variant="caption">no plugins</Typography>
+									) : (
+										deferredRegistry.map((plugin) => (
+											<Box key={plugin.name} sx={{ p: 1.5, borderBottom: 1, borderColor: "divider" }}>
+												<Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+													<Typography noWrap variant="body2">{plugin.name}</Typography>
+													<Typography color="textSecondary" variant="caption">p{plugin.priority}</Typography>
+												</Box>
+												<Typography color="textSecondary" variant="caption">v{plugin.version}</Typography>
+												<Typography color="textSecondary" variant="caption">{plugin.metrics.interventions} hits · {formatDuration(plugin.metrics.totalMs)}</Typography>
+												<Typography color="textSecondary" variant="caption">{plugin.metrics.fileCount} files · {plugin.metrics.buildCount} builds · {formatDuration(plugin.metrics.onLoadMs)}</Typography>
+												{plugin.dependencies.length > 0 && (
+													<Typography color="textSecondary" sx={{ mt: 1 }} variant="caption">{plugin.dependencies.map((d) => `${d.name}${d.satisfied ? "" : " !"}`).join(", ")}</Typography>
+												)}
 											</Box>
-										))}
-										{selectedStep.error && (
-											<Box sx={{ display: "grid", gridTemplateColumns: "48px minmax(0, 1fr)", gap: 1 }}><Typography color="textSecondary" variant="caption">error</Typography><Typography color="error" sx={{ overflowWrap: "anywhere" }} variant="caption">{selectedStep.error.name}: {selectedStep.error.message}</Typography></Box>
-										)}
-									</Box>
-								) : (
-									<Typography color="textSecondary" variant="caption">no step selected</Typography>
-								)}
-							</Box>
+										))
+									)}
+								</Box>
+							</DrawerSection>
 
-							<Divider />
-							<Typography sx={{ px: 2, py: 1 }} variant="overline">Session</Typography>
-							<Divider />
-							<Box sx={{ display: "grid", gridTemplateColumns: "48px minmax(0, 1fr)", gap: 1, p: 1.5 }}>
-								<Typography color="textSecondary" variant="caption">started</Typography><Typography variant="caption">{state.session ? new Date(state.session.startedAt).toLocaleTimeString() : "pending"}</Typography>
-								<Typography color="textSecondary" variant="caption">trace</Typography><Typography sx={{ overflowWrap: "anywhere" }} variant="caption">{state.lastSavedTracePath ?? "not saved"}</Typography>
-							</Box>
+							<DrawerSection
+								expanded={expandedSections.step}
+								grow={false}
+								label="Step"
+								onToggle={() => toggleSection("step")}
+							>
+								<Box sx={{ p: 1.5 }}>
+									{selectedStep ? (
+										<Box sx={{ display: "grid", gap: 0.5 }}>
+											{(
+													[
+														["kind", selectedStep.kind],
+														[
+															"source",
+															isVirtualModule(selectedFile?.namespace)
+																? "plugin virtual module"
+																: "file system",
+														],
+													["plugin", selectedStep.pluginName ?? "core"],
+													[
+														"loader",
+														`${selectedStep.loaderBefore ?? "-"} → ${selectedStep.loaderAfter ?? "-"}`,
+													],
+													[
+														"size",
+														`${selectedStep.sizeBefore}b → ${selectedStep.sizeAfter}b`,
+													],
+												] as const
+											).map(([k, v]) => (
+												<Box key={k} sx={{ display: "grid", gridTemplateColumns: "48px minmax(0, 1fr)", gap: 1 }}>
+													<Typography color="textSecondary" variant="caption">{k}</Typography>
+													<Typography variant="caption">{v}</Typography>
+												</Box>
+											))}
+											{selectedStep.error && (
+												<Box sx={{ display: "grid", gridTemplateColumns: "48px minmax(0, 1fr)", gap: 1 }}><Typography color="textSecondary" variant="caption">error</Typography><Typography color="error" sx={{ overflowWrap: "anywhere" }} variant="caption">{selectedStep.error.name}: {selectedStep.error.message}</Typography></Box>
+											)}
+										</Box>
+									) : (
+										<Typography color="textSecondary" variant="caption">no step selected</Typography>
+									)}
+								</Box>
+							</DrawerSection>
+
+							<DrawerSection
+								expanded={expandedSections.session}
+								grow={false}
+								label="Session"
+								onToggle={() => toggleSection("session")}
+							>
+								<Box sx={{ display: "grid", gridTemplateColumns: "48px minmax(0, 1fr)", gap: 1, p: 1.5 }}>
+									<Typography color="textSecondary" variant="caption">started</Typography><Typography variant="caption">{state.session ? new Date(state.session.startedAt).toLocaleTimeString() : "pending"}</Typography>
+									<Typography color="textSecondary" variant="caption">trace</Typography><Typography sx={{ overflowWrap: "anywhere" }} variant="caption">{state.lastSavedTracePath ?? "not saved"}</Typography>
+								</Box>
+							</DrawerSection>
 						</Box>
 					)}
 				</Drawer>
@@ -781,7 +944,7 @@ export default function DebugApp() {
 				{/* Center — diff editor (full height) */}
 				<Box sx={{ display: "flex", minWidth: 0, flex: 1, flexDirection: "column", overflow: "hidden" }}>
 					{/* Build summary bar */}
-					<Box sx={{ display: "flex", flexShrink: 0, flexWrap: "wrap", gap: 1.5, alignItems: "center", borderBottom: 1, borderColor: "divider", p: 1.5 }}>
+					<Box sx={{ display: "flex", flexShrink: 0, flexWrap: "wrap", gap: { xs: 0.75, sm: 1.5 }, alignItems: "center", borderBottom: 1, borderColor: "divider", px: { xs: 1.25, sm: 1.5 }, py: { xs: 1, sm: 1.5 }, minWidth: 0 }}>
 						{selectedSummary ? (
 							<>
 								<Typography variant="body2">build #{selectedSummary.sequence}</Typography>
@@ -803,17 +966,15 @@ export default function DebugApp() {
 					</Box>
 
 					{/* Diff info bar */}
-					<Box sx={{ display: "flex", flexShrink: 0, flexWrap: "wrap", gap: 1, alignItems: "center", borderBottom: 1, borderColor: "divider", px: 2, py: 1 }}>
+					<Box sx={{ display: "flex", flexShrink: 0, flexWrap: "wrap", gap: { xs: 0.75, sm: 1 }, alignItems: "center", borderBottom: 1, borderColor: "divider", px: { xs: 1.25, sm: 2 }, py: { xs: 0.75, sm: 1 }, minWidth: 0 }}>
 						<Typography color="textSecondary" variant="caption">diff</Typography>
 						{selectedStep ? (
 							<>
 								<Typography variant="caption">{selectedStep.pluginName ?? "core"}</Typography>
-								<Typography color="textSecondary" variant="caption">{selectedLanguage}</Typography>
+								<Typography color="textSecondary" sx={{ display: { xs: "none", sm: "inline" } }} variant="caption">{selectedLanguage}</Typography>
 								<Typography color="textSecondary" variant="caption">{selectedStep.sizeBefore} bytes → {selectedStep.sizeAfter} bytes</Typography>
 								{selectedFile && (
-									<>
-										<Typography color="textSecondary" noWrap sx={{ maxWidth: 320 }} variant="caption">{selectedFile.path}</Typography>
-									</>
+									<Typography color="textSecondary" noWrap sx={{ maxWidth: { xs: "100%", sm: 320 }, minWidth: 0 }} variant="caption">{selectedFile.path}</Typography>
 								)}
 							</>
 						) : (
@@ -822,7 +983,7 @@ export default function DebugApp() {
 					</Box>
 
 					{/* Monaco diff — takes all remaining height */}
-					<Box sx={{ flex: 1, overflow: "hidden" }}>
+					<Box sx={{ flex: 1, minHeight: 0, minWidth: 0, overflow: "hidden" }}>
 						{selectedStep?.error ? (
 							<StepErrorPanel error={selectedStep.error} />
 						) : (
