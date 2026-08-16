@@ -671,7 +671,7 @@ export default function DebugApp() {
 								onToggle={() => toggleSection("files")}
 							/>
 							{expandedSections.files && (
-								<Box sx={{ display: "flex", minHeight: 0, flex: "1 1 50%", flexDirection: "column", overflow: "hidden" }}>
+								<Box sx={{ display: "flex", minHeight: 0, flex: expandedSections.steps ? "1 1 50%" : 1, flexDirection: "column", overflow: "hidden" }}>
 								<Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0, 1fr)", sm: "minmax(0, 1fr) minmax(132px, 0.4fr)" }, gap: 1.5, p: 1.5 }}>
 									<TextField
 										variant="outlined"
@@ -739,7 +739,7 @@ export default function DebugApp() {
 								onToggle={() => toggleSection("steps")}
 							/>
 							{expandedSections.steps && (
-								<Box sx={{ display: "flex", minHeight: 0, flex: "1 1 50%", flexDirection: "column", overflow: "hidden" }}>
+								<Box sx={{ display: "flex", minHeight: 0, flex: expandedSections.files ? "1 1 50%" : 1, flexDirection: "column", overflow: "hidden" }}>
 								<Box sx={{ flex: 1, overflowY: "auto" }}>
 									{selectedFile?.steps.length ? (
 										selectedFile.steps.map((step) => {
