@@ -8,6 +8,7 @@ import { verboseLog } from "../utils";
 import {
 	resolveVirtualModuleContents,
 	VIRTUAL_MODULE_NAMESPACE,
+	type RegisteredVirtualModule,
 	type VirtualModuleRegistry,
 } from "./virtual-modules";
 
@@ -132,18 +133,23 @@ export class PluginProxy {
 	private formatedSuffix: string;
 	private trace: BuildTraceCollector | null;
 	private virtualModuleRegistry: VirtualModuleRegistry | undefined;
+	private virtualModuleOverlay:
+		| ReadonlyMap<string, RegisteredVirtualModule>
+		| undefined;
 
 	constructor(
 		opt: {
 			suffix?: string;
 			trace?: BuildTraceCollector | null;
 			virtualModuleRegistry?: VirtualModuleRegistry;
+			virtualModuleOverlay?: ReadonlyMap<string, RegisteredVirtualModule>;
 		} = {},
 	) {
 		this.suffix = opt.suffix ?? "";
 		this.formatedSuffix = this.suffix ? `:${this.suffix}` : "";
 		this.trace = opt.trace ?? null;
 		this.virtualModuleRegistry = opt.virtualModuleRegistry;
+		this.virtualModuleOverlay = opt.virtualModuleOverlay;
 	}
 
 	/**
@@ -880,7 +886,9 @@ export class PluginProxy {
 		if (!this.trace) return args;
 		if (args.__traceSourceContents !== undefined) return args;
 		if (args.namespace === VIRTUAL_MODULE_NAMESPACE) {
-			const module = this.virtualModuleRegistry?.getModule(args.path);
+			const module =
+				this.virtualModuleOverlay?.get(args.path) ??
+				this.virtualModuleRegistry?.getModule(args.path);
 			if (module) {
 				return {
 					...args,
@@ -1049,6 +1057,7 @@ export function chainPlugins(
 		suffix?: string;
 		trace?: BuildTraceCollector | null;
 		virtualModuleRegistry?: VirtualModuleRegistry;
+		virtualModuleOverlay?: ReadonlyMap<string, RegisteredVirtualModule>;
 	},
 ): BunPlugin {
 	const proxy = new PluginProxy(opt);

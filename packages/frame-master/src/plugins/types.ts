@@ -217,6 +217,26 @@ export type VirtualModuleDeclaration = {
 };
 
 /**
+ * Per-build virtual module on `buildConfig.virtualModules`.
+ * `injectRuntime` defaults to `false` so overlay modules stay build-only.
+ */
+export type OverlayVirtualModuleDeclaration = Omit<
+	VirtualModuleDeclaration,
+	"injectRuntime"
+> & {
+	injectRuntime?: boolean;
+};
+
+/**
+ * Frame-Master build configuration: Bun's build config plus a per-build
+ * virtual-module overlay. `virtualModules` and `files` are collected by
+ * the Builder and stripped before `Bun.build()`.
+ */
+export type FrameMasterBuildConfig = Partial<Bun.BuildConfig> & {
+	virtualModules?: Record<string, OverlayVirtualModuleDeclaration>;
+};
+
+/**
  * Build lifecycle hooks configuration for Frame-Master plugins.
  *
  * Frame-Master uses a **singleton builder** pattern where all plugins contribute
@@ -312,7 +332,7 @@ export type BuildOptionsPlugin = {
 	 * - `builder.isLogEnabled` - Check if logging is enabled
 	 *
 	 * @param builder - The singleton Builder instance shared by all plugins
-	 * @returns Partial Bun.BuildConfig to merge with other plugins' configs
+	 * @returns Partial FrameMasterBuildConfig to merge with other plugins' configs
 	 *
 	 * @example
 	 * ```typescript
@@ -374,10 +394,10 @@ export type BuildOptionsPlugin = {
 	 * ```
 	 */
 	buildConfig?:
-		| Partial<Bun.BuildConfig>
+		| FrameMasterBuildConfig
 		| ((
 				builder: Builder,
-		  ) => Partial<Bun.BuildConfig> | Promise<Partial<Bun.BuildConfig>>);
+		  ) => FrameMasterBuildConfig | Promise<FrameMasterBuildConfig>);
 
 	/**
 	 * Hook executed before the build process starts.

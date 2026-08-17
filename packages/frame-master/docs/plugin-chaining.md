@@ -221,6 +221,60 @@ plugin needs the declared source for parsing or compatibility with existing Bun
 plugin code. Use `getChainableContent(args)` for transforms that must preserve
 output from earlier handlers in the chain.
 
+The Bun.file proxy only sees plugin-level `virtualModules`. Per-build overlay
+modules stay on that Builder and are not installed into the process-wide proxy.
+
+## Per-build virtualModules overlay
+
+Plugin-level `virtualModules` is a static map for known specifiers. Generated
+specifiers that exist only for one `builder.build()` belong on
+`buildConfig.virtualModules` instead:
+
+```typescript
+build: {
+  buildConfig: async () => ({
+    entrypoints: Object.keys(generated),
+    virtualModules: {
+      "src/actions/index.cfdynamicssr": {
+        contents: generated["src/actions/index.cfdynamicssr"],
+        loader: "tsx",
+      },
+    },
+  }),
+}
+```
+
+`contents` is the same `string | Uint8Array | (() => string | Uint8Array | Promise<string | Uint8Array>)`
+shape as plugin `virtualModules`. `injectRuntime` defaults to `false`; overlay
+modules are not registered by the runtime loader.
+
+The Builder collects the overlay when it merges configs, seeds the managed
+provider (`frame-master-virtual-module`) from **overlay first, then the global
+plugin registry**, then discards the overlay after that build. Isolated
+pipelines only see their own overlay plus global plugin `virtualModules`.
+
+A specifier that collides with a plugin `virtualModules` entry, or with another
+plugin's overlay in the same Builder, is rejected and names both owners.
+
+### Legacy `files` shim
+
+`buildConfig.files` is promoted into the same overlay so existing plugins keep
+working:
+
+- `loader` comes from `buildConfig.loader[ext]` when set, otherwise from the
+  specifier extension (`.tsx` → `tsx`, `.ts` → `ts`, `.jsx` → `jsx`, `.js` →
+  `js`, `.html` / `.css` / `.json` when those extensions are used, else `js`).
+- `injectRuntime` is `false`.
+- The owner is the contributing plugin, or `"buildConfig.files"` when that
+  name is not recoverable.
+
+After promotion, declared `files` contents and `virtualModules` are stripped
+from the merged config. Module source is loaded only through the managed
+virtual-module provider. Frame-Master may pass empty Bun `files` stubs for
+non-absolute overlay specifiers so Bun can open them as entrypoints
+(`@scope/name` or `src/actions/index.cfdynamicssr`); those stubs are not the
+source of truth.
+
 ## Other Handlers
 
 Only `onLoad` handlers are chained. Other handlers are passed through unchanged:

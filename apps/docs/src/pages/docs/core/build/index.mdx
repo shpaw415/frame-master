@@ -467,7 +467,9 @@ export default {
   returns the isolated pipeline (`getBuilder(name)`). The untyped
   `getGlobalPluginContext("build-unifier")` path still works.
 - Every bucket receives the active virtual-module registry, so declared
-  `virtualModules` resolve the same way they do on the default builder.
+  plugin `virtualModules` resolve the same way they do on the default builder.
+- Per-build `buildConfig.virtualModules` (and the `files` shim) stay on that
+  bucket's Builder. Pipeline A cannot see pipeline B's overlay.
 - `frame-master build` runs bucket builds from the unifier `beforeBuild` hook.
 - `frame-master debug build` lists **Default build** plus each named bucket.
 

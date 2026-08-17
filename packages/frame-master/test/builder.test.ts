@@ -266,6 +266,115 @@ describe("builder", () => {
 		).toContain("export const transformed = true;");
 	});
 
+	test("pipeline overlay is invisible to another pipeline while global virtualModules stay shared", async () => {
+		const seenA: string[] = [];
+		const seenB: string[] = [];
+		const pluginA = { name: "pipeline-a-plugin", version: "1.0.0" };
+		const pluginB = { name: "pipeline-b-plugin", version: "1.0.0" };
+		const config: FrameMasterConfig = {
+			HTTPServer: { port: 0 },
+			plugins: [
+				{
+					name: "shared-virtual-provider",
+					version: "1.0.0",
+					virtualModules: {
+						"@test/shared-virtual": {
+							contents: `export const shared = true;`,
+							loader: "ts",
+							injectRuntime: false,
+						},
+					},
+				},
+				...BuildUnifier({
+					id: "pipeline-a",
+					label: "Pipeline A",
+					plugins: [pluginA],
+				}),
+				...BuildUnifier({
+					id: "pipeline-b",
+					label: "Pipeline B",
+					plugins: [pluginB],
+				}),
+			],
+		};
+		const loader = new PluginLoader(config);
+		await configureBuildPipelines(config, loader);
+		getBuildUnifierContext()?.setBuildConfig?.("pipeline-a-plugin", {
+			buildConfig: {
+				outdir: `${TEMP_DIR}/pipeline-a`,
+				entrypoints: ["@overlay/a", "@test/shared-virtual"],
+				virtualModules: {
+					"@overlay/a": {
+						contents: `export const a = true;`,
+						loader: "ts",
+					},
+				},
+				plugins: [
+					{
+						name: "capture-a",
+						setup(build) {
+							build.onLoad({ filter: /.*/ }, (args) => {
+								if (
+									args.path === "@overlay/a" ||
+									args.path === "@overlay/b" ||
+									args.path === "@test/shared-virtual"
+								) {
+									seenA.push(args.path);
+								}
+								return undefined;
+							});
+						},
+					},
+				],
+			},
+		});
+		getBuildUnifierContext()?.setBuildConfig?.("pipeline-b-plugin", {
+			buildConfig: {
+				outdir: `${TEMP_DIR}/pipeline-b`,
+				entrypoints: ["@overlay/b", "@test/shared-virtual"],
+				virtualModules: {
+					"@overlay/b": {
+						contents: `export const b = true;`,
+						loader: "ts",
+					},
+				},
+				plugins: [
+					{
+						name: "capture-b",
+						setup(build) {
+							build.onLoad({ filter: /.*/ }, (args) => {
+								if (
+									args.path === "@overlay/a" ||
+									args.path === "@overlay/b" ||
+									args.path === "@test/shared-virtual"
+								) {
+									seenB.push(args.path);
+								}
+								return undefined;
+							});
+						},
+					},
+				],
+			},
+		});
+		await initializeBuildPipelines();
+		const builderA = await getBuildPipeline("pipeline-a").getBuilder(
+			"pipeline-a-plugin",
+		);
+		const builderB = await getBuildPipeline("pipeline-b").getBuilder(
+			"pipeline-b-plugin",
+		);
+
+		expect((await builderA.build()).success).toBeTrue();
+		expect((await builderB.build()).success).toBeTrue();
+		expect(seenA).toContain("@overlay/a");
+		expect(seenA).toContain("@test/shared-virtual");
+		expect(seenA).not.toContain("@overlay/b");
+		expect(seenB).toContain("@overlay/b");
+		expect(seenB).toContain("@test/shared-virtual");
+		expect(seenB).not.toContain("@overlay/a");
+	});
+
 	test("should merge configs", async () => {
 		const fmConfig: FrameMasterConfig = {
 			HTTPServer: {

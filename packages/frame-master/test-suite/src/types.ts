@@ -62,7 +62,7 @@ export type PluginTestEnvBuildOptions = {
 	 * (via a temporary dynamic buildConfig on the builder).
 	 * Prefer plugin `build.buildConfig` for real plugin tests.
 	 */
-	buildConfig?: Partial<Bun.BuildConfig>;
+	buildConfig?: import("frame-master/plugin/types").FrameMasterBuildConfig;
 };
 
 /**

@@ -1,14 +1,19 @@
 import { existsSync, mkdirSync } from "node:fs";
-import { isAbsolute, join } from "node:path";
+import { extname, isAbsolute, join } from "node:path";
 import { cwd } from "node:process";
 import chalk from "chalk";
 import type { FrameMasterConfig } from "frame-master/server/type";
 import {
+	createManagedVirtualModulePlugin,
 	type PluginLoader,
+	type RegisteredVirtualModule,
 	type VirtualModuleRegistry,
 } from "../plugins";
 import { chainPlugins } from "../plugins/plugin-chaining";
-import type { BuildOptionsPlugin } from "../plugins/types";
+import type {
+	BuildOptionsPlugin,
+	FrameMasterBuildConfig,
+} from "../plugins/types";
 import { getConfig } from "../server/config";
 import { onVerbose, pluginRegex } from "../utils";
 import {
@@ -23,6 +28,12 @@ import {
 
 export type BuilderProps = {
 	buildConfigs: Array<FrameMasterConfig["plugins"][number]["build"]>;
+	/**
+	 * Plugin name for each `buildConfigs` entry, used to own overlay
+	 * `virtualModules` / `files` specifiers. Missing names fall back to
+	 * `"buildConfig.virtualModules"` / `"buildConfig.files"`.
+	 */
+	buildConfigPluginNames?: Array<string | undefined>;
 	enableLogging?: boolean;
 	/**
 	 * Disable onLoad handler chaining for build plugins.
@@ -58,6 +69,10 @@ export class Builder {
 	private baseEntrypoints: string[];
 	private virtualModulePlugin: Bun.BunPlugin | null;
 	private virtualModuleRegistry: VirtualModuleRegistry | undefined;
+	private virtualModuleOverlay:
+		| Map<string, RegisteredVirtualModule>
+		| undefined;
+	private configOwners: Array<string | undefined>;
 
 	readonly isLogEnabled: boolean;
 	public outputs: Bun.BuildArtifact[] | null = null;
@@ -84,6 +99,7 @@ export class Builder {
 		this.baseEntrypoints = props.baseEntrypoints ?? [];
 		this.virtualModulePlugin = props.virtualModulePlugin ?? null;
 		this.virtualModuleRegistry = props.virtualModuleRegistry;
+		this.configOwners = props.buildConfigPluginNames ?? [];
 	}
 
 	private async init() {
@@ -237,82 +253,92 @@ export class Builder {
 			this.buildResolver = resolve;
 		});
 		const startTime = performance.now();
-
-		const buildConfig = await this.createConfigs();
-		buildConfig.entrypoints = [
-			...(buildConfig.entrypoints || []),
-			...(entrypoints || []),
-		];
-		this.debugSession?.startBuild(buildConfig.entrypoints ?? []);
-
-		this.log("🔨 Building with merged configuration:", {
-			entrypoints: buildConfig.entrypoints?.length || 0,
-			plugins: buildConfig.plugins?.length || 0,
-			outdir: buildConfig.outdir,
-			config: buildConfig,
-		});
-
-		await Promise.all(
-			this.getHooksByType("beforeBuild").map((hook) => hook(buildConfig, this)),
-		);
 		let res: Bun.BuildOutput = {
 			logs: [],
 			outputs: [],
-			success: true,
+			success: false,
 		};
 
 		try {
-			res = await Bun.build(buildConfig);
-		} catch (e) {
-			console.error(e);
-			res.success = false;
-			this.debugSession?.completeBuild({
-				success: false,
-				outputCount: 0,
-				errors: [e instanceof Error ? e.message : String(e)],
+			const buildConfig = await this.createConfigs();
+			buildConfig.entrypoints = [
+				...(buildConfig.entrypoints || []),
+				...(entrypoints || []),
+			];
+			this.debugSession?.startBuild(buildConfig.entrypoints ?? []);
+
+			this.log("🔨 Building with merged configuration:", {
+				entrypoints: buildConfig.entrypoints?.length || 0,
+				plugins: buildConfig.plugins?.length || 0,
+				outdir: buildConfig.outdir,
+				config: buildConfig,
 			});
-		}
 
-		const duration = performance.now() - startTime;
-
-		this.outputs = res.outputs;
-		await this.cleanUpOutputDir();
-
-		// Track build history
-		this.buildHistory.push({
-			timestamp: Date.now(),
-			duration,
-			entrypoints: buildConfig.entrypoints,
-			outputCount: res.outputs.length,
-			success: res.success,
-		});
-		if (res.success) {
-			this.debugSession?.completeBuild({
-				success: true,
-				outputCount: res.outputs.length,
-			});
 			await Promise.all(
-				this.getHooksByType("afterBuild").map((hook) =>
-					hook(buildConfig, res, this),
+				this.getHooksByType("beforeBuild").map((hook) =>
+					hook(buildConfig, this),
 				),
 			);
-		} else {
-			this.debugSession?.completeBuild({
-				success: false,
-				outputCount: res.outputs.length,
-				errors: res.logs?.map((log) => log.message),
-			});
-			console.log(chalk.red("✗ Build failed. Skipping after-build hooks."));
-			this.log(res);
-		}
+			res = {
+				logs: [],
+				outputs: [],
+				success: true,
+			};
 
-		this._isBuilding = false;
-		if (this.buildResolver) {
-			this.buildResolver(res);
-			this.buildResolver = null;
+			try {
+				res = await Bun.build(buildConfig);
+			} catch (e) {
+				console.error(e);
+				res.success = false;
+				this.debugSession?.completeBuild({
+					success: false,
+					outputCount: 0,
+					errors: [e instanceof Error ? e.message : String(e)],
+				});
+			}
+
+			const duration = performance.now() - startTime;
+
+			this.outputs = res.outputs;
+			await this.cleanUpOutputDir();
+
+			this.buildHistory.push({
+				timestamp: Date.now(),
+				duration,
+				entrypoints: buildConfig.entrypoints,
+				outputCount: res.outputs.length,
+				success: res.success,
+			});
+			if (res.success) {
+				this.debugSession?.completeBuild({
+					success: true,
+					outputCount: res.outputs.length,
+				});
+				await Promise.all(
+					this.getHooksByType("afterBuild").map((hook) =>
+						hook(buildConfig, res, this),
+					),
+				);
+			} else {
+				this.debugSession?.completeBuild({
+					success: false,
+					outputCount: res.outputs.length,
+					errors: res.logs?.map((log) => log.message),
+				});
+				console.log(chalk.red("✗ Build failed. Skipping after-build hooks."));
+				this.log(res);
+			}
+
+			return res;
+		} finally {
+			this.clearVirtualModuleOverlay();
+			this._isBuilding = false;
+			if (this.buildResolver) {
+				this.buildResolver(res);
+				this.buildResolver = null;
+			}
+			this.buildPromise = null;
 		}
-		this.buildPromise = null;
-		return res;
 	}
 	/** Remove leftOver files from previous build */
 	public async cleanUpOutputDir(): Promise<void> {
@@ -570,34 +596,41 @@ export class Builder {
 	 * @Note: This method is more expensive than `getConfig()` as it re-evaluates dynamic config factories, so it should be used when you need to ensure you have the latest configuration after plugins have had a chance to modify it.
 	 */
 	async createConfigs(): Promise<Bun.BuildConfig> {
-		const configs = this.configs
-			.map((c) => c?.buildConfig)
-			.filter((c) => c !== undefined);
-		const staticConfigs = configs
-			.filter((c) => typeof c !== "function")
-			.reduce((prev, next) => {
-				return this.mergeConfigSafely(prev, next as Bun.BuildConfig);
-			}, {} as Bun.BuildConfig) as Bun.BuildConfig;
+		const overlay = new Map<string, RegisteredVirtualModule>();
+		let merged = {} as Bun.BuildConfig;
 
-		this.currentBuildConfig = staticConfigs;
+		for (const [index, config] of this.configs.entries()) {
+			const buildConfig = config?.buildConfig;
+			if (!buildConfig || typeof buildConfig === "function") continue;
+			merged = this.mergeConfigSafely(
+				merged,
+				this.extractBuildOverlay(overlay, this.configOwners[index], buildConfig),
+			) as Bun.BuildConfig;
+		}
 
-		const mergedConfigs = (await Promise.all(
-			configs
-				.filter((c) => typeof c === "function")
-				.map((c) => {
-					const res = c(this);
-					if (res instanceof Promise) {
-						return res;
-					} else return Promise.resolve(res);
-				}),
-		).then((dynamic) =>
-			dynamic.reduce(
-				(prev, next) => this.mergeConfigSafely(prev, next),
-				staticConfigs,
-			),
-		)) as Bun.BuildConfig;
+		this.currentBuildConfig = merged;
 
-		this.currentBuildConfig = this.mergeConfigSafely(mergedConfigs, {
+		const dynamicEntries = await Promise.all(
+			this.configs.map(async (config, index) => {
+				const buildConfig = config?.buildConfig;
+				if (typeof buildConfig !== "function") return null;
+				return {
+					owner: this.configOwners[index],
+					raw: await buildConfig(this),
+				};
+			}),
+		);
+		for (const entry of dynamicEntries) {
+			if (!entry) continue;
+			merged = this.mergeConfigSafely(
+				merged,
+				this.extractBuildOverlay(overlay, entry.owner, entry.raw),
+			) as Bun.BuildConfig;
+		}
+
+		this.installVirtualModuleOverlay(overlay);
+
+		this.currentBuildConfig = this.mergeConfigSafely(merged, {
 			entrypoints: this.baseEntrypoints,
 		}) as Bun.BuildConfig;
 		this.currentBuildConfig = this.normalizeBuildPlugins(
@@ -606,6 +639,11 @@ export class Builder {
 
 		if (this.currentBuildConfig.outdir === undefined) {
 			this.currentBuildConfig.outdir = this.outDir;
+		}
+
+		const bunFileStubs = bunFileStubsFromOverlay(overlay);
+		if (bunFileStubs) {
+			this.currentBuildConfig.files = bunFileStubs;
 		}
 
 		return this.currentBuildConfig;
@@ -639,6 +677,7 @@ export class Builder {
 					suffix: "build",
 					trace: this.debugSession,
 					virtualModuleRegistry: this.virtualModuleRegistry,
+					virtualModuleOverlay: this.virtualModuleOverlay,
 				}),
 			],
 		};
@@ -902,6 +941,77 @@ export class Builder {
 		return report;
 	}
 
+	private extractBuildOverlay(
+		overlay: Map<string, RegisteredVirtualModule>,
+		pluginName: string | undefined,
+		config: FrameMasterBuildConfig,
+	): Partial<Bun.BuildConfig> {
+		const virtualModules = config.virtualModules;
+		if (virtualModules) {
+			const owner = pluginName ?? "buildConfig.virtualModules";
+			for (const [specifier, declaration] of Object.entries(virtualModules)) {
+				this.addOverlayModule(overlay, specifier, {
+					...declaration,
+					injectRuntime: declaration.injectRuntime ?? false,
+					pluginName: owner,
+				});
+			}
+		}
+
+		const files = config.files;
+		if (files) {
+			const owner = pluginName ?? "buildConfig.files";
+			for (const [specifier, contents] of Object.entries(files)) {
+				this.addOverlayModule(overlay, specifier, {
+					contents: fileContentsToVirtual(contents),
+					loader: loaderFromSpecifier(specifier, config.loader),
+					injectRuntime: false,
+					pluginName: owner,
+				});
+			}
+		}
+
+		const stripped: FrameMasterBuildConfig = { ...config };
+		delete stripped.virtualModules;
+		delete stripped.files;
+		return stripped;
+	}
+
+	private addOverlayModule(
+		overlay: Map<string, RegisteredVirtualModule>,
+		specifier: string,
+		module: RegisteredVirtualModule,
+	): void {
+		const existingOverlay = overlay.get(specifier);
+		if (existingOverlay) {
+			throw new Error(
+				`Virtual module "${specifier}" is declared by both plugins "${existingOverlay.pluginName}" and "${module.pluginName}".`,
+			);
+		}
+		const existingGlobal = this.virtualModuleRegistry?.getModule(specifier);
+		if (existingGlobal) {
+			throw new Error(
+				`Virtual module "${specifier}" is declared by both plugins "${existingGlobal.pluginName}" and "${module.pluginName}".`,
+			);
+		}
+		overlay.set(specifier, module);
+	}
+
+	private installVirtualModuleOverlay(
+		overlay: Map<string, RegisteredVirtualModule>,
+	): void {
+		this.virtualModuleOverlay = overlay;
+		this.virtualModulePlugin = this.virtualModuleRegistry
+			? this.virtualModuleRegistry.createPlugin(false, overlay)
+			: createManagedVirtualModulePlugin({ overlay });
+	}
+
+	private clearVirtualModuleOverlay(): void {
+		this.virtualModuleOverlay = undefined;
+		this.virtualModulePlugin =
+			this.virtualModuleRegistry?.createPlugin() ?? null;
+	}
+
 	/**
 	 * @internal
 	 * Safely merges multiple Bun.BuildConfig objects with intelligent handling of arrays and objects.
@@ -1134,6 +1244,7 @@ export async function createBuilder(
 		enableLogging: logIsEnabled,
 		disableOnLoadChaining: _config?.pluginsOptions?.disableOnLoadChaining,
 		buildConfigs: plugin.map((p) => p.pluginParent),
+		buildConfigPluginNames: plugin.map((p) => p.name),
 		baseEntrypoints: _config?.pluginsOptions?.entrypoints,
 		virtualModulePlugin: virtualModuleRegistry.createPlugin(),
 		virtualModuleRegistry,
@@ -1238,8 +1349,63 @@ export async function reloadBuilder(): Promise<void> {
  *   },
  * });
  */
-export function defineBuildConfig<T extends Partial<Bun.BuildConfig>>(
+export function defineBuildConfig<T extends FrameMasterBuildConfig>(
 	config: T,
 ): T {
 	return config;
+}
+
+function bunFileStubsFromOverlay(
+	overlay: Map<string, RegisteredVirtualModule>,
+): Record<string, string> | undefined {
+	const files: Record<string, string> = {};
+	for (const specifier of overlay.keys()) {
+		if (!isAbsolute(specifier)) {
+			files[specifier] = "";
+		}
+	}
+	return Object.keys(files).length > 0 ? files : undefined;
+}
+
+function fileContentsToVirtual(contents: unknown): string | Uint8Array {
+	if (typeof contents === "string") return contents;
+	if (contents instanceof Uint8Array) return contents;
+	if (contents instanceof ArrayBuffer || contents instanceof SharedArrayBuffer) {
+		return new Uint8Array(contents);
+	}
+	if (ArrayBuffer.isView(contents)) {
+		return new Uint8Array(
+			contents.buffer,
+			contents.byteOffset,
+			contents.byteLength,
+		);
+	}
+	throw new Error("buildConfig.files values must be a string or binary contents.");
+}
+
+function loaderFromSpecifier(
+	specifier: string,
+	loaderMap?: Record<string, Bun.Loader>,
+): Bun.Loader {
+	const ext = extname(specifier).toLowerCase();
+	const fromMap = ext ? loaderMap?.[ext] : undefined;
+	if (fromMap) return fromMap;
+	switch (ext) {
+		case ".tsx":
+			return "tsx";
+		case ".ts":
+			return "ts";
+		case ".jsx":
+			return "jsx";
+		case ".js":
+			return "js";
+		case ".html":
+			return "html";
+		case ".css":
+			return "css";
+		case ".json":
+			return "json";
+		default:
+			return "js";
+	}
 }

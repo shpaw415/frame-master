@@ -442,3 +442,337 @@ describe("plugin virtual modules", () => {
 		);
 	});
 });
+
+describe("buildConfig virtualModules overlay", () => {
+	test("builds an overlay specifier as an entrypoint through the managed provider", async () => {
+		const { createPluginTestEnv } = await import("../test-suite/src/create-env");
+		const { withTempDir } = await import("../test-suite/src/fixtures");
+
+		await withTempDir(async (dir) => {
+			const received: Array<{
+				contents: string | Uint8Array | undefined;
+				loader: Bun.Loader | undefined;
+				namespace: string | undefined;
+			}> = [];
+			const env = await createPluginTestEnv({
+				cwd: dir,
+				startServer: false,
+				runServerStart: false,
+				runCreateContext: false,
+				runServerStop: false,
+				plugins: [
+					{
+						name: "overlay-provider",
+						version: "1.0.0",
+						build: {
+							buildConfig: {
+								outdir: join(dir, "overlay-out"),
+								entrypoints: ["@overlay/entry"],
+								virtualModules: {
+									"@overlay/entry": {
+										contents: `export const value = "overlay-entry";`,
+										loader: "ts",
+									},
+								},
+								plugins: [
+									{
+										name: "overlay-seed-capture",
+										setup(build) {
+											build.onLoad({ filter: /.*/ }, (args) => {
+												if (args.path !== "@overlay/entry") return undefined;
+												received.push({
+													contents: args.__chainedContents,
+													loader: args.__chainedLoader,
+													namespace: args.namespace,
+												});
+												return undefined;
+											});
+										},
+									},
+								],
+							},
+						},
+					},
+				],
+			});
+
+			try {
+				const result = await env.build();
+				expect(result.success).toBeTrue();
+				expect(received).toEqual([
+					{
+						contents: `export const value = "overlay-entry";`,
+						loader: "ts",
+						namespace: "frame-master-virtual-module",
+					},
+				]);
+				const merged = await env.builder.createConfigs();
+				expect(merged.files).toEqual({ "@overlay/entry": "" });
+				expect(
+					(merged as { virtualModules?: unknown }).virtualModules,
+				).toBeUndefined();
+			} finally {
+				await env.dispose();
+			}
+		});
+	});
+
+	test("promotes legacy buildConfig.files into the overlay without a disk file", async () => {
+		const specifier = join(TEST_DIR, "missing-on-disk.ts");
+		const config: FrameMasterConfig = {
+			HTTPServer: { port: 0 },
+			plugins: [
+				{
+					name: "files-shim-plugin",
+					version: "1.0.0",
+					build: {
+						buildConfig: {
+							outdir: join(TEST_DIR, "files-shim-out"),
+							entrypoints: [specifier],
+							files: {
+								[specifier]: `export const value = "from-files";`,
+							},
+						},
+					},
+				},
+			],
+		};
+
+		const builder = await createBuilder(config, new PluginLoader(config));
+		const result = await builder.build();
+		expect(result.success).toBeTrue();
+		expect(await Bun.file(specifier).exists()).toBeFalse();
+	});
+
+	test("second build picks up added overlay specifiers and drops removed ones", async () => {
+		let generated: Record<string, string> = {
+			"@overlay/keep": `export const keep = 1;`,
+		};
+		const config: FrameMasterConfig = {
+			HTTPServer: { port: 0 },
+			plugins: [
+				{
+					name: "overlay-rebuild",
+					version: "1.0.0",
+					build: {
+						buildConfig: () => ({
+							outdir: join(TEST_DIR, "overlay-rebuild-out"),
+							entrypoints: Object.keys(generated),
+							virtualModules: Object.fromEntries(
+								Object.entries(generated).map(([specifier, contents]) => [
+									specifier,
+									{ contents, loader: "ts" as const },
+								]),
+							),
+						}),
+					},
+				},
+			],
+		};
+
+		const builder = await createBuilder(config, new PluginLoader(config));
+		expect((await builder.build()).success).toBeTrue();
+
+		generated = {
+			"@overlay/keep": `export const keep = 2;`,
+			"@overlay/added": `export const added = true;`,
+		};
+		expect((await builder.build()).success).toBeTrue();
+
+		generated = {
+			"@overlay/added": `export const added = true;`,
+		};
+		expect((await builder.build()).success).toBeTrue();
+	});
+
+	test("duplicate overlay vs plugin virtualModules names both owners", async () => {
+		const config = configWithVirtualModule(`export const value = "plugin";`);
+		config.plugins.push({
+			name: "overlay-duplicate",
+			version: "1.0.0",
+			build: {
+				buildConfig: {
+					outdir: join(TEST_DIR, "dup-out"),
+					virtualModules: {
+						"@test/virtual": {
+							contents: `export const value = "overlay";`,
+							loader: "ts",
+						},
+					},
+				},
+			},
+		});
+
+		const builder = await createBuilder(config, new PluginLoader(config));
+		await expect(builder.createConfigs()).rejects.toThrow(
+			'Virtual module "@test/virtual" is declared by both plugins "virtual-provider" and "overlay-duplicate".',
+		);
+	});
+
+	test("duplicate overlay owners name both plugins", async () => {
+		const config: FrameMasterConfig = {
+			HTTPServer: { port: 0 },
+			plugins: [
+				{
+					name: "overlay-a",
+					version: "1.0.0",
+					build: {
+						buildConfig: {
+							virtualModules: {
+								"@overlay/shared": {
+									contents: `export const a = true;`,
+									loader: "ts",
+								},
+							},
+						},
+					},
+				},
+				{
+					name: "overlay-b",
+					version: "1.0.0",
+					build: {
+						buildConfig: {
+							virtualModules: {
+								"@overlay/shared": {
+									contents: `export const b = true;`,
+									loader: "ts",
+								},
+							},
+						},
+					},
+				},
+			],
+		};
+
+		const builder = await createBuilder(config, new PluginLoader(config));
+		await expect(builder.createConfigs()).rejects.toThrow(
+			'Virtual module "@overlay/shared" is declared by both plugins "overlay-a" and "overlay-b".',
+		);
+	});
+
+	test("default overlay and files shim stay out of createPlugin(true)", async () => {
+		const config: FrameMasterConfig = {
+			HTTPServer: { port: 0 },
+			plugins: [
+				{
+					name: "overlay-runtime-filter",
+					version: "1.0.0",
+					virtualModules: {
+						"@test/runtime": {
+							contents: `export const runtime = true;`,
+							loader: "ts",
+							injectRuntime: true,
+						},
+					},
+					build: {
+						buildConfig: {
+							virtualModules: {
+								"@overlay/build-only": {
+									contents: `export const overlay = true;`,
+									loader: "ts",
+								},
+								"@overlay/opt-in": {
+									contents: `export const optIn = true;`,
+									loader: "ts",
+									injectRuntime: true,
+								},
+							},
+							files: {
+								"@overlay/from-files": `export const fromFiles = true;`,
+							},
+						},
+					},
+				},
+			],
+		};
+
+		const registry = new PluginLoader(config).getVirtualModuleRegistry();
+		const overlay = new Map([
+			[
+				"@overlay/build-only",
+				{
+					contents: `export const overlay = true;`,
+					loader: "ts" as const,
+					injectRuntime: false,
+					pluginName: "overlay-runtime-filter",
+				},
+			],
+			[
+				"@overlay/opt-in",
+				{
+					contents: `export const optIn = true;`,
+					loader: "ts" as const,
+					injectRuntime: true,
+					pluginName: "overlay-runtime-filter",
+				},
+			],
+			[
+				"@overlay/from-files",
+				{
+					contents: `export const fromFiles = true;`,
+					loader: "js" as const,
+					injectRuntime: false,
+					pluginName: "overlay-runtime-filter",
+				},
+			],
+		]);
+
+		expect(registry.lookupModule("@overlay/build-only", true, overlay)).toBeUndefined();
+		expect(registry.lookupModule("@overlay/from-files", true, overlay)).toBeUndefined();
+		expect(registry.lookupModule("@overlay/opt-in", true, overlay)?.injectRuntime).toBeTrue();
+		expect(registry.lookupModule("@test/runtime", true, overlay)?.injectRuntime).toBeTrue();
+	});
+
+	test("debug snapshot uses overlay factory source and labels the file virtual", async () => {
+		const config: FrameMasterConfig = {
+			HTTPServer: { port: 0 },
+			plugins: [
+				{
+					name: "overlay-debug",
+					version: "1.0.0",
+					build: {
+						buildConfig: {
+							outdir: join(TEST_DIR, "overlay-debug-out"),
+							entrypoints: ["@overlay/debug"],
+							virtualModules: {
+								"@overlay/debug": {
+									contents: () => `export const value = "debug-factory";`,
+									loader: "ts",
+								},
+							},
+							plugins: [
+								{
+									name: "overlay-debug-transform",
+									setup(build) {
+										build.onLoad(
+											{ filter: /^@overlay\/debug$/ },
+											(args) => ({
+												contents: `${args.__chainedContents}\nexport const transformed = true;`,
+												loader: "ts",
+											}),
+										);
+									},
+								},
+							],
+						},
+					},
+				},
+			],
+		};
+
+		const builder = await createBuilder(config, new PluginLoader(config));
+		builder.startDebugSession({ watch: false, includeTextSnapshots: true });
+		const result = await builder.build();
+		const build = builder.getDebugSession()?.builds[0];
+		const virtualFile = build?.files.find((file) => file.path === "@overlay/debug");
+
+		expect(result.success).toBeTrue();
+		expect(virtualFile?.namespace).toBe("frame-master-virtual-module");
+		expect(build?.snapshots[virtualFile?.initialSnapshotId as string]?.text).toBe(
+			`export const value = "debug-factory";`,
+		);
+		expect(build?.snapshots[virtualFile?.finalSnapshotId as string]?.text).toContain(
+			"export const transformed = true;",
+		);
+	});
+});

@@ -150,6 +150,7 @@ export function buildPipeline(options: BuildPipelineOptions): FrameMasterPlugin[
 
 class CoreBuildPipeline implements BuildPipeline {
 	private configs: BuildOptionsPlugin[] = [];
+	private configOwners: string[] = [];
 	private builder: Builder | null = null;
 	private readonly builderPromise: Promise<Builder>;
 	private resolveBuilder!: (builder: Builder) => void;
@@ -181,6 +182,7 @@ class CoreBuildPipeline implements BuildPipeline {
 			);
 		}
 		this.configs.push(config);
+		this.configOwners.push(pluginName);
 	}
 
 	getBuilder(pluginName?: string): Promise<Builder> {
@@ -212,6 +214,7 @@ class CoreBuildPipeline implements BuildPipeline {
 			const virtualModuleRegistry = pluginLoader.getVirtualModuleRegistry();
 			this.builder = await Builder.createBuilder({
 				buildConfigs: this.configs,
+				buildConfigPluginNames: this.configOwners,
 				enableLogging:
 					this.logging ?? this.configs.some((entry) => entry.enableLoging),
 				baseEntrypoints: config.pluginsOptions?.entrypoints,

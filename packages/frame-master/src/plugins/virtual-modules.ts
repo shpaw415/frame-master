@@ -254,35 +254,91 @@ export class VirtualModuleRegistry {
 		return this.modules.get(specifier);
 	}
 
-	createPlugin(runtimeOnly = false): BunPlugin | null {
-		const modules = new Map(
-			[...this.modules].filter(
-				([, module]) => !runtimeOnly || module.injectRuntime,
-			),
+	hasModules(runtimeOnly = false): boolean {
+		return [...this.modules.values()].some(
+			(module) => !runtimeOnly || module.injectRuntime,
 		);
-		if (modules.size === 0) return null;
-
-		return {
-			name: runtimeOnly
-				? "frame-master-runtime-virtual-modules"
-				: "frame-master-virtual-modules",
-			setup(build) {
-				build.onResolve({ filter: /.*/ }, (args) => {
-					if (!modules.has(args.path)) return undefined;
-					return { path: args.path, namespace: VIRTUAL_MODULE_NAMESPACE };
-				});
-				build.onLoad(
-					{ filter: /.*/, namespace: VIRTUAL_MODULE_NAMESPACE },
-					async (args) => {
-						const module = modules.get(args.path);
-						if (!module) return undefined;
-						return {
-							contents: await resolveVirtualModuleContents(module, args.path),
-							loader: module.loader,
-						};
-					},
-				);
-			},
-		};
 	}
+
+	lookupModule(
+		specifier: string,
+		runtimeOnly = false,
+		overlay?: ReadonlyMap<string, RegisteredVirtualModule>,
+	): RegisteredVirtualModule | undefined {
+		const fromOverlay = overlay?.get(specifier);
+		if (fromOverlay) {
+			if (runtimeOnly && !fromOverlay.injectRuntime) return undefined;
+			return fromOverlay;
+		}
+		const fromGlobal = this.modules.get(specifier);
+		if (fromGlobal && (!runtimeOnly || fromGlobal.injectRuntime)) {
+			return fromGlobal;
+		}
+		return undefined;
+	}
+
+	createPlugin(
+		runtimeOnly = false,
+		overlay?: ReadonlyMap<string, RegisteredVirtualModule>,
+	): BunPlugin | null {
+		return createManagedVirtualModulePlugin({
+			registry: this,
+			overlay,
+			runtimeOnly,
+		});
+	}
+}
+
+export function createManagedVirtualModulePlugin(options: {
+	registry?: VirtualModuleRegistry | null;
+	overlay?: ReadonlyMap<string, RegisteredVirtualModule>;
+	runtimeOnly?: boolean;
+}): BunPlugin | null {
+	const runtimeOnly = options.runtimeOnly ?? false;
+	const overlay = options.overlay;
+	const registry = options.registry ?? undefined;
+	const hasOverlay = overlay
+		? [...overlay.values()].some((module) => !runtimeOnly || module.injectRuntime)
+		: false;
+	const hasGlobal = registry?.hasModules(runtimeOnly) ?? false;
+	if (!hasOverlay && !hasGlobal) return null;
+
+	const lookup = (specifier: string) =>
+		registry
+			? registry.lookupModule(specifier, runtimeOnly, overlay)
+			: overlayLookup(overlay, specifier, runtimeOnly);
+
+	return {
+		name: runtimeOnly
+			? "frame-master-runtime-virtual-modules"
+			: "frame-master-virtual-modules",
+		setup(build) {
+			build.onResolve({ filter: /.*/ }, (args) => {
+				if (!lookup(args.path)) return undefined;
+				return { path: args.path, namespace: VIRTUAL_MODULE_NAMESPACE };
+			});
+			build.onLoad(
+				{ filter: /.*/, namespace: VIRTUAL_MODULE_NAMESPACE },
+				async (args) => {
+					const module = lookup(args.path);
+					if (!module) return undefined;
+					return {
+						contents: await resolveVirtualModuleContents(module, args.path),
+						loader: module.loader,
+					};
+				},
+			);
+		},
+	};
+}
+
+function overlayLookup(
+	overlay: ReadonlyMap<string, RegisteredVirtualModule> | undefined,
+	specifier: string,
+	runtimeOnly: boolean,
+): RegisteredVirtualModule | undefined {
+	const module = overlay?.get(specifier);
+	if (!module) return undefined;
+	if (runtimeOnly && !module.injectRuntime) return undefined;
+	return module;
 }

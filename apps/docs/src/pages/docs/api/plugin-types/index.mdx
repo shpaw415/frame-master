@@ -84,6 +84,20 @@ type ServerStart = Partial<{
 }>;
 ```
 
+## FrameMasterBuildConfig
+
+Bun build config plus a per-build virtual-module overlay. `virtualModules`
+and `files` are collected by the Builder and stripped before `Bun.build()`.
+
+```ts
+type FrameMasterBuildConfig = Partial<Bun.BuildConfig> & {
+  virtualModules?: Record<string, OverlayVirtualModuleDeclaration>;
+};
+```
+
+`injectRuntime` defaults to `false` on overlay declarations. Isolated
+pipelines only see their own overlay plus plugin-level `virtualModules`.
+
 ## BuildOptionsPlugin
 
 Build lifecycle hooks.
@@ -94,10 +108,10 @@ type BuildOptionsPlugin = {
    * Build configuration - static object or dynamic function
    */
   buildConfig?:
-    | Partial<Bun.BuildConfig>
+    | FrameMasterBuildConfig
     | ((
         builder: Builder,
-      ) => Partial<Bun.BuildConfig> | Promise<Partial<Bun.BuildConfig>>);
+      ) => FrameMasterBuildConfig | Promise<FrameMasterBuildConfig>);
 
   /**
    * Called before Bun.build() - setup, validation

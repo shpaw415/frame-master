@@ -109,9 +109,60 @@ earlier transforms. Use `getChainableContent(args)` for a transformation that
 must preserve the rest of the chain. Unregistered paths retain native
 `Bun.file()` behavior.
 
+The Bun.file proxy only sees plugin-level `virtualModules`. Per-build overlay
+modules stay on that Builder.
+
+## Per-build virtualModules overlay
+
+Plugin-level `virtualModules` is for known specifiers. Generated files that
+exist only for one `builder.build()` belong on `buildConfig.virtualModules`:
+
+```ts
+build: {
+  buildConfig: async () => ({
+    entrypoints: Object.keys(generated),
+    virtualModules: {
+      "src/actions/index.cfdynamicssr": {
+        contents: generated["src/actions/index.cfdynamicssr"],
+        loader: "tsx",
+      },
+    },
+  }),
+}
+```
+
+`contents` uses the same `string | Uint8Array | factory` shape as plugin
+`virtualModules`. `injectRuntime` defaults to `false`; overlay modules are
+not registered by the runtime loader.
+
+The Builder collects the overlay when it merges configs, seeds the managed
+provider from **overlay first, then the global plugin registry**, and discards
+the overlay after that build. Isolated pipelines only see their own overlay
+plus global plugin `virtualModules`.
+
+A specifier that collides with a plugin `virtualModules` entry, or with another
+plugin's overlay in the same Builder, fails and names both owners.
+
+### Legacy `files` shim
+
+`buildConfig.files` is promoted into the same overlay:
+
+- `loader` from `buildConfig.loader[ext]` when set, otherwise from the
+  specifier extension (`.tsx` / `.ts` / `.jsx` / `.js`, plus `.html` / `.css` /
+  `.json` when used; otherwise `js`)
+- `injectRuntime: false`
+- owner is the contributing plugin, or `"buildConfig.files"`
+
+After promotion, declared `files` contents and `virtualModules` are stripped.
+Source is loaded only through the managed virtual-module provider. Frame-Master
+may pass empty Bun `files` stubs for non-absolute overlay specifiers so Bun can
+open them as entrypoints; those stubs are not the source of truth.
+
 ## Rules
 
 - A virtual module specifier has one owner; duplicate declarations fail during plugin loading and name both plugins.
-- Registry contents are rebuilt when `frame-master.config.ts` reloads.
+- Overlay specifiers colliding with plugin `virtualModules` or another overlay owner fail and name both plugins.
+- Isolated pipelines do not see each other's overlay; they still see global plugin `virtualModules`.
+- Registry contents are rebuilt when `frame-master.config.ts` reloads. Overlay maps are rebuilt on every `builder.build()`.
 - Use `string` for text modules, `Uint8Array` when byte preservation matters, or a factory to generate source on each build load or runtime import.
 - Prefer specific `onLoad` filters when a transform does not need every module.
