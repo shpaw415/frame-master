@@ -1,5 +1,16 @@
 import { DiffEditor, type Monaco } from "@monaco-editor/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { formatDebugSource } from "./format-debug-source";
+
+type DiffEditorInstance = {
+	getOriginalEditor: () => StandaloneEditor;
+	getModifiedEditor: () => StandaloneEditor;
+};
+
+type StandaloneEditor = {
+	getAction: (id: string) => { run: () => void | Promise<void> } | null;
+	updateOptions: (options: { readOnly?: boolean; domReadOnly?: boolean }) => void;
+};
 
 const THEME_DARK = "fm-dark";
 const THEME_LIGHT = "fm-light";
@@ -101,6 +112,24 @@ function registerThemes(monaco: Monaco) {
 	});
 }
 
+async function formatStandaloneEditor(standalone: StandaloneEditor) {
+	const action = standalone.getAction("editor.action.formatDocument");
+	if (!action) return;
+	standalone.updateOptions({ readOnly: false, domReadOnly: false });
+	try {
+		await action.run();
+	} catch {
+		return;
+	} finally {
+		standalone.updateOptions({ readOnly: true, domReadOnly: true });
+	}
+}
+
+async function formatDiffEditor(diff: DiffEditorInstance) {
+	await formatStandaloneEditor(diff.getOriginalEditor());
+	await formatStandaloneEditor(diff.getModifiedEditor());
+}
+
 export default function MonacoDiff({
 	original,
 	modified,
@@ -112,6 +141,9 @@ export default function MonacoDiff({
 	language?: string;
 	theme?: "dark" | "light";
 }) {
+	const editorRef = useRef<DiffEditorInstance | null>(null);
+	const formattedOriginal = formatDebugSource(original, language);
+	const formattedModified = formatDebugSource(modified, language);
 	const [compact, setCompact] = useState(
 		() => window.matchMedia(COMPACT_QUERY).matches,
 	);
@@ -124,6 +156,12 @@ export default function MonacoDiff({
 		return () => query.removeEventListener("change", update);
 	}, []);
 
+	useEffect(() => {
+		const diff = editorRef.current;
+		if (!diff) return;
+		void formatDiffEditor(diff);
+	}, [formattedOriginal, formattedModified, language]);
+
 	return (
 		<div
 			style={{
@@ -135,8 +173,8 @@ export default function MonacoDiff({
 			}}
 		>
 			<DiffEditor
-				original={original}
-				modified={modified}
+				original={formattedOriginal}
+				modified={formattedModified}
 				language={language}
 				theme={theme === "light" ? THEME_LIGHT : THEME_DARK}
 				height="100%"
@@ -185,6 +223,10 @@ export default function MonacoDiff({
 					},
 				}}
 				beforeMount={registerThemes}
+				onMount={(diff) => {
+					editorRef.current = diff;
+					void formatDiffEditor(diff);
+				}}
 			/>
 		</div>
 	);

@@ -20,8 +20,10 @@ import {
 	ListItemButton,
 	ListItemText,
 } from "@shpaw415/mui-lite/List";
+import FormControl from "@shpaw415/mui-lite/FormControl";
+import InputLabel from "@shpaw415/mui-lite/InputLabel";
+import NativeSelect from "@shpaw415/mui-lite/NativeSelect";
 import Paper from "@shpaw415/mui-lite/Paper";
-import Select from "@shpaw415/mui-lite/Select";
 import { Tab } from "@shpaw415/mui-lite/Tabs";
 import Tabs from "@shpaw415/mui-lite/Tabs";
 import { DefaultTheme, ThemeProvider } from "@shpaw415/mui-lite/theme";
@@ -238,6 +240,37 @@ function statusColor(status: BuildTraceBuildStatus) {
 
 function isVirtualModule(namespace?: string) {
 	return namespace === VIRTUAL_MODULE_NAMESPACE;
+}
+
+function DebugFilterSelect({
+	id,
+	label,
+	value,
+	onChange,
+	children,
+}: {
+	id: string;
+	label: string;
+	value: string;
+	onChange: (value: string) => void;
+	children: ReactNode;
+}) {
+	return (
+		<FormControl fullWidth variant="outlined">
+			<InputLabel htmlFor={id} shrink>
+				{label}
+			</InputLabel>
+			<NativeSelect
+				id={id}
+				value={value}
+				onChange={(event) => onChange(event.target.value)}
+				variant="outlined"
+				fullWidth
+			>
+				{children}
+			</NativeSelect>
+		</FormControl>
+	);
 }
 
 function StepErrorPanel({ error }: { error: BuildTraceStepError }) {
@@ -644,11 +677,11 @@ export default function DebugApp() {
 						<Box sx={{ display: "flex", minHeight: 0, flex: 1, flexDirection: "column", overflow: "hidden" }}>
 							{(state.session?.pipelines?.length ?? 0) > 1 && (
 								<Box sx={{ flexShrink: 0, p: 1.5 }}>
-									<Select
-										name="debug-pipeline"
+									<DebugFilterSelect
+										id="debug-pipeline"
 										label="Pipeline"
 										value={pipelineFilter}
-										onSelect={(pipelineId) => {
+										onChange={(pipelineId) => {
 											setPipelineFilter(pipelineId);
 											const nextBuild = deferredBuildList.find(
 												(build) => pipelineId === "all" || build.pipelineId === pipelineId,
@@ -660,15 +693,13 @@ export default function DebugApp() {
 											}
 										}}
 									>
-										{[
-											<option key="all" value="all">All pipelines</option>,
-											...(state.session?.pipelines ?? []).map((pipeline) => (
-												<option key={pipeline.id} value={pipeline.id}>
-													{pipeline.label}
-												</option>
-											)),
-										]}
-									</Select>
+										<option value="all">All pipelines</option>
+										{(state.session?.pipelines ?? []).map((pipeline) => (
+											<option key={pipeline.id} value={pipeline.id}>
+												{pipeline.label}
+											</option>
+										))}
+									</DebugFilterSelect>
 								</Box>
 							)}
 							<Box sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
@@ -750,19 +781,17 @@ export default function DebugApp() {
 										onChange={(event) => setFileNameFilter(event.target.value)}
 										startIcon={<Search size={16} />}
 									/>
-									<Select
-										name="debug-file-type"
+									<DebugFilterSelect
+										id="debug-file-type"
 										label="File type"
 										value={fileTypeFilter}
-										onSelect={setFileTypeFilter}
+										onChange={setFileTypeFilter}
 									>
-										{[
-											<option key="all" value="all">All types</option>,
-											...availableFileTypes.map((loader) => (
-												<option key={loader} value={loader}>{loader}</option>
-											)),
-										]}
-									</Select>
+										<option value="all">All types</option>
+										{availableFileTypes.map((loader) => (
+											<option key={loader} value={loader}>{loader}</option>
+										))}
+									</DebugFilterSelect>
 								</Box>
 								<Box sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
 									{selectedBuild?.files.length ? (
@@ -954,11 +983,6 @@ export default function DebugApp() {
 								<Typography color="textSecondary" variant="caption">{formatDuration(selectedSummary.durationMs)}</Typography>
 								<Typography color="textSecondary" variant="caption">{selectedSummary.fileCount} files</Typography>
 								<Typography color="textSecondary" variant="caption">{selectedSummary.stepCount} steps</Typography>
-								<Box sx={{ display: "flex", minWidth: 0, gap: 1 }}>
-									{selectedSummary.entrypoints?.map((ep) => (
-										<Typography key={ep} color="textSecondary" noWrap variant="caption">{ep}</Typography>
-									))}
-								</Box>
 							</>
 						) : (
 							<Typography color="textSecondary" variant="caption">no build selected</Typography>
