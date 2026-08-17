@@ -128,12 +128,13 @@ export interface GlobalPluginContextMap {}
 
 declare module "./types" {
 	interface GlobalPluginContextMap {
-		/** @deprecated Prefer `getBuildUnifierContext()` / `getBuildPipeline(id)` from `frame-master/plugin`. */
+		/** @deprecated Prefer `getBuildUnifierContext()` / `getBuildPipeline(pluginName)` from `frame-master/plugin`. */
 		"build-unifier": Partial<{
 			builders: Record<string, Promise<Builder>>;
 			getBuilder: (pluginName: string) => Promise<Builder>;
 			build_config: Record<string, BuildOptionsPlugin[]>;
 			setBuildConfig: (pluginName: string, config: BuildOptionsPlugin) => void;
+			_id_list: Map<string, string>;
 		}>;
 	}
 }
