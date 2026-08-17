@@ -422,6 +422,46 @@ describe("builder", () => {
 		).toContain("export const transformed = true;");
 	});
 
+	test("should trace resolved virtual module factory source", async () => {
+		const entrypoint = join(TEMP_DIR, "virtual-factory-entry.ts");
+		writeFileSync(
+			entrypoint,
+			`import { value } from "@test/debug-virtual-factory"; console.log(value);`,
+		);
+		const fmConfig: FrameMasterConfig = {
+			HTTPServer: { port: 3000 },
+			pluginsOptions: { entrypoints: [entrypoint] },
+			plugins: [
+				{
+					name: "debug-virtual-factory-provider",
+					version: "0",
+					virtualModules: {
+						"@test/debug-virtual-factory": {
+							contents: () => `export const value = "from-factory";`,
+							loader: "ts",
+							injectRuntime: false,
+						},
+					},
+				},
+			],
+		};
+
+		const builder = await createBuilder(fmConfig, new PluginLoader(fmConfig));
+		builder.startDebugSession({ watch: false, includeTextSnapshots: true });
+
+		const result = await builder.build();
+		const build = builder.getDebugSession()?.builds[0];
+		const virtualFile = build?.files.find(
+			(file) => file.path === "@test/debug-virtual-factory",
+		);
+
+		expect(result.success).toBeTrue();
+		expect(virtualFile?.namespace).toBe("frame-master-virtual-module");
+		expect(
+			build?.snapshots[virtualFile?.initialSnapshotId as string]?.text,
+		).toBe(`export const value = "from-factory";`);
+	});
+
 	test("should disable text snapshots by default in debug sessions", async () => {
 		const executionOrder: string[] = [];
 		const fmConfig: FrameMasterConfig = {

@@ -1,5 +1,9 @@
 import type { BunPlugin } from "bun";
-import type { FrameMasterPlugin, VirtualModuleDeclaration } from "./types";
+import type {
+	FrameMasterPlugin,
+	VirtualModuleContentsFactory,
+	VirtualModuleDeclaration,
+} from "./types";
 
 export const VIRTUAL_MODULE_NAMESPACE = "frame-master-virtual-module";
 
@@ -23,10 +27,99 @@ let nativeBunFile: typeof Bun.file | null = null;
 let activeRegistry: VirtualModuleRegistry | null = null;
 let virtualModuleFileProxyInstalled = false;
 
-function moduleBytes(module: RegisteredVirtualModule): Uint8Array {
-	return typeof module.contents === "string"
-		? new TextEncoder().encode(module.contents)
-		: module.contents;
+export function isVirtualModuleContentsFactory(
+	contents: VirtualModuleDeclaration["contents"],
+): contents is VirtualModuleContentsFactory {
+	return typeof contents === "function";
+}
+
+function isResolvedVirtualModuleContents(
+	value: unknown,
+): value is string | Uint8Array {
+	return typeof value === "string" || value instanceof Uint8Array;
+}
+
+function factoryFailedError(
+	specifier: string,
+	pluginName: string,
+	cause: unknown,
+): Error {
+	return new Error(
+		`Virtual module "${specifier}" contents factory from plugin "${pluginName}" failed`,
+		{ cause },
+	);
+}
+
+function invalidContentsError(specifier: string, pluginName: string): Error {
+	return new Error(
+		`Virtual module "${specifier}" contents factory from plugin "${pluginName}" must return a string or Uint8Array.`,
+	);
+}
+
+function assertResolvedContents(
+	value: unknown,
+	specifier: string,
+	pluginName: string,
+): asserts value is string | Uint8Array {
+	if (!isResolvedVirtualModuleContents(value)) {
+		throw invalidContentsError(specifier, pluginName);
+	}
+}
+
+export async function resolveVirtualModuleContents(
+	module: RegisteredVirtualModule,
+	specifier: string,
+): Promise<string | Uint8Array> {
+	if (!isVirtualModuleContentsFactory(module.contents)) {
+		return module.contents;
+	}
+
+	let resolved: string | Uint8Array | Promise<string | Uint8Array>;
+	try {
+		resolved = module.contents();
+	} catch (error) {
+		throw factoryFailedError(specifier, module.pluginName, error);
+	}
+
+	try {
+		resolved = await resolved;
+	} catch (error) {
+		throw factoryFailedError(specifier, module.pluginName, error);
+	}
+
+	assertResolvedContents(resolved, specifier, module.pluginName);
+	return resolved;
+}
+
+export function resolveVirtualModuleContentsSync(
+	module: RegisteredVirtualModule,
+	specifier: string,
+): string | Uint8Array {
+	if (!isVirtualModuleContentsFactory(module.contents)) {
+		return module.contents;
+	}
+
+	let resolved: string | Uint8Array | Promise<string | Uint8Array>;
+	try {
+		resolved = module.contents();
+	} catch (error) {
+		throw factoryFailedError(specifier, module.pluginName, error);
+	}
+
+	if (resolved instanceof Promise) {
+		throw new Error(
+			`Virtual module "${specifier}" contents factory from plugin "${module.pluginName}" is async; use .text() / .bytes() instead of sync accessors.`,
+		);
+	}
+
+	assertResolvedContents(resolved, specifier, module.pluginName);
+	return resolved;
+}
+
+function contentsToBytes(contents: string | Uint8Array): Uint8Array {
+	return typeof contents === "string"
+		? new TextEncoder().encode(contents)
+		: contents;
 }
 
 function moduleType(loader: Bun.Loader): string {
@@ -48,45 +141,48 @@ function createVirtualModuleFile(
 	registry: VirtualModuleRegistry,
 	specifier: string,
 ): VirtualModuleFile {
-	const getModule = () => registry.getModule(specifier);
-	const getBytes = () => {
-		const module = getModule();
+	const getModule = () => {
+		const module = registry.getModule(specifier);
 		if (!module)
 			throw new Error(`Virtual module "${specifier}" is no longer registered.`);
-		return moduleBytes(module);
+		return module;
 	};
+	const getBytesSync = () =>
+		contentsToBytes(resolveVirtualModuleContentsSync(getModule(), specifier));
+	const getBytes = async () =>
+		contentsToBytes(await resolveVirtualModuleContents(getModule(), specifier));
 
 	return {
 		get size() {
-			return getBytes().byteLength;
+			return getBytesSync().byteLength;
 		},
 		get type() {
-			const module = getModule();
+			const module = registry.getModule(specifier);
 			return module ? moduleType(module.loader) : "";
 		},
 		async arrayBuffer() {
-			const bytes = getBytes();
+			const bytes = await getBytes();
 			return bytes.buffer.slice(
 				bytes.byteOffset,
 				bytes.byteOffset + bytes.byteLength,
 			) as ArrayBuffer;
 		},
 		async bytes() {
-			return new Uint8Array(getBytes());
+			return new Uint8Array(await getBytes());
 		},
 		async exists() {
-			return getModule() !== undefined;
+			return registry.getModule(specifier) !== undefined;
 		},
 		async json() {
 			return JSON.parse(await this.text());
 		},
 		stream() {
-			return new Blob([getBytes().slice().buffer], {
+			return new Blob([getBytesSync().slice().buffer], {
 				type: this.type,
 			}).stream();
 		},
 		async text() {
-			return new TextDecoder().decode(getBytes());
+			return new TextDecoder().decode(await getBytes());
 		},
 	};
 }
@@ -177,10 +273,13 @@ export class VirtualModuleRegistry {
 				});
 				build.onLoad(
 					{ filter: /.*/, namespace: VIRTUAL_MODULE_NAMESPACE },
-					(args) => {
+					async (args) => {
 						const module = modules.get(args.path);
 						if (!module) return undefined;
-						return { contents: module.contents, loader: module.loader };
+						return {
+							contents: await resolveVirtualModuleContents(module, args.path),
+							loader: module.loader,
+						};
 					},
 				);
 			},

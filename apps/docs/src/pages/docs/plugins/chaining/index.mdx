@@ -45,9 +45,23 @@ export const routesPlugin = (): FrameMasterPlugin => ({
       loader: "ts",
       injectRuntime: true,
     },
+    "@routes/live": {
+      contents: () => `export const generatedAt = ${Date.now()};`,
+      loader: "ts",
+      injectRuntime: true,
+    },
   },
 });
 ```
+
+`contents` may be a `string`, a `Uint8Array`, or a zero-arg factory
+`()` → `string | Uint8Array | Promise<string | Uint8Array>`. Frame-Master
+invokes the factory when the specifier is loaded during a build or a runtime
+import (and when the opt-in `Bun.file` proxy reads it). Close over plugin
+state as needed. Bun may cache a runtime module after the first successful
+load until config reload. Sync `Bun.file` accessors such as `size` and
+`stream()` require a sync factory; async factories must use `.text()` /
+`.bytes()`.
 
 Declaring the entry is enough. Frame-Master internally resolves and loads the
 module; plugin authors do **not** add a separate `onResolve` or `onLoad` merely
@@ -99,5 +113,5 @@ must preserve the rest of the chain. Unregistered paths retain native
 
 - A virtual module specifier has one owner; duplicate declarations fail during plugin loading and name both plugins.
 - Registry contents are rebuilt when `frame-master.config.ts` reloads.
-- Use `string` for text modules and `Uint8Array` when byte preservation matters.
+- Use `string` for text modules, `Uint8Array` when byte preservation matters, or a factory to generate source on each build load or runtime import.
 - Prefer specific `onLoad` filters when a transform does not need every module.

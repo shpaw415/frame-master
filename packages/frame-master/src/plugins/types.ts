@@ -158,14 +158,37 @@ export type DebugUIOptions = {
 };
 
 /**
+ * Zero-arg factory that produces virtual-module source when Frame-Master loads
+ * the specifier during a build or a runtime import.
+ *
+ * Close over plugin state as needed. Async factories are allowed. Bun may cache
+ * a runtime module after the first successful load until config reload.
+ */
+export type VirtualModuleContentsFactory = () =>
+	| string
+	| Uint8Array
+	| Promise<string | Uint8Array>;
+
+export type VirtualModuleContents =
+	| string
+	| Uint8Array
+	| VirtualModuleContentsFactory;
+
+/**
  * A virtual source module declared by a Frame-Master plugin.
  *
  * Frame-Master resolves and loads declarations through its managed provider, so
  * plugin authors do not need a matching Bun `onResolve` or `onLoad` handler.
  */
 export type VirtualModuleDeclaration = {
-	/** Source made available when the module specifier is imported and chained. */
-	contents: string | Uint8Array;
+	/**
+	 * Source made available when the module specifier is imported and chained.
+	 *
+	 * A string or Uint8Array is used as-is. A zero-arg factory is invoked when
+	 * Frame-Master loads the specifier during a build or a runtime import, and
+	 * when the opt-in Bun.file proxy reads it.
+	 */
+	contents: VirtualModuleContents;
 	/** Bun loader used for the source. */
 	loader: Bun.Loader;
 	/** Also make this module available through `frame-master/runtime`. */
