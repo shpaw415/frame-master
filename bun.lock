@@ -16,12 +16,11 @@
         "clsx": "^2.1.1",
         "drizzle-orm": "^0.44.7",
         "frame-master": "workspace:*",
-        "frame-master-plugin-apply-react": "https://github.com/shpaw415/frame-master-plugin-apply-react.git#fix/hmr-behaviour",
+        "frame-master-plugin-apply-react": "https://github.com/shpaw415/frame-master-plugin-apply-react.git#feat/v4-api",
         "frame-master-plugin-assets-to-build": "^0.1.1",
         "frame-master-plugin-auto-sitemap": "^0.1.0",
-        "frame-master-plugin-build-unifier": "^1.0.0",
-        "frame-master-plugin-cloudflare-pages-dynamic-ssr": "^0.2.1",
-        "frame-master-plugin-cloudflare-pages-functions-action": "^3.0.0",
+        "frame-master-plugin-cloudflare-pages-dynamic-ssr": "https://github.com/shpaw415/frame-master-plugin-cloudflare-pages-dynamic-ssr.git#feat/v4-api",
+        "frame-master-plugin-cloudflare-pages-functions-action": "https://github.com/shpaw415/frame-master-plugin-cloudflare-pages-functions-action.git#feat/v4-api",
         "frame-master-plugin-cloudflare-route-file-generator": "^0.1.2",
         "frame-master-plugin-env-in-html": "^0.1.2",
         "frame-master-plugin-html-search-engine": "0.1.0",
@@ -31,7 +30,7 @@
         "frame-master-plugin-react-to-html": "^1.0.7",
         "frame-master-plugin-seo": "^0.1.1",
         "frame-master-plugin-serve-from-build": "^1.1.1",
-        "frame-master-plugin-tailwind": "^1.2.0",
+        "frame-master-plugin-tailwind": "^2.0.0",
         "frame-master-svg-to-jsx-loader": "^0.1.0",
         "markdown-it": "^14.1.1",
         "mermaid": "^11.15.0",
@@ -928,7 +927,7 @@
 
     "frame-master-docs": ["frame-master-docs@workspace:apps/docs"],
 
-    "frame-master-plugin-apply-react": ["frame-master-plugin-apply-react@github:shpaw415/frame-master-plugin-apply-react#53c7980", { "dependencies": { "@babel/core": "^8.0.1", "@babel/types": "^8.0.4", "bun-file-system-router-browser": "^1.3.13", "react-refresh": "^0.18.0" }, "peerDependencies": { "frame-master": "^3.1.3", "react": "19.2.8", "react-dom": "19.2.8", "typescript": "^5.9.3" } }, "shpaw415-frame-master-plugin-apply-react-53c7980", "sha512-eefZQI2Qio+GTVQ4KibV+LouyLRLviwJRsHfQcdKQwW61rIYHVg6qpNrWpFpYLj41N8zPCxu824Nq93nn6qcpA=="],
+    "frame-master-plugin-apply-react": ["frame-master-plugin-apply-react@github:shpaw415/frame-master-plugin-apply-react#e75ec33", { "dependencies": { "@babel/core": "^8.0.1", "@babel/types": "^8.0.4", "bun-file-system-router-browser": "^1.3.13", "react-refresh": "^0.18.0" }, "peerDependencies": { "frame-master": "^4.0.0-0", "react": "19.2.8", "react-dom": "19.2.8", "typescript": "^5.9.3" } }, "shpaw415-frame-master-plugin-apply-react-e75ec33", "sha512-xM4wmwwgqDUjXBiqen/BPNxGCOHdSqvSo596dC5YeN9K27RCR7WWZ9datXLT+HYjj+j+/oyx2prij76uTdXVTg=="],
 
     "frame-master-plugin-assets-to-build": ["frame-master-plugin-assets-to-build@0.1.1", "", { "peerDependencies": { "frame-master": "^3.1.1", "typescript": "^5" } }, "sha512-VQDzoJVKcgPpPScaRw75AXn4CVXKObPsSGpTPjSdZTaZlh79A2PfIaTrF31xk4Zqne0dsd6axJyZgM4r3clsug=="],
 
@@ -936,9 +935,9 @@
 
     "frame-master-plugin-build-unifier": ["frame-master-plugin-build-unifier@1.0.0", "", { "peerDependencies": { "frame-master": "^3.1.6", "typescript": "^5.9.3" } }, "sha512-2yMWSJhQzeBCUqguz44XbJxIQ2ej+/G3e1GAutlYmkM/wAXt5Mfqd4sO8B6Y1MBPXFSIjfRH8xHvo/B3jJzX3w=="],
 
-    "frame-master-plugin-cloudflare-pages-dynamic-ssr": ["frame-master-plugin-cloudflare-pages-dynamic-ssr@0.2.1", "", { "dependencies": { "react": "^19.2.5", "react-dom": "^19.2.5" }, "peerDependencies": { "frame-master": "^3.1.6", "frame-master-plugin-build-unifier": "^1.0.0", "frame-master-plugin-cloudflare-pages-functions-action": "^3.0.0" } }, "sha512-vgG9MIn/b1Pz43POnMHiAZX8BFjvStDIHkWR0HDDhp87DhIvyuv7v+rHP+P1LCf5di+jncGdV5ymgSn5b8gVNQ=="],
+    "frame-master-plugin-cloudflare-pages-dynamic-ssr": ["frame-master-plugin-cloudflare-pages-dynamic-ssr@github:shpaw415/frame-master-plugin-cloudflare-pages-dynamic-ssr#b7f9a2a", { "dependencies": { "react": "^19.2.5", "react-dom": "^19.2.5" }, "peerDependencies": { "frame-master": "^4.0.0-0", "frame-master-plugin-build-unifier": "^2.1.0", "frame-master-plugin-cloudflare-pages-functions-action": "^4.0.0" } }, "shpaw415-frame-master-plugin-cloudflare-pages-dynamic-ssr-b7f9a2a", "sha512-ulgaf4+DgouHq3LOlaxkVkmmoN47k0TqLdQ8WKwCLvhcd6g8ebplJjyPiUq8QUthPtV5fmvlk9Z6I5eY48h/Mw=="],
 
-    "frame-master-plugin-cloudflare-pages-functions-action": ["frame-master-plugin-cloudflare-pages-functions-action@3.0.0", "", { "dependencies": { "frame-master-plugin-cloudflare-pages-functions-action": "^0.3.1", "superjson": "^2.2.6" }, "peerDependencies": { "frame-master": "^3.1.3", "frame-master-plugin-build-unifier": "^1.0.0", "npm": "11.6.2", "wrangler": "^4.83.0" } }, "sha512-Gky8wb2m2HQF7Bl0sGkHncoOBCF31QjzBgqB4nMkaQ/OCIRTjVaMxX5U3UXdSAmsfi6dBhrl2Q9WM3W4P3sBhg=="],
+    "frame-master-plugin-cloudflare-pages-functions-action": ["frame-master-plugin-cloudflare-pages-functions-action@github:shpaw415/frame-master-plugin-cloudflare-pages-functions-action#ab44657", { "dependencies": { "superjson": "^2.2.6" }, "peerDependencies": { "frame-master": "^4.0.0-0", "npm": "11.6.2", "wrangler": "^4.83.0" } }, "shpaw415-frame-master-plugin-cloudflare-pages-functions-action-ab44657", "sha512-dzXM0hskntD3r5Kvx/AaddO3XvQH0dLqHIiwOAR+KbETqanmMRqtvIeOoYUW6GHZNfs18rbQuOeth5hzWUdIpg=="],
 
     "frame-master-plugin-cloudflare-route-file-generator": ["frame-master-plugin-cloudflare-route-file-generator@0.1.2", "", { "peerDependencies": { "frame-master": "^3.1.5", "typescript": "^6.0.3" } }, "sha512-OslPe9+TDBVdXXnxK0hUFy/FjYocuq14OcWfgnyd6FZa9Cxawi9UYTEfIksZe2YdKfylfdkzPO03Vvrf+O8Tmg=="],
 
@@ -958,7 +957,7 @@
 
     "frame-master-plugin-serve-from-build": ["frame-master-plugin-serve-from-build@1.1.1", "", { "peerDependencies": { "frame-master": "^3.1.1", "typescript": "^5.9.3" } }, "sha512-VatTIDZ3Vb6G+RAV+0PQNasAlnLuPAY6+GGLNzOSjZ/aHK3uN8hDsaEQxTegi0UG8smaBcjrqX3bCocqRAMGZg=="],
 
-    "frame-master-plugin-tailwind": ["frame-master-plugin-tailwind@1.2.0", "", { "dependencies": { "chalk": "^5.6.2" }, "peerDependencies": { "@tailwindcss/cli": ">=4.1.18", "frame-master": "^3.2.0", "tailwindcss": ">=4.1.18", "typescript": "^5.9.3" } }, "sha512-mGbXjqoXsYxbahgix9HCxkq3V+t8vpgLahmwyA/ZhmSvmr8M6L4+H4N95iPOA3dggtJgKkgJ6OdORZ5AAXWcCg=="],
+    "frame-master-plugin-tailwind": ["frame-master-plugin-tailwind@2.0.0", "", { "dependencies": { "chalk": "^5.6.2" }, "peerDependencies": { "@tailwindcss/cli": ">=4.1.18", "frame-master": "^4.0.0-0", "tailwindcss": ">=4.1.18", "typescript": "^5.9.3" } }, "sha512-c49eUk+k6jocYs/rc9F8cZTHRXvUn2zueWBj8f1WnDygJjo0rOVf3+Ts399Vsd0ZlppM8SCGF075yCX3DqSiFA=="],
 
     "frame-master-svg-to-jsx-loader": ["frame-master-svg-to-jsx-loader@0.1.0", "", { "dependencies": { "@svgr/core": "^8.1.0", "@svgr/plugin-jsx": "^8.1.0", "@svgr/plugin-prettier": "^8.1.0", "@svgr/plugin-svgo": "^8.1.0", "@types/react": "^19.2.7", "svgo": "4.0.0" }, "peerDependencies": { "frame-master": "^3.0.0", "typescript": "^5" } }, "sha512-RDLPpeGnnH3QBAvmt9lTOtargSA1P60ULe+zxSQ/4RPcCNSm0+0gDQi+7plEBcvdgE5U3yonw3DcpgbxgM3+xg=="],
 
@@ -1678,7 +1677,7 @@
 
     "d3-sankey/d3-shape": ["d3-shape@1.3.7", "", { "dependencies": { "d3-path": "1" } }, "sha512-EUkvKjqPFUAZyOlhY5gzCxCeI0Aep04LwIRpsZ/mLFelJiUfnK56jo5JMDSE7yyP2kLSb6LtF+S5chMk7uqPqw=="],
 
-    "frame-master-plugin-cloudflare-pages-functions-action/frame-master-plugin-cloudflare-pages-functions-action": ["frame-master-plugin-cloudflare-pages-functions-action@0.3.1", "", { "dependencies": { "superjson": "^2.2.6" }, "peerDependencies": { "frame-master": "^3.1.1", "npm": "11.6.2", "wrangler": "^4.83.0" } }, "sha512-YmyB11gOeydBwDfJEx1vIJwoz2rFFmsnq9gtyUY8YPcsS6ynvKKRmUecDjIpqA4nbHCV54+vuh+PXufCjO0bkQ=="],
+    "frame-master-plugin-cloudflare-pages-dynamic-ssr/frame-master-plugin-cloudflare-pages-functions-action": ["frame-master-plugin-cloudflare-pages-functions-action@4.0.0", "", { "dependencies": { "frame-master-plugin-cloudflare-pages-functions-action": "^0.3.1", "superjson": "^2.2.6" }, "peerDependencies": { "frame-master": "^4.0.0-0", "frame-master-plugin-build-unifier": "^2.1.0", "npm": "11.6.2", "wrangler": "^4.83.0" } }, "sha512-+GzQq9d9GNrQglbUwVNonKPPEL9P8XEka4tv5FL4JmHWoGbDM8idUMquwBOy0vxG3tZfFyp73QgdzIWc21c8ug=="],
 
     "htmlparser2/entities": ["entities@7.0.1", "", {}, "sha512-TWrgLOFUQTH994YUyl1yT4uyavY5nNB5muff+RtWaqNVCAK408b5ZnnbNAUEWLTCpum9w6arT70i1XdQ4UeOPA=="],
 
@@ -2383,6 +2382,8 @@
     "cytoscape-fcose/cose-base/layout-base": ["layout-base@2.0.1", "", {}, "sha512-dp3s92+uNI1hWIpPGH3jK2kxE2lMjdXdr+DH8ynZHpd6PUlH6x6cbuXnoMmiNumznqaNO31xu9e79F0uuZ0JFg=="],
 
     "d3-sankey/d3-shape/d3-path": ["d3-path@1.0.9", "", {}, "sha512-VLaYcn81dtHVTjEHd8B+pbe9yHWpXKZUC87PzoFmsFrJqgFwDe/qxfp5MlfsfM1V5E/iVt0MmEbWQ7FVIXh/bg=="],
+
+    "frame-master-plugin-cloudflare-pages-dynamic-ssr/frame-master-plugin-cloudflare-pages-functions-action/frame-master-plugin-cloudflare-pages-functions-action": ["frame-master-plugin-cloudflare-pages-functions-action@0.3.1", "", { "dependencies": { "superjson": "^2.2.6" }, "peerDependencies": { "frame-master": "^3.1.1", "npm": "11.6.2", "wrangler": "^4.83.0" } }, "sha512-YmyB11gOeydBwDfJEx1vIJwoz2rFFmsnq9gtyUY8YPcsS6ynvKKRmUecDjIpqA4nbHCV54+vuh+PXufCjO0bkQ=="],
 
     "mermaid-isomorphic/mermaid/@braintree/sanitize-url": ["@braintree/sanitize-url@6.0.4", "", {}, "sha512-s3jaWicZd0pkP0jf5ysyHUI/RE7MHos6qlToFcGWXVp+ykHOy77OUMrfbgJ9it2C5bow7OIQwYYaHjk9XlBQ2A=="],
 

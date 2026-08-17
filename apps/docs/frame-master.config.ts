@@ -3,12 +3,12 @@ import {
 	directiveToolSingleton,
 	getGlobalPluginContext,
 } from "frame-master/plugin/utils";
+import { BuildUnifier } from "frame-master/plugin";
 import type { FrameMasterConfig } from "frame-master/server/types";
 import { isProd } from "frame-master/utils";
 import ApplyReact from "frame-master-plugin-apply-react/plugin";
 import AssetsToBuild from "frame-master-plugin-assets-to-build";
 import AutoSiteMap from "frame-master-plugin-auto-sitemap";
-import buildUnifier from "frame-master-plugin-build-unifier";
 import SSRPlugin from "frame-master-plugin-cloudflare-pages-dynamic-ssr";
 import CFActionPlugin from "frame-master-plugin-cloudflare-pages-functions-action";
 import CloudflareRouteFilePlugin from "frame-master-plugin-cloudflare-route-file-generator";
@@ -77,7 +77,7 @@ export default {
 			exclude: [/loading\.(tsx|jsx)$/, /404\.(tsx|jsx)$/],
 		}),
 		imgOptimizerPlugin,
-		...buildUnifier({
+		...BuildUnifier({
 			plugins: [
 				CFActionPlugin({
 					actionBasePath: "src/actions",
@@ -95,11 +95,9 @@ export default {
 				{
 					name: "env-vars-in-build",
 					version: "1.0.0",
-					build: {
-						buildConfig: {
-							entrypoints: ["@cf-process-env.js"],
-							files: {
-								"@cf-process-env.js": `
+					virtualModules: {
+						"@cf-process-env.js": {
+							contents: `
 								globalThis.process ??= {}; process.env ??= ${JSON.stringify({
 									NODE_ENV: process.env.NODE_ENV,
 									...Object.fromEntries(
@@ -108,7 +106,13 @@ export default {
 										),
 									),
 								})};`,
-							},
+							injectRuntime: true,
+							loader: "js",
+						},
+					},
+					build: {
+						buildConfig: {
+							entrypoints: ["@cf-process-env.js"],
 						},
 					},
 				},
@@ -240,7 +244,7 @@ export default {
 				{
 					src: "404.html",
 					dist: "404.html",
-				}
+				},
 			],
 		}),
 		SEOPlugin(SiteConfig.SEO),
