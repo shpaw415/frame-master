@@ -272,6 +272,7 @@ export class DirectiveTool {
 }
 
 export const directiveToolSingleton = new DirectiveTool();
+export { directiveToolSingleton as directiveManager };
 
 export function createPlugin<Options extends PluginOptions>(
 	plugin: FrameMasterPlugin<Options>,
