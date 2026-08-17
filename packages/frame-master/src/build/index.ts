@@ -1126,14 +1126,7 @@ export async function createBuilder(
 	_config: FrameMasterConfig,
 	_pluginLoader: PluginLoader,
 ) {
-	const pipelinePluginNames = new Set(
-		_pluginLoader
-			.getPluginByName("debugUIOptions")
-			.flatMap((entry) => entry.pluginParent.pipeline?.plugins ?? []),
-	);
-	const plugin = _pluginLoader
-		.getPluginByName("build")
-		.filter((entry) => !pipelinePluginNames.has(entry.name));
+	const plugin = _pluginLoader.getPluginByName("build");
 	const logIsEnabled = plugin.some((p) => p.pluginParent.enableLoging === true);
 
 	const virtualModuleRegistry = _pluginLoader.getVirtualModuleRegistry();

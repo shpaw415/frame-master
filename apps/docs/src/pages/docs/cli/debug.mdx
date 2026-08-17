@@ -126,17 +126,18 @@ In view mode, the UI is read-only:
 
 ## Build Pipelines
 
-Wrap isolated, inspectable build pipelines with `buildPipeline()`.
-Each pipeline has its own builder and appears in the debug UI's pipeline filter,
-with its build history, files, and transforms preserved in exported traces.
+`BuildUnifier()` is the core build-unifier: it groups plugins into an isolated
+builder bucket. `frame-master debug build` always shows **Default build** (the
+global `plugin.build` merge) plus one selector entry per unifier bucket.
+Each bucket inherits the same virtual-module registry as the default builder.
 
 ```ts
-import { buildPipeline, getBuildPipeline } from "frame-master/plugin";
+import { BuildUnifier, getBuildPipeline, getBuildUnifierContext } from "frame-master/plugin";
 
 export default {
   HTTPServer: { port: 3000 },
   plugins: [
-    ...buildPipeline({
+    ...BuildUnifier({
       id: "functions",
       label: "Cloudflare Functions",
       plugins: [actionsPlugin, ssrPlugin],
@@ -145,10 +146,11 @@ export default {
 };
 ```
 
-Pipeline plugins can use `getBuildPipeline("functions")` to register a build
-fragment or await the isolated builder. The existing
-`getGlobalPluginContext("build-unifier")` `setBuildConfig` and `getBuilder`
-methods remain available for legacy build-unifier consumers.
+Bucket plugins register fragments with `getBuildUnifierContext()?.setBuildConfig`
+in `createContext`, then await `getBuildUnifierContext("functions").getBuilder(name)`
+or `getBuildPipeline("functions")`. Legacy `getGlobalPluginContext("build-unifier")`
+still works. `buildPipeline()` remains as a deprecated alias.
+
 - The rebuild action is disabled while the saved trace is open
 
 ## Recommended Workflow

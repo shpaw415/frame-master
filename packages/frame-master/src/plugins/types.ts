@@ -128,7 +128,7 @@ export interface GlobalPluginContextMap {}
 
 declare module "./types" {
 	interface GlobalPluginContextMap {
-		/** @deprecated Use `getBuildPipeline(id)` from `frame-master/plugin`. */
+		/** @deprecated Prefer `getBuildUnifierContext()` / `getBuildPipeline(id)` from `frame-master/plugin`. */
 		"build-unifier": Partial<{
 			builders: Record<string, Promise<Builder>>;
 			getBuilder: (pluginName: string) => Promise<Builder>;
@@ -550,7 +550,7 @@ export type FrameMasterPlugin<
 	version: string;
 }> &
 	Partial<{
-		/** Debug UI metadata, normally supplied by `buildPipeline()`. */
+		/** Debug UI metadata, normally supplied by `BuildUnifier()`. */
 		debugUIOptions: DebugUIOptions;
 		/**
 		 * Virtual modules owned by this plugin. Frame-Master resolves these modules

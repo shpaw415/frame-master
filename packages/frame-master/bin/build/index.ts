@@ -1,7 +1,6 @@
 import chalk from "chalk";
 import { Command } from "commander";
 import { InitBuild } from "frame-master/server/init";
-import { getBuildPipelines } from "frame-master/plugin";
 import { verboseLog } from "frame-master/utils";
 import { ensureNodeEnv, onVerbose } from "../share";
 
@@ -48,17 +47,11 @@ export const buildCommand = new Command("build")
 			// Start the build
 			const startTime = performance.now();
 			const result = await builder.build();
-			const pipelineResults = await Promise.all(
-				getBuildPipelines().map(async (pipeline) => {
-					const pipelineBuilder = await pipeline.getBuilder();
-					return pipelineBuilder.build();
-				}),
-			);
 			const duration = performance.now() - startTime;
 
 			verboseLog(result);
 
-			if (result.success && pipelineResults.every((pipeline) => pipeline.success)) {
+			if (result.success) {
 				console.log(
 					"\n" +
 						chalk.bold.green("┌─────────────────────────────────────────┐"),
