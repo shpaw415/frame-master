@@ -5,7 +5,7 @@ import { pluginLoader } from "../plugins";
 import { getConfig } from "./config";
 import { HotFileWatcher } from "./hot-file-watcher";
 import { reloadServer } from "./index";
-import { reinitAll } from "./init";
+import { reinitAll, stopCurrentGeneration } from "./init";
 import type { FrameMasterConfig } from "./type";
 
 export type ConfigReloadCallback = (
@@ -16,10 +16,10 @@ export type ConfigReloadCallback = (
  * ConfigWatcher handles hot-reloading of the frame-master.config.ts file.
  *
  * When the config file changes, it:
- * 1. Reloads the configuration from disk
- * 2. Reinitializes the plugin loader with the new config
- * 3. Reinitializes the builder with new plugin build configs
- * 4. Reloads the HTTP server with new routes and settings, then reruns serverReady hooks
+ * 1. Runs `serverStop` on the old plugins and stops the HTTP server
+ * 2. Reloads the configuration from disk and reinitializes plugins/builder
+ * 3. Runs `onConfigReload` on the new plugins
+ * 4. Creates the HTTP server and reruns `serverReady`
  * 5. Calls any registered callbacks with the new config
  *
  * @example
@@ -78,16 +78,19 @@ class ConfigWatcher {
 		verboseLog("[ConfigWatcher] Reloading configuration...");
 
 		try {
-			// 1. Reinitialize everything (config, plugins, builder, hooks, watchers)
+			// 1. Stop the old generation (serverStop on OLD plugins, then HTTP)
+			await stopCurrentGeneration({ reason: "reload", force: false });
+
+			// 2. Reinitialize everything (config, plugins, builder, start hooks, watchers)
 			await reinitAll();
 
-			// 2. Run onConfigReload plugin hooks
+			// 3. Run onConfigReload plugin hooks on the NEW plugins
 			await this.runReloadHooks();
 
-			// 3. Reload the HTTP server with new routes and config
+			// 4. Create the HTTP server and run serverReady
 			await reloadServer();
 
-			// 4. Notify all registered callbacks
+			// 5. Notify all registered callbacks
 			const newConfig = getConfig();
 			if (newConfig) {
 				for (const callback of this.callbacks) {

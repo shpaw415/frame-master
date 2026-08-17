@@ -58,6 +58,8 @@ pluginCommand
 					if (plugin.router?.after_request) features.push("after_request");
 					if (plugin.router?.html_rewrite) features.push("html_rewrite");
 					if (plugin.serverStart) features.push("serverStart");
+					if (plugin.serverReady) features.push("serverReady");
+					if (plugin.serverStop) features.push("serverStop");
 					if (plugin.websocket) features.push("websocket");
 					if (plugin.fileSystemWatchDir) features.push("file watching");
 
@@ -128,11 +130,13 @@ pluginCommand
 					console.log(chalk.gray("    ✓ html_rewrite"));
 			}
 
-			if (plugin.serverStart) {
+			if (plugin.serverStart || plugin.serverReady || plugin.serverStop) {
 				console.log(chalk.gray("  Server Lifecycle:"));
-				if (plugin.serverStart.main) console.log(chalk.gray("    ✓ main"));
-				if (plugin.serverStart.dev_main)
+				if (plugin.serverStart?.main) console.log(chalk.gray("    ✓ main"));
+				if (plugin.serverStart?.dev_main)
 					console.log(chalk.gray("    ✓ dev_main"));
+				if (plugin.serverReady) console.log(chalk.gray("    ✓ serverReady"));
+				if (plugin.serverStop) console.log(chalk.gray("    ✓ serverStop"));
 			}
 
 			if (plugin.build) {

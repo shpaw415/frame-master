@@ -40,6 +40,11 @@ export type CreatePluginTestEnvOptions = {
 	 * @default true
 	 */
 	runServerStart?: boolean;
+	/**
+	 * Run `serverStop` during {@link PluginTestEnv.dispose}.
+	 * @default true
+	 */
+	runServerStop?: boolean;
 };
 
 export type HandleRequestResult = {

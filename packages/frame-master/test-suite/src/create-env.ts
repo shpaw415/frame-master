@@ -4,6 +4,7 @@ import { setMockConfig } from "frame-master/config";
 import { PluginLoader } from "frame-master/plugin";
 import type { FrameMasterPlugin } from "frame-master/plugin/types";
 import { createServer } from "frame-master/server";
+import { runServerStopHooks } from "frame-master/server/init";
 import { masterRequest } from "frame-master/server/request";
 import type { FrameMasterConfig } from "frame-master/server/types";
 import {
@@ -100,6 +101,7 @@ export async function createPluginTestEnv(
 	let server: Bun.Server<unknown> | null = null;
 	let dummyServer: Bun.Server<unknown> | null = null;
 	let disposed = false;
+	const runServerStop = options.runServerStop !== false;
 
 	const getDummyServer = (): Bun.Server<unknown> => {
 		if (!dummyServer) {
@@ -209,6 +211,15 @@ export async function createPluginTestEnv(
 		async dispose() {
 			if (disposed) return;
 			disposed = true;
+			if (runServerStop) {
+				await runServerStopHooks({
+					reason: "dispose",
+					server,
+					config,
+					pluginLoader,
+					builder,
+				});
+			}
 			try {
 				server?.stop(true);
 			} catch {

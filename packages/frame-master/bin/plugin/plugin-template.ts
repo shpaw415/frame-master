@@ -66,6 +66,9 @@ export default function __CleanPluginName__(): FrameMasterPlugin {
 				console.log("__PluginName__ running in development mode");
 			},
 		},
+		serverStop: async ({ reason }) => {
+			console.log(`__PluginName__ stopping (${reason})`);
+		},
 
 		// Plugin requirements
 		requirement: {

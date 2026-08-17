@@ -80,6 +80,9 @@ export default defineConfig({
 ### Hooks
 
 - `serverStart` — `{ main?, dev_main? }` (server initialization)
+- `serverReady` — after `Bun.serve` is listening
+- `serverStop` — teardown on reload, test dispose, and SIGINT/SIGTERM
+- `createContext` — seed `getGlobalPluginContext`
 - `router` — `{ before_request?, request?, after_request?, html_rewrite? }` (request processing)
 - `build` — `{ buildConfig?, beforeBuild?, afterBuild? }` (build customization)
 

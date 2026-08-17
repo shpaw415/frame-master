@@ -5,7 +5,7 @@ import type { PluginContext, PluginLoader } from "../plugins";
 import { pluginLoader } from "../plugins";
 import { getConfig } from "./config";
 import masterRoutes from "./frame-master-routes";
-import { InitAll, runServerReadyHooks } from "./init";
+import { InitAll, runServerReadyHooks, stopServer } from "./init";
 import { logRequest } from "./log";
 import { masterRequest } from "./request-manager";
 import type { FrameMasterConfig } from "./type";
@@ -14,7 +14,7 @@ import type { FileSystemWatcher } from "./watch";
 declare global {
 	var __FILESYSTEM_WATCHER__: FileSystemWatcher[];
 	var __DRY_RUN__: boolean;
-	var __SERVER_INSTANCE__: Bun.Server<unknown>;
+	var __SERVER_INSTANCE__: Bun.Server<unknown> | undefined;
 	var __GLOBAL_CONTEXT__: PluginContext;
 }
 globalThis.__FILESYSTEM_WATCHER__ ??= [];
@@ -184,9 +184,11 @@ export function createServer(params?: {
  * @returns The new server instance
  */
 export async function reloadServer(): Promise<Bun.Server<unknown>> {
-	// Stop existing server if running
+	// Caller (config reload) should already have run serverStop + stop.
+	// If the instance is still up, stop sockets only — do not re-run hooks.
 	if (globalThis.__SERVER_INSTANCE__) {
 		await globalThis.__SERVER_INSTANCE__.stop();
+		globalThis.__SERVER_INSTANCE__ = undefined;
 		console.log("[Server] Stopped existing server for reload");
 	}
 
@@ -260,5 +262,32 @@ export default async (params?: {
 		server: globalThis.__SERVER_INSTANCE__,
 	});
 
+	installProcessShutdownHandlers();
+
 	return globalThis.__SERVER_INSTANCE__;
 };
+
+export { runServerStopHooks, stopCurrentGeneration, stopServer } from "./init";
+
+let shutdownHandlersInstalled = false;
+let shuttingDown = false;
+
+function installProcessShutdownHandlers(): void {
+	if (shutdownHandlersInstalled) return;
+	if (process.env.FRAME_MASTER_NO_SHUTDOWN_HANDLERS === "1") return;
+	shutdownHandlersInstalled = true;
+
+	const onSignal = async () => {
+		if (shuttingDown) return;
+		shuttingDown = true;
+		try {
+			await stopServer({ reason: "signal", force: true });
+		} catch (error) {
+			console.error("[Server] Error during shutdown:", error);
+		}
+		process.exit(0);
+	};
+
+	process.on("SIGINT", onSignal);
+	process.on("SIGTERM", onSignal);
+}

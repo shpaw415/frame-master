@@ -90,4 +90,66 @@ describe("plugin test suite — lifecycle", () => {
 		expect(createCalled).toBe(false);
 		expect(getGlobalPluginContext(uniqueName)).toBeUndefined();
 	});
+
+	test("dispose runs serverStop with reason dispose and the live server", async () => {
+		let receivedReason: string | undefined;
+		let receivedServer: Bun.Server<unknown> | null | undefined;
+
+		const plugin: FrameMasterPlugin = {
+			name: "stop-dispose",
+			version: "1.0.0",
+			serverStop: ({ reason, server: stopping }) => {
+				receivedReason = reason;
+				receivedServer = stopping;
+			},
+		};
+
+		env = await createPluginTestEnv({ plugins: [plugin] });
+		const live = env.server;
+		await env.dispose();
+
+		expect(receivedReason).toBe("dispose");
+		expect(receivedServer).toBe(live);
+		expect(receivedServer).not.toBeNull();
+	});
+
+	test("dispose with startServer: false still runs serverStop with null server", async () => {
+		let receivedServer: Bun.Server<unknown> | null | undefined;
+
+		const plugin: FrameMasterPlugin = {
+			name: "stop-no-listen",
+			version: "1.0.0",
+			serverStop: ({ server: stopping }) => {
+				receivedServer = stopping;
+			},
+		};
+
+		env = await createPluginTestEnv({
+			plugins: [plugin],
+			startServer: false,
+		});
+		await env.dispose();
+
+		expect(receivedServer).toBeNull();
+	});
+
+	test("runServerStop: false skips serverStop on dispose", async () => {
+		let called = false;
+		const plugin: FrameMasterPlugin = {
+			name: "skip-stop",
+			version: "1.0.0",
+			serverStop: () => {
+				called = true;
+			},
+		};
+
+		env = await createPluginTestEnv({
+			plugins: [plugin],
+			startServer: false,
+			runServerStop: false,
+		});
+		await env.dispose();
+
+		expect(called).toBe(false);
+	});
 });
