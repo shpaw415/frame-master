@@ -80,6 +80,13 @@ const reactFix: BunPlugin = {
 				filter: /\.tsx$/,
 			},
 			async (props) => {
+				const path = props.path.replaceAll("\\", "/");
+				if (
+					path.includes("/src/debug/ui/") ||
+					path.includes("/.frame-master/debug-ui/")
+				) {
+					return;
+				}
 				const file = await Bun.file(props.path).text();
 				return {
 					contents: [

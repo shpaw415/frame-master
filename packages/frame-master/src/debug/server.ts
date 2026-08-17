@@ -16,6 +16,7 @@ import type {
 import { pluginLoader } from "../../src/plugins";
 import { createWatcher, type FileSystemWatcher } from "../../src/server/watch";
 import {
+	buildDebugUiAssets,
 	isDebugUiIndexHtml,
 	serveDebugUiAsset,
 	toDebugUiPathname,
@@ -149,8 +150,8 @@ export class DebugBuildServer {
 			});
 		}
 
-		await this.runBuild();
 		this.logStartup();
+		await this.runBuild();
 	}
 
 	async startWithDefaultUI() {
@@ -411,14 +412,7 @@ export class DebugBuildServer {
 		const assetsDir = join(process.cwd(), ".frame-master", "debug-ui");
 		mkdirIfNeeded(assetsDir);
 
-		const result = await Bun.build({
-			entrypoints,
-			outdir: assetsDir,
-			minify: true,
-			sourcemap: "none",
-			splitting: false,
-			target: "browser",
-		});
+		const result = await buildDebugUiAssets(entrypoints, assetsDir);
 		return result.outputs.map((out) => {
 			return {
 				pathname: publicAssetPath(assetsDir, out.path),
@@ -736,14 +730,7 @@ export class DebugTraceViewServer {
 		const assetsDir = join(process.cwd(), ".frame-master", "debug-ui");
 		mkdirIfNeeded(assetsDir);
 
-		const result = await Bun.build({
-			entrypoints,
-			outdir: assetsDir,
-			minify: true,
-			sourcemap: "none",
-			splitting: false,
-			target: "browser",
-		});
+		const result = await buildDebugUiAssets(entrypoints, assetsDir);
 		return result.outputs.map((out) => ({
 			pathname: publicAssetPath(assetsDir, out.path),
 			assetPath: out.path,

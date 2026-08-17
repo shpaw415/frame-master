@@ -190,6 +190,96 @@ describe("builder", () => {
 		}
 	});
 
+	test("keeps the default builder up when a debug session sees a failed unifier bucket", async () => {
+		const previousBuildMode = process.env.BUILD_MODE;
+		process.env.BUILD_MODE = "true";
+		const config: FrameMasterConfig = {
+			HTTPServer: { port: 0 },
+			plugins: [
+				{
+					name: "default-plugin",
+					version: "1.0.0",
+					build: {
+						buildConfig: {
+							outdir: `${TEMP_DIR}/default-debug`,
+							entrypoints: [TEXT_ENTRYPOINT],
+						},
+					},
+				},
+				...BuildUnifier({
+					label: "Broken pipeline",
+					plugins: [{ name: "broken-pipeline-plugin", version: "1.0.0" }],
+				}),
+			],
+		};
+		const loader = new PluginLoader(config);
+		await configureBuildPipelines(config, loader);
+		getBuildUnifierContext()?.setBuildConfig?.("broken-pipeline-plugin", {
+			buildConfig: {
+				outdir: `${TEMP_DIR}/broken-pipeline`,
+				entrypoints: [join(TEMP_DIR, "missing-entry.ts")],
+			},
+		});
+		await initializeBuildPipelines();
+		try {
+			const coreBuilder = await createBuilder(config, loader);
+			coreBuilder.startDebugSession();
+			const result = await coreBuilder.build();
+			expect(result.success).toBe(true);
+		} finally {
+			if (previousBuildMode === undefined) {
+				delete process.env.BUILD_MODE;
+			} else {
+				process.env.BUILD_MODE = previousBuildMode;
+			}
+		}
+	});
+
+	test("throws from a failed unifier bucket during a normal BUILD_MODE build", async () => {
+		const previousBuildMode = process.env.BUILD_MODE;
+		process.env.BUILD_MODE = "true";
+		const config: FrameMasterConfig = {
+			HTTPServer: { port: 0 },
+			plugins: [
+				{
+					name: "default-plugin",
+					version: "1.0.0",
+					build: {
+						buildConfig: {
+							outdir: `${TEMP_DIR}/default-throw`,
+							entrypoints: [TEXT_ENTRYPOINT],
+						},
+					},
+				},
+				...BuildUnifier({
+					label: "Broken pipeline",
+					plugins: [{ name: "broken-pipeline-plugin", version: "1.0.0" }],
+				}),
+			],
+		};
+		const loader = new PluginLoader(config);
+		await configureBuildPipelines(config, loader);
+		getBuildUnifierContext()?.setBuildConfig?.("broken-pipeline-plugin", {
+			buildConfig: {
+				outdir: `${TEMP_DIR}/broken-pipeline-throw`,
+				entrypoints: [join(TEMP_DIR, "missing-entry.ts")],
+			},
+		});
+		await initializeBuildPipelines();
+		try {
+			const coreBuilder = await createBuilder(config, loader);
+			await expect(coreBuilder.build()).rejects.toThrow(
+				'Build pipeline "Broken pipeline" failed',
+			);
+		} finally {
+			if (previousBuildMode === undefined) {
+				delete process.env.BUILD_MODE;
+			} else {
+				process.env.BUILD_MODE = previousBuildMode;
+			}
+		}
+	});
+
 	test("includes declared virtual modules in unifier bucket builds", async () => {
 		const entrypoint = join(TEMP_DIR, "unifier-virtual-entry.ts");
 		writeFileSync(

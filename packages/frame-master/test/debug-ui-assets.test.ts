@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, win32 } from "node:path";
 import {
+	buildDebugUiAssets,
 	isDebugUiAssetName,
 	isDebugUiIndexHtml,
 	rewriteDebugUiHtml,
@@ -58,5 +59,20 @@ describe("debug UI assets", () => {
 		const js = await serveDebugUiAsset("/chunk-abc.js", assetsDir);
 		expect(js?.ok).toBe(true);
 		expect(await js?.text()).toBe("window.__ok = true;");
+	});
+
+	test("bundles the debug UI entry to index.html", async () => {
+		const assetsDir = join(tmpdir(), `fm-debug-ui-build-${Date.now()}`);
+		mkdirSync(assetsDir, { recursive: true });
+		const result = await buildDebugUiAssets(
+			[join(import.meta.dir, "../src/debug/ui/src/index.html")],
+			assetsDir,
+		);
+		expect(result.success).toBe(true);
+		expect(
+			result.outputs.some((output) =>
+				output.path.replaceAll("\\", "/").endsWith("/index.html"),
+			),
+		).toBe(true);
 	});
 });

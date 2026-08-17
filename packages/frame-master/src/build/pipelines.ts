@@ -1,12 +1,14 @@
-import { getConfig } from "../server/config";
 import type { FrameMasterConfig } from "../server/type";
 import type { PluginLoader } from "../plugins/plugin-loader";
+import {
+	getGlobalPluginContext,
+	setGlobalPluginContext,
+} from "../plugins/global-context";
 import type {
 	BuildOptionsPlugin,
 	FrameMasterPlugin,
 	PluginGlobalContext,
 } from "../plugins/types";
-import { getGlobalPluginContext, setGlobalPluginContext } from "../plugins/utils";
 import type { Builder } from "./index";
 
 export interface BuildPipelinePluginMap {}
@@ -244,13 +246,17 @@ export function BuildUnifier(options: BuildUnifierOptions): FrameMasterPlugin[] 
 				},
 			},
 			build: {
-				async beforeBuild() {
+				async beforeBuild(_buildConfig, parentBuilder) {
 					if (process.env.BUILD_MODE !== "true") return;
 					await pipeline.initialize();
 					const builder = await pipeline.getBuilder();
 					if (!builder.isBuilding()) {
 						const result = await builder.build();
 						if (!result.success) {
+							if (parentBuilder.getDebugSession()) {
+								console.error(`Build pipeline "${label}" failed`);
+								return;
+							}
 							throw new Error(`Build pipeline "${label}" failed`, {
 								cause: result.logs,
 							});
@@ -317,7 +323,8 @@ class CoreBuildPipeline implements BuildPipeline {
 
 	async initialize(): Promise<void> {
 		if (this.builder) return;
-		const config = this.config ?? getConfig();
+		const config =
+			this.config ?? (await import("../server/config")).getConfig();
 		const pluginLoader =
 			this.pluginLoader ??
 			(await import("../plugins/plugin-loader")).pluginLoader;

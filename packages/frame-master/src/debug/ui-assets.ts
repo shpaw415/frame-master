@@ -40,6 +40,28 @@ export function getDebugUiAssetsDir(cwd = process.cwd()) {
 	return join(cwd, ".frame-master", "debug-ui");
 }
 
+export async function buildDebugUiAssets(
+	entrypoints: string[],
+	assetsDir: string,
+) {
+	const result = await Bun.build({
+		entrypoints,
+		outdir: assetsDir,
+		minify: true,
+		sourcemap: "none",
+		splitting: false,
+		target: "browser",
+		plugins: [],
+	});
+	if (!result.success) {
+		console.error("Debug UI bundle failed:");
+		for (const log of result.logs) {
+			console.error(log);
+		}
+	}
+	return result;
+}
+
 export function isDebugUiAssetName(name: string) {
 	return DEBUG_ASSET_NAME.test(name);
 }
