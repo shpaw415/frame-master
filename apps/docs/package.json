@@ -21,7 +21,7 @@
 		"clsx": "^2.1.1",
 		"drizzle-orm": "^0.44.7",
 		"frame-master": "workspace:*",
-		"frame-master-plugin-apply-react": "https://github.com/shpaw415/frame-master-plugin-apply-react.git#feat/v4-api",
+		"frame-master-plugin-apply-react": "https://github.com/shpaw415/frame-master-plugin-apply-react.git#deb42cb",
 		"frame-master-plugin-assets-to-build": "^0.1.1",
 		"frame-master-plugin-auto-sitemap": "^0.1.0",
 		"frame-master-plugin-cloudflare-pages-dynamic-ssr": "https://github.com/shpaw415/frame-master-plugin-cloudflare-pages-dynamic-ssr.git#feat/v4-api",
