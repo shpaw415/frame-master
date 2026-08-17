@@ -132,7 +132,7 @@ global `plugin.build` merge) plus one selector entry per unifier bucket.
 Each bucket inherits the same virtual-module registry as the default builder.
 
 ```ts
-import { BuildUnifier, getBuildPipeline, getGlobalPluginContext } from "frame-master/plugin";
+import { BuildUnifier, getBuildPipeline, getBuildUnifierContext } from "frame-master/plugin";
 
 export default {
   HTTPServer: { port: 3000 },
@@ -146,10 +146,10 @@ export default {
 };
 ```
 
-Bucket plugins register fragments with `setBuildConfig` in `createContext`, then
-await `getBuilder` (or `getBuildPipeline("functions")`). Legacy
-`getGlobalPluginContext("build-unifier")` still works. `buildPipeline()` remains
-as a deprecated alias.
+Bucket plugins register fragments with `getBuildUnifierContext()?.setBuildConfig`
+in `createContext`, then await `getBuildUnifierContext("functions").getBuilder(name)`
+or `getBuildPipeline("functions")`. Legacy `getGlobalPluginContext("build-unifier")`
+still works. `buildPipeline()` remains as a deprecated alias.
 
 - The rebuild action is disabled while the saved trace is open
 

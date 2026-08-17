@@ -1,7 +1,11 @@
 import { getConfig } from "../server/config";
 import type { FrameMasterConfig } from "../server/type";
 import type { PluginLoader } from "../plugins/plugin-loader";
-import type { BuildOptionsPlugin, FrameMasterPlugin } from "../plugins/types";
+import type {
+	BuildOptionsPlugin,
+	FrameMasterPlugin,
+	PluginGlobalContext,
+} from "../plugins/types";
 import { getGlobalPluginContext, setGlobalPluginContext } from "../plugins/utils";
 import type { Builder } from "./index";
 
@@ -26,6 +30,8 @@ export type BuildUnifierOptions = {
 export type BuildPipelineOptions = BuildUnifierOptions & {
 	id: string;
 };
+
+export type BuildUnifierContext = PluginGlobalContext<"build-unifier">;
 
 let unifierIndex = 0;
 let pipelines = new Map<string, CoreBuildPipeline>();
@@ -252,6 +258,18 @@ export function getBuildPipeline(id: string): BuildPipeline {
 	const pipeline = pipelines.get(id);
 	if (!pipeline) throw new Error(`Unknown build pipeline: ${id}`);
 	return pipeline;
+}
+
+export function getBuildUnifierContext(): BuildUnifierContext | undefined;
+export function getBuildUnifierContext<K extends keyof BuildPipelinePluginMap>(
+	pipelineId: K,
+): BuildPipeline<BuildPipelinePluginMap[K] & string>;
+export function getBuildUnifierContext(pipelineId: string): BuildPipeline;
+export function getBuildUnifierContext(pipelineId?: string) {
+	if (pipelineId === undefined) {
+		return getGlobalPluginContext("build-unifier");
+	}
+	return getBuildPipeline(pipelineId);
 }
 
 export function getBuildPipelines(): BuildPipeline[] {

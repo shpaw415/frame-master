@@ -8,9 +8,11 @@ export {
 	buildPipeline,
 	getBuildPipeline,
 	getBuildPipelines,
+	getBuildUnifierContext,
 	type BuildPipeline,
 	type BuildPipelineOptions,
 	type BuildPipelinePluginMap,
+	type BuildUnifierContext,
 	type BuildUnifierOptions,
 } from "../build/pipelines";
 

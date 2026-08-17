@@ -446,7 +446,7 @@ separate from the default global `builder`. This is the same contract as
 `frame-master-plugin-build-unifier`, now exported from `frame-master/plugin`.
 
 ```ts
-import { BuildUnifier, getBuildPipeline, getGlobalPluginContext } from "frame-master/plugin";
+import { BuildUnifier, getBuildPipeline, getBuildUnifierContext } from "frame-master/plugin";
 
 export default {
   HTTPServer: { port: 3000 },
@@ -460,10 +460,12 @@ export default {
 };
 ```
 
-- `setBuildConfig(pluginName, fragment)` in `createContext` contributes
-  `buildConfig` / `beforeBuild` / `afterBuild` to that bucket only.
-- `getBuildPipeline("functions")` or `getGlobalPluginContext("build-unifier")?.getBuilder(name)`
-  returns the isolated builder.
+- `getBuildUnifierContext()?.setBuildConfig(pluginName, fragment)` in
+  `createContext` contributes `buildConfig` / `beforeBuild` / `afterBuild`
+  to that bucket only.
+- `getBuildUnifierContext("functions")` or `getBuildPipeline("functions")`
+  returns the isolated pipeline (`getBuilder(name)`). The untyped
+  `getGlobalPluginContext("build-unifier")` path still works.
 - Every bucket receives the active virtual-module registry, so declared
   `virtualModules` resolve the same way they do on the default builder.
 - `frame-master build` runs bucket builds from the unifier `beforeBuild` hook.
