@@ -71,7 +71,7 @@ The debug UI is meant for build-level diagnosis:
 - File filters — search traced file paths by name and narrow the list by final loader type
 - Plugin interventions — `onLoad` and `finally` steps with execution order and timings
 - Snapshots — before/after content snapshots for traced transformations
-- Virtual modules — plugin-declared `virtualModules` source content, the managed provider load, and every downstream transformation
+- Virtual modules — plugin-declared `virtualModules` source content (resolved from a string, `Uint8Array`, or contents factory), the managed provider load, and every downstream transformation
 - Plugin registry metrics — plugin priority, dependency constraints, loader coverage, and total intervention time
 - Material diagnostic workspace — adaptive tabs, status chips, and a high-contrast diff surface for desktop and narrow screens
 - Mobile navigation drawer — keeps the diff workspace visible until you open Builds, Files, or Info

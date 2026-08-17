@@ -145,9 +145,23 @@ export const routesPlugin = (): FrameMasterPlugin => ({
       loader: "json",
       injectRuntime: false,
     },
+    "@routes/live": {
+      contents: () => `export const generatedAt = ${Date.now()};`,
+      loader: "ts",
+      injectRuntime: true,
+    },
   },
 });
 ```
+
+`contents` may be a `string`, a `Uint8Array`, or a zero-arg factory
+`()` → `string | Uint8Array | Promise<string | Uint8Array>`. Frame-Master
+invokes the factory when the specifier is loaded during a build or a runtime
+import (and when the opt-in `Bun.file` proxy reads it). Close over plugin
+state as needed. Bun may cache a runtime module after the first successful
+load until config reload. Sync `Bun.file` accessors such as `size` and
+`stream()` require a sync factory; async factories must use `.text()` /
+`.bytes()`.
 
 All declared modules are available to Frame-Master builds. Only declarations with
 `injectRuntime: true` are registered through `frame-master/runtime`. A plugin can

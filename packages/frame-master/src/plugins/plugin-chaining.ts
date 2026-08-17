@@ -6,8 +6,9 @@ import type {
 } from "../build/debug-trace";
 import { verboseLog } from "../utils";
 import {
-	type VirtualModuleRegistry,
+	resolveVirtualModuleContents,
 	VIRTUAL_MODULE_NAMESPACE,
+	type VirtualModuleRegistry,
 } from "./virtual-modules";
 
 type OnLoadArgs = Parameters<OnLoadCallback>[0];
@@ -883,7 +884,10 @@ export class PluginProxy {
 			if (module) {
 				return {
 					...args,
-					__traceSourceContents: module.contents,
+					__traceSourceContents: await resolveVirtualModuleContents(
+						module,
+						args.path,
+					),
 					__traceSourceLoader: module.loader,
 				};
 			}

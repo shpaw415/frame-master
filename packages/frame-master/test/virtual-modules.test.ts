@@ -4,6 +4,8 @@ import { join } from "node:path";
 import type { FrameMasterConfig } from "frame-master/server/type";
 import { createBuilder } from "../src/build";
 import { PluginLoader } from "../src/plugins/plugin-loader";
+import type { VirtualModuleContentsFactory } from "../src/plugins/types";
+import { resolveVirtualModuleContents } from "../src/plugins/virtual-modules";
 
 const TEST_DIR = join(import.meta.dir, ".test-virtual-modules-tmp");
 
@@ -12,7 +14,9 @@ afterEach(() => {
 	new PluginLoader({ HTTPServer: { port: 0 }, plugins: [] });
 });
 
-function configWithVirtualModule(contents: string): FrameMasterConfig {
+function configWithVirtualModule(
+	contents: string | Uint8Array | VirtualModuleContentsFactory,
+): FrameMasterConfig {
 	return {
 		HTTPServer: { port: 0 },
 		plugins: [
@@ -249,5 +253,192 @@ describe("plugin virtual modules", () => {
 		expect(
 			second.getVirtualModuleRegistry().getModule("@test/virtual")?.contents,
 		).toBe(`export const value = "second";`);
+	});
+
+	test("invokes a sync contents factory when a build loads the module", async () => {
+		const entry = join(TEST_DIR, "factory-entry.ts");
+		await Bun.write(
+			entry,
+			`import { value } from "@test/virtual"; console.log(value);`,
+		);
+		const received: string[] = [];
+		const config = configWithVirtualModule(
+			() => `export const value = "from-factory";`,
+		);
+		config.plugins.push({
+			name: "virtual-factory-transform",
+			version: "1.0.0",
+			build: {
+				buildConfig: {
+					outdir: join(TEST_DIR, "factory-out"),
+					plugins: [
+						{
+							name: "virtual-factory-capture",
+							setup(build) {
+								build.onLoad({ filter: /.*/ }, (args) => {
+									if (args.path !== "@test/virtual") return undefined;
+									received.push(String(args.__chainedContents ?? ""));
+									return undefined;
+								});
+							},
+						},
+					],
+				},
+			},
+		});
+
+		const builder = await createBuilder(config, new PluginLoader(config));
+		const result = await builder.build(entry);
+
+		expect(result.success).toBeTrue();
+		expect(received).toEqual([`export const value = "from-factory";`]);
+	});
+
+	test("invokes a contents factory on each builder.build()", async () => {
+		const entry = join(TEST_DIR, "factory-count-entry.ts");
+		await Bun.write(
+			entry,
+			`import { value } from "@test/virtual"; console.log(value);`,
+		);
+		let calls = 0;
+		const config = configWithVirtualModule(() => {
+			calls += 1;
+			return `export const value = ${calls};`;
+		});
+		config.plugins.push({
+			name: "virtual-factory-count-build",
+			version: "1.0.0",
+			build: {
+				buildConfig: {
+					outdir: join(TEST_DIR, "factory-count-out"),
+				},
+			},
+		});
+
+		const builder = await createBuilder(config, new PluginLoader(config));
+		expect((await builder.build(entry)).success).toBeTrue();
+		expect((await builder.build(entry)).success).toBeTrue();
+		expect(calls).toBe(2);
+	});
+
+	test("invokes an async contents factory during build", async () => {
+		const entry = join(TEST_DIR, "async-factory-entry.ts");
+		await Bun.write(
+			entry,
+			`import { value } from "@test/virtual"; console.log(value);`,
+		);
+		const config = configWithVirtualModule(async () => {
+			await Promise.resolve();
+			return `export const value = "async-factory";`;
+		});
+		config.plugins.push({
+			name: "virtual-async-factory-build",
+			version: "1.0.0",
+			build: {
+				buildConfig: {
+					outdir: join(TEST_DIR, "async-factory-out"),
+				},
+			},
+		});
+
+		const builder = await createBuilder(config, new PluginLoader(config));
+		const result = await builder.build(entry);
+		expect(result.success).toBeTrue();
+	});
+
+	test("invokes a contents factory from the runtime virtual-module plugin", async () => {
+		let calls = 0;
+		const config = configWithVirtualModule(() => {
+			calls += 1;
+			return `export const runtime = ${calls};`;
+		});
+		const runtimePlugin = new PluginLoader(config)
+			.getVirtualModuleRegistry()
+			.createPlugin(true);
+		if (!runtimePlugin)
+			throw new Error("Missing runtime virtual module plugin");
+		const entry = join(TEST_DIR, "runtime-factory-entry.ts");
+		await Bun.write(
+			entry,
+			`import { runtime } from "@test/virtual"; console.log(runtime);`,
+		);
+
+		const result = await Bun.build({
+			entrypoints: [entry],
+			outdir: join(TEST_DIR, "runtime-factory-out"),
+			plugins: [runtimePlugin],
+		});
+
+		expect(result.success).toBeTrue();
+		expect(calls).toBe(1);
+	});
+
+	test("names specifier and plugin when a contents factory throws", async () => {
+		const config = configWithVirtualModule(() => {
+			throw new Error("boom");
+		});
+		const module = new PluginLoader(config)
+			.getVirtualModuleRegistry()
+			.getModule("@test/virtual");
+		if (!module) throw new Error("Missing virtual module");
+
+		try {
+			await resolveVirtualModuleContents(module, "@test/virtual");
+			throw new Error("expected factory to fail");
+		} catch (error) {
+			expect(error).toBeInstanceOf(Error);
+			expect((error as Error).message).toBe(
+				'Virtual module "@test/virtual" contents factory from plugin "virtual-provider" failed',
+			);
+			expect((error as Error).cause).toBeInstanceOf(Error);
+			expect(((error as Error).cause as Error).message).toBe("boom");
+		}
+	});
+
+	test("rejects a contents factory that does not return string or Uint8Array", async () => {
+		const config = configWithVirtualModule(
+			(() => 42) as unknown as VirtualModuleContentsFactory,
+		);
+		const module = new PluginLoader(config)
+			.getVirtualModuleRegistry()
+			.getModule("@test/virtual");
+		if (!module) throw new Error("Missing virtual module");
+
+		await expect(
+			resolveVirtualModuleContents(module, "@test/virtual"),
+		).rejects.toThrow(
+			'Virtual module "@test/virtual" contents factory from plugin "virtual-provider" must return a string or Uint8Array.',
+		);
+	});
+
+	test("reads factory contents through the opt-in Bun.file proxy", async () => {
+		const config = configWithVirtualModule(
+			() => `export const value = "proxy";`,
+		);
+		config.pluginsOptions = { virtualModuleFileProxy: true };
+		new PluginLoader(config);
+
+		expect(await Bun.file("@test/virtual").text()).toBe(
+			`export const value = "proxy";`,
+		);
+		expect(Bun.file("@test/virtual").size).toBe(
+			new TextEncoder().encode(`export const value = "proxy";`).byteLength,
+		);
+	});
+
+	test("async factory Bun.file text works and sync size throws", async () => {
+		const config = configWithVirtualModule(async () => {
+			await Promise.resolve();
+			return `export const value = "async-proxy";`;
+		});
+		config.pluginsOptions = { virtualModuleFileProxy: true };
+		new PluginLoader(config);
+
+		expect(await Bun.file("@test/virtual").text()).toBe(
+			`export const value = "async-proxy";`,
+		);
+		expect(() => Bun.file("@test/virtual").size).toThrow(
+			'Virtual module "@test/virtual" contents factory from plugin "virtual-provider" is async; use .text() / .bytes() instead of sync accessors.',
+		);
 	});
 });
