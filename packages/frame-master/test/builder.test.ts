@@ -99,7 +99,11 @@ describe("builder", () => {
 		};
 		const loader = new PluginLoader(config);
 		await configureBuildPipelines(config, loader);
-		getBuildUnifierContext()?.setBuildConfig?.("pipeline-plugin", {
+		const unifier = getBuildUnifierContext();
+		if (!unifier?.setBuildConfig) {
+			throw new Error("build-unifier context was not initialized");
+		}
+		unifier.setBuildConfig("pipeline-plugin", {
 			beforeBuild: () => { pipelineCalls.push("before"); },
 			buildConfig: {
 				outdir: `${TEMP_DIR}/pipeline`,
@@ -119,6 +123,8 @@ describe("builder", () => {
 		]);
 		expect(getBuildUnifierContext()).toBe(getGlobalPluginContext("build-unifier"));
 		expect(getBuildUnifierContext("pipeline")).toBe(getBuildPipeline("pipeline"));
+		globalThis.__GLOBAL_CONTEXT__ = {};
+		expect(getBuildUnifierContext()?.setBuildConfig).toBeTypeOf("function");
 	});
 
 	test("runs each unifier bucket from the default builder in BUILD_MODE", async () => {

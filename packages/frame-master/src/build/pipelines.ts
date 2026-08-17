@@ -42,8 +42,9 @@ function pluginNameList(plugins: FrameMasterPlugin[]): string[] {
 }
 
 function ensureUnifierContext(): void {
-	if (contextBound) return;
-	const legacy = getGlobalPluginContext("build-unifier") ?? {};
+	const existing = getGlobalPluginContext("build-unifier");
+	if (contextBound && existing?.setBuildConfig && existing?.getBuilder) return;
+	const legacy = existing ?? {};
 	setGlobalPluginContext("build-unifier", {
 		...legacy,
 		setBuildConfig(pluginName, buildConfig) {
@@ -267,6 +268,7 @@ export function getBuildUnifierContext<K extends keyof BuildPipelinePluginMap>(
 export function getBuildUnifierContext(pipelineId: string): BuildPipeline;
 export function getBuildUnifierContext(pipelineId?: string) {
 	if (pipelineId === undefined) {
+		ensureUnifierContext();
 		return getGlobalPluginContext("build-unifier");
 	}
 	return getBuildPipeline(pipelineId);
