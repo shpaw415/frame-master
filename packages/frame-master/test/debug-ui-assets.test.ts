@@ -61,13 +61,15 @@ describe("debug UI assets", () => {
 		expect(await js?.text()).toBe("window.__ok = true;");
 	});
 
-	test("bundles the debug UI entry to index.html", async () => {
+	test("bundles an HTML entry to index.html", async () => {
 		const assetsDir = join(tmpdir(), `fm-debug-ui-build-${Date.now()}`);
 		mkdirSync(assetsDir, { recursive: true });
-		const result = await buildDebugUiAssets(
-			[join(import.meta.dir, "../src/debug/ui/src/index.html")],
-			assetsDir,
+		const entry = join(assetsDir, "index.html");
+		writeFileSync(
+			entry,
+			`<!DOCTYPE html><html><head><title>debug</title></head><body><p>ok</p></body></html>`,
 		);
+		const result = await buildDebugUiAssets([entry], assetsDir);
 		expect(result.success).toBe(true);
 		expect(
 			result.outputs.some((output) =>

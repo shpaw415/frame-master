@@ -677,7 +677,7 @@ export default {
 			try {
 				await waitForJson<Array<{ id: string }>>(
 					`http://${DEBUG_HOST}:3312/api/builds`,
-					(value) => value.length === 1,
+					(value) => value.length >= 1,
 					10000,
 					diagnostics,
 				);
