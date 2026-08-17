@@ -5,11 +5,12 @@ import type { BunPlugin } from "bun";
 import type { FrameMasterConfig } from "frame-master/server/type";
 import { createBuilder } from "../src/build";
 import {
-	buildPipeline,
+	BuildUnifier,
 	configureBuildPipelines,
 	getBuildPipeline,
 	getBuildPipelines,
 	initializeBuildPipelines,
+	resetBuildPipelines,
 } from "../src/build/pipelines";
 import {
 	type BuildTraceSession,
@@ -66,23 +67,17 @@ beforeEach(() => {
 	writeFileSync(TEXT_ENTRYPOINT, "builder input");
 });
 afterEach(() => {
+	resetBuildPipelines();
 	rmSync(TEMP_DIR, { recursive: true, force: true });
 });
 
 describe("builder", () => {
-	test("keeps debug UI pipeline fragments isolated and exposes legacy context", async () => {
+	test("keeps unifier bucket fragments isolated and exposes legacy context", async () => {
 		const defaultCalls: string[] = [];
 		const pipelineCalls: string[] = [];
 		const pipelinePlugin = {
 			name: "pipeline-plugin",
 			version: "1.0.0",
-			build: {
-				buildConfig: {
-					outdir: `${TEMP_DIR}/pipeline`,
-					entrypoints: [TEXT_ENTRYPOINT],
-					plugins: [{ name: "pipeline-plugin", setup: () => { pipelineCalls.push("pipeline"); } }],
-				},
-			},
 		};
 		const config: FrameMasterConfig = {
 			HTTPServer: { port: 0 },
@@ -98,13 +93,18 @@ describe("builder", () => {
 						},
 					},
 				},
-				...buildPipeline({ id: "pipeline", label: "Pipeline", plugins: [pipelinePlugin] }),
+				...BuildUnifier({ id: "pipeline", label: "Pipeline", plugins: [pipelinePlugin] }),
 			],
 		};
 		const loader = new PluginLoader(config);
 		await configureBuildPipelines(config, loader);
 		getGlobalPluginContext("build-unifier")?.setBuildConfig?.("pipeline-plugin", {
 			beforeBuild: () => { pipelineCalls.push("before"); },
+			buildConfig: {
+				outdir: `${TEMP_DIR}/pipeline`,
+				entrypoints: [TEXT_ENTRYPOINT],
+				plugins: [{ name: "pipeline-plugin", setup: () => { pipelineCalls.push("pipeline"); } }],
+			},
 		});
 		await initializeBuildPipelines();
 		const coreBuilder = await createBuilder(config, loader);
@@ -116,6 +116,145 @@ describe("builder", () => {
 		expect(getBuildPipelines().map((pipeline) => pipeline.id)).toEqual([
 			"pipeline",
 		]);
+	});
+
+	test("runs each unifier bucket from the default builder in BUILD_MODE", async () => {
+		const previousBuildMode = process.env.BUILD_MODE;
+		process.env.BUILD_MODE = "true";
+		const pipelineCalls: string[] = [];
+		const config: FrameMasterConfig = {
+			HTTPServer: { port: 0 },
+			plugins: [
+				{
+					name: "default-plugin",
+					version: "1.0.0",
+					build: {
+						buildConfig: {
+							outdir: `${TEMP_DIR}/default-cli`,
+							entrypoints: [TEXT_ENTRYPOINT],
+						},
+					},
+				},
+				...BuildUnifier({
+					id: "cli-pipeline",
+					plugins: [{ name: "cli-pipeline-plugin", version: "1.0.0" }],
+				}),
+			],
+		};
+		const loader = new PluginLoader(config);
+		await configureBuildPipelines(config, loader);
+		getGlobalPluginContext("build-unifier")?.setBuildConfig?.(
+			"cli-pipeline-plugin",
+			{
+				beforeBuild: () => {
+					pipelineCalls.push("before");
+				},
+				buildConfig: {
+					outdir: `${TEMP_DIR}/cli-pipeline`,
+					entrypoints: [TEXT_ENTRYPOINT],
+					plugins: [
+						{
+							name: "cli-pipeline-plugin",
+							setup: () => {
+								pipelineCalls.push("pipeline");
+							},
+						},
+					],
+				},
+			},
+		);
+		await initializeBuildPipelines();
+		try {
+			const coreBuilder = await createBuilder(config, loader);
+			await coreBuilder.build();
+			expect(pipelineCalls).toEqual(["pipeline", "before"]);
+		} finally {
+			if (previousBuildMode === undefined) {
+				delete process.env.BUILD_MODE;
+			} else {
+				process.env.BUILD_MODE = previousBuildMode;
+			}
+		}
+	});
+
+	test("includes declared virtual modules in unifier bucket builds", async () => {
+		const entrypoint = join(TEMP_DIR, "unifier-virtual-entry.ts");
+		writeFileSync(
+			entrypoint,
+			`import { value } from "@test/unifier-virtual"; console.log(value);`,
+		);
+		const bucketPlugin = {
+			name: "unifier-virtual-consumer",
+			version: "1.0.0",
+		};
+		const config: FrameMasterConfig = {
+			HTTPServer: { port: 0 },
+			plugins: [
+				{
+					name: "unifier-virtual-provider",
+					version: "1.0.0",
+					virtualModules: {
+						"@test/unifier-virtual": {
+							contents: `export const value = "bucket-virtual";`,
+							loader: "ts",
+							injectRuntime: false,
+						},
+					},
+				},
+				...BuildUnifier({
+					id: "virtual-bucket",
+					label: "Virtual bucket",
+					plugins: [bucketPlugin],
+				}),
+			],
+		};
+		const loader = new PluginLoader(config);
+		await configureBuildPipelines(config, loader);
+		getGlobalPluginContext("build-unifier")?.setBuildConfig?.(
+			"unifier-virtual-consumer",
+			{
+				buildConfig: {
+					outdir: `${TEMP_DIR}/unifier-virtual`,
+					entrypoints: [entrypoint],
+					plugins: [
+						{
+							name: "unifier-virtual-transform",
+							setup(build) {
+								build.onLoad({ filter: /^@test\/unifier-virtual$/ }, (args) => ({
+									contents: `${args.__chainedContents}\nexport const transformed = true;`,
+									loader: "ts",
+								}));
+							},
+						},
+					],
+				},
+			},
+		);
+		await initializeBuildPipelines();
+		const bucketBuilder = await getBuildPipeline("virtual-bucket").getBuilder(
+			"unifier-virtual-consumer",
+		);
+		bucketBuilder.startDebugSession({ watch: false, includeTextSnapshots: true });
+		const result = await bucketBuilder.build();
+		const build = bucketBuilder.getDebugSession()?.builds[0];
+		const virtualFile = build?.files.find(
+			(file) => file.path === "@test/unifier-virtual",
+		);
+
+		expect(result.success).toBeTrue();
+		expect(virtualFile?.namespace).toBe("frame-master-virtual-module");
+		expect(virtualFile?.steps.map((step) => [step.kind, step.pluginName])).toEqual([
+			["source", undefined],
+			["onLoad", "frame-master-virtual-modules"],
+			["onLoad", "unifier-virtual-transform"],
+			["final-output", undefined],
+		]);
+		expect(
+			build?.snapshots[virtualFile?.initialSnapshotId as string]?.text,
+		).toBe(`export const value = "bucket-virtual";`);
+		expect(
+			build?.snapshots[virtualFile?.finalSnapshotId as string]?.text,
+		).toContain("export const transformed = true;");
 	});
 
 	test("should merge configs", async () => {

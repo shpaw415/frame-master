@@ -4,6 +4,7 @@ import { getBuilder, InitBuilder, reloadBuilder } from "../build";
 import {
 	configureBuildPipelines,
 	initializeBuildPipelines,
+	resetBuildPipelines,
 } from "../build/pipelines";
 import type {
 	PluginLoader,
@@ -123,6 +124,8 @@ import { pluginLoader } from '../plugins/plugin-loader';
  * ```
  */
 export async function reinitAll(): Promise<void> {
+	resetBuildPipelines();
+
 	// 1. Reload config from disk
 	await reloadConfig();
 
@@ -131,6 +134,12 @@ export async function reinitAll(): Promise<void> {
 
 	// 3. Reinitialize builder
 	await reloadBuilder();
+
+	const config = getConfig();
+	const loader = pluginLoader;
+	if (config && loader) {
+		await configureBuildPipelines(config, loader);
+	}
 
 	// 4. Re-run createContext hooks
 	await runCreateContextHooks();

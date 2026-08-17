@@ -309,7 +309,6 @@ export class DebugBuildServer {
 
 	private async runBuild() {
 		const result = await this.builder.build();
-		await Promise.all(this.pipelines.map(async (pipeline) => pipeline.builder.build()));
 		if (this.options.saveTrace) {
 			const savePath = this.resolveTracePath();
 			const finalSavePath = this.shouldWriteTraceInsideRepo(savePath)
