@@ -1,13 +1,21 @@
 "server only";
 
 import cluster, { type Cluster } from "node:cluster";
-import type {
-	FrameMasterPlugin,
-	PluginContext,
-	PluginContextKey,
-	PluginGlobalContext,
-	PluginOptions,
-} from "./types";
+import type { FrameMasterPlugin, PluginOptions } from "./types";
+
+export {
+	createCustomDirective,
+	createDirective,
+	DirectiveTool,
+	directiveToolSingleton,
+} from "./directive-tool";
+export {
+	deleteGlobalPluginContext,
+	getGlobalPluginContext,
+	hasGlobalPluginContext,
+	mergeGlobalPluginContext,
+	setGlobalPluginContext,
+} from "./global-context";
 
 // Base directives that are always available
 export type BaseDirectives =
@@ -74,286 +82,10 @@ export interface DirectiveDefinition<T extends string = Directives> {
 	regex: RegExp;
 }
 
-/**
- * Helper function to create a type-safe directive definition.
- * Useful when defining custom directives in plugins.
- *
- * @example
- * ```typescript
- * // First, extend CustomDirectives
- * declare module "frame-master/plugin/utils" {
- *   interface CustomDirectives {
- *     "use-analytics": true;
- *   }
- * }
- *
- * // Then create the directive definition
- * const analyticsDirective = createDirective(
- *   "use-analytics",
- *   /^['"]use[-\s]analytics['"];?\s*$/m
- * );
- *
- * // Use in plugin
- * const plugin: FrameMasterPlugin = {
- *   name: "analytics-plugin",
- *   version: "1.0.0",
- *   directives: [analyticsDirective]
- * };
- * ```
- */
-export function createDirective<T extends Directives>(
-	name: T,
-	regex: RegExp,
-): DirectiveDefinition<T> {
-	return { name, regex };
-}
-
-/**
- * Create a custom directive with an arbitrary name (not type-checked).
- * Use this when you need to define a directive that isn't declared in CustomDirectives.
- *
- * For type-safe directives, extend CustomDirectives instead.
- *
- * @example
- * ```typescript
- * const customDirective = createCustomDirective(
- *   "my-special-directive",
- *   /^['"]my[-\s]special[-\s]directive['"];?\s*$/m
- * );
- * ```
- */
-export function createCustomDirective(
-	name: string,
-	regex: RegExp,
-): DirectiveDefinition<string> {
-	return { name, regex };
-}
-
-type DirectiveEntry = { path: string; route?: string };
-
-export class DirectiveTool {
-	private entries: Map<string, Array<DirectiveEntry>> = new Map<
-		string,
-		Array<DirectiveEntry>
-	>();
-	private directiveToRegex: Map<string, RegExp> = new Map();
-	private filePaths: string[] = [];
-	private knownDirectives: Set<string> = new Set([
-		"use-client",
-		"use-server",
-		"use-static",
-		"server-only",
-	]);
-
-	constructor() {
-		// Improved regex patterns to match directives at the beginning of the file
-		// Supports both hyphen and space formats (e.g., "use-client" or "use client")
-		// Allows for optional whitespace, comments, and flexible quote styles
-		this.directiveToRegex.set(
-			"use-client",
-			/^(?:\s*(?:\/\/.*?\n|\s)*)?['"]use[-\s]client['"];?\s*(?:\/\/.*)?(?:\r?\n|$)/m,
-		);
-		this.directiveToRegex.set(
-			"use-server",
-			/^(?:\s*(?:\/\/.*?\n|\s)*)?['"]use[-\s]server['"];?\s*(?:\/\/.*)?(?:\r?\n|$)/m,
-		);
-		this.directiveToRegex.set(
-			"use-static",
-			/^(?:\s*(?:\/\/.*?\n|\s)*)?['"]use[-\s]static['"];?\s*(?:\/\/.*)?(?:\r?\n|$)/m,
-		);
-		this.directiveToRegex.set(
-			"server-only",
-			/^(?:\s*(?:\/\/.*?\n|\s)*)?['"]server[-\s]only['"];?\s*(?:\/\/.*)?(?:\r?\n|$)/m,
-		);
-	}
-
-	/**
-	 * Add a custom directive to the tool
-	 * @param directive The directive name (will be added to known directives)
-	 * @param regex The regex pattern to match the directive in files
-	 * @returns This instance for chaining
-	 */
-	addDirective<T extends string>(directive: T, regex: RegExp) {
-		this.directiveToRegex.set(directive, regex);
-		this.knownDirectives.add(directive);
-		return this;
-	}
-
-	clearPaths() {
-		this.filePaths = [];
-	}
-
-	static async getInstance(init?: Array<DirectiveEntry>) {
-		const instance = new DirectiveTool();
-		if (init) {
-			await Promise.all(
-				init.map((entry) => instance.addEntry(entry.path, entry.route)),
-			);
-		}
-		return instance;
-	}
-
-	/**
-	 * Check if a file path is associated with a specific directive.
-	 * @param directive The directive to check against.
-	 * @param filePath The file path to check.
-	 * @param route Optional route information.
-	 * @returns True if the file path is associated with the directive, false otherwise.
-	 */
-	public async pathIs(
-		directive: Directives,
-		filePath: string,
-		route?: string,
-	): Promise<boolean> {
-		if (!this.filePaths.includes(filePath))
-			return (await this.addEntry(filePath, route)) === directive;
-		return (
-			this.entries.get(directive)?.some((entry) => entry.path === filePath) ??
-			false
-		);
-	}
-
-	public getFromDirective(directive: Directives): Array<DirectiveEntry> {
-		return this.entries.get(directive as string) || [];
-	}
-	/**
-	 * Get the directive associated with a specific route.
-	 * @param route The route to check.
-	 * @returns The directive associated with the route, or null if none found.
-	 */
-	public getDirectiveFromRoute(route: string): string | null {
-		for (const [directive, entries] of this.entries) {
-			if (entries.some((entry) => entry.route === route)) {
-				return directive;
-			}
-		}
-		return null;
-	}
-	/**
-	 * Get the directive associated with a specific file path.
-	 * @param filePath The file path to check.
-	 * @returns The directive associated with the file path, or null if none found.
-	 */
-	public getDirectiveFromFilePath(filePath: string): string | null {
-		for (const [directive, entries] of this.entries) {
-			if (entries.some((entry) => entry.path === filePath)) {
-				return directive;
-			}
-		}
-		return null;
-	}
-
-	/**
-	 * Add a new entry for a file path and its associated route.
-	 * @param filePath The file path to add.
-	 * @param route The route associated with the file path.
-	 * @returns The directive associated with the file path, default: use-server
-	 */
-	public async addEntry(filePath: string, route?: string) {
-		if (this.filePaths.includes(filePath))
-			return this.getDirectiveFromFilePath(filePath) as string;
-		const directive = await this.detectDirective(filePath);
-		if (!this.entries.has(directive)) {
-			this.entries.set(directive, []);
-		}
-		this.entries.get(directive)?.push({ path: filePath, route });
-		this.filePaths.push(filePath);
-		return directive;
-	}
-
-	private async detectDirective(filePath: string): Promise<string> {
-		const file = Bun.file(filePath);
-		if (!(await file.exists())) return "use-server";
-		const fileContent = await file.text();
-		// Trim leading whitespace to check if directive is at the very beginning
-		const trimmedContent = fileContent.trimStart();
-
-		for (const [directive, regex] of this.directiveToRegex) {
-			if (regex.test(trimmedContent)) {
-				return directive;
-			}
-		}
-		return "use-server";
-	}
-}
-
-export const directiveToolSingleton = new DirectiveTool();
-
 export function createPlugin<Options extends PluginOptions>(
 	plugin: FrameMasterPlugin<Options>,
 ): FrameMasterPlugin<Options> {
 	return plugin;
-}
-
-type GlobalPluginStore = typeof globalThis & {
-	__GLOBAL_CONTEXT__?: PluginContext;
-};
-
-type MergeablePluginContext = Record<string, unknown>;
-
-function getGlobalPluginStore(): PluginContext {
-	const store = globalThis as GlobalPluginStore;
-	store.__GLOBAL_CONTEXT__ ??= {};
-	return store.__GLOBAL_CONTEXT__;
-}
-
-function isMergeablePluginContext(
-	value: unknown,
-): value is MergeablePluginContext {
-	return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-export function getGlobalPluginContext(): PluginContext;
-export function getGlobalPluginContext<TPluginName extends PluginContextKey>(
-	pluginName: TPluginName,
-): PluginGlobalContext<TPluginName> | undefined;
-export function getGlobalPluginContext(pluginName?: PluginContextKey) {
-	const store = getGlobalPluginStore();
-	if (typeof pluginName === "undefined") return store;
-	return store[pluginName] as
-		| PluginGlobalContext<typeof pluginName>
-		| undefined;
-}
-
-export function hasGlobalPluginContext(pluginName: PluginContextKey): boolean {
-	return Object.hasOwn(getGlobalPluginStore(), pluginName);
-}
-
-export function setGlobalPluginContext<TPluginName extends PluginContextKey>(
-	pluginName: TPluginName,
-	context: PluginGlobalContext<TPluginName>,
-): PluginGlobalContext<TPluginName> {
-	const store = getGlobalPluginStore() as Record<string, unknown>;
-	store[pluginName] = context;
-	return store[pluginName] as PluginGlobalContext<TPluginName>;
-}
-
-export function mergeGlobalPluginContext<TPluginName extends PluginContextKey>(
-	pluginName: TPluginName,
-	context: PluginGlobalContext<TPluginName>,
-): PluginGlobalContext<TPluginName> {
-	const store = getGlobalPluginStore() as Record<string, unknown>;
-	const previousContext = store[pluginName];
-
-	if (
-		isMergeablePluginContext(previousContext) &&
-		isMergeablePluginContext(context)
-	) {
-		store[pluginName] = {
-			...previousContext,
-			...context,
-		};
-	} else {
-		store[pluginName] = context;
-	}
-
-	return store[pluginName] as PluginGlobalContext<TPluginName>;
-}
-
-export function deleteGlobalPluginContext(
-	pluginName: PluginContextKey,
-): boolean {
-	return delete getGlobalPluginStore()[pluginName];
 }
 
 type IPCProcesses = {

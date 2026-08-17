@@ -12,7 +12,7 @@ import type {
 	ServerStopReason,
 } from "../plugins";
 import { InitPluginLoader, pluginLoader, reloadPluginLoader } from "../plugins";
-import { mergeGlobalPluginContext } from "../plugins/utils";
+import { mergeGlobalPluginContext } from "../plugins/global-context";
 import { getConfig, InitConfig, reloadConfig } from "./config";
 import { startConfigWatcher, stopConfigWatcher } from "./config-watcher";
 import type { FrameMasterConfig } from "./type";

@@ -1,3 +1,16 @@
+export {
+	createCustomDirective,
+	createDirective,
+	DirectiveTool,
+	directiveToolSingleton,
+} from "./directive-tool";
+export {
+	deleteGlobalPluginContext,
+	getGlobalPluginContext,
+	hasGlobalPluginContext,
+	mergeGlobalPluginContext,
+	setGlobalPluginContext,
+} from "./global-context";
 export * from "./plugin-chaining";
 export * from "./plugin-loader";
 export * from "./types";

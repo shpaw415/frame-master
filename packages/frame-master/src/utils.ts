@@ -1,4 +1,4 @@
-import { directiveToolSingleton } from "./plugins";
+import { directiveToolSingleton } from "./plugins/directive-tool";
 import type { masterRequest } from "./server/request-manager";
 
 export { directiveToolSingleton as directiveManager };

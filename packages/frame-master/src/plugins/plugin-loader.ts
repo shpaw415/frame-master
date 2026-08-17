@@ -4,7 +4,7 @@ import type { FrameMasterConfig } from "frame-master/server/type";
 import FrameMasterPackageJson from "../../package.json";
 import { getConfig } from "../server/config";
 import type { FrameMasterPlugin } from "./types";
-import { directiveToolSingleton } from "./utils";
+import { directiveToolSingleton } from "./directive-tool";
 import {
 	configureVirtualModuleFileProxy,
 	VirtualModuleRegistry,

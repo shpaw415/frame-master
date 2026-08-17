@@ -6,7 +6,10 @@ import type {
 	FrameMasterPlugin,
 	PluginGlobalContext,
 } from "../plugins/types";
-import { getGlobalPluginContext, setGlobalPluginContext } from "../plugins/utils";
+import {
+	getGlobalPluginContext,
+	setGlobalPluginContext,
+} from "../plugins/global-context";
 import type { Builder } from "./index";
 
 export interface BuildPipelinePluginMap {}
