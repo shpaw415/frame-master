@@ -23,13 +23,10 @@ export type BuildPipeline<PluginName extends string = string> = {
 export type BuildUnifierOptions = {
 	plugins: FrameMasterPlugin[];
 	logging?: boolean;
-	id?: string;
 	label?: string;
 };
 
-export type BuildPipelineOptions = BuildUnifierOptions & {
-	id: string;
-};
+export type BuildPipelineOptions = BuildUnifierOptions;
 
 export type BuildUnifierContext = PluginGlobalContext<"build-unifier">;
 
@@ -218,7 +215,7 @@ export function BuildUnifier(options: BuildUnifierOptions): FrameMasterPlugin[] 
 		throw new Error("A build pipeline must contain at least one plugin.");
 	}
 	const pluginNames = pluginNameList(options.plugins);
-	const id = options.id ?? `unifier-${unifierIndex}`;
+	const id = `unifier-${unifierIndex}`;
 	const label = options.label ?? `Build pipeline ${unifierIndex + 1}`;
 	unifierIndex += 1;
 	registerPipeline(id, label, pluginNames, options.logging);

@@ -98,7 +98,7 @@ describe("builder", () => {
 						},
 					},
 				},
-				...BuildUnifier({ id: "pipeline", label: "Pipeline", plugins: [pipelinePlugin] }),
+				...BuildUnifier({ label: "Pipeline", plugins: [pipelinePlugin] }),
 			],
 		};
 		const loader = new PluginLoader(config);
@@ -149,7 +149,6 @@ describe("builder", () => {
 					},
 				},
 				...BuildUnifier({
-					id: "cli-pipeline",
 					plugins: [{ name: "cli-pipeline-plugin", version: "1.0.0" }],
 				}),
 			],
@@ -215,7 +214,6 @@ describe("builder", () => {
 					},
 				},
 				...BuildUnifier({
-					id: "virtual-bucket",
 					label: "Virtual bucket",
 					plugins: [bucketPlugin],
 				}),

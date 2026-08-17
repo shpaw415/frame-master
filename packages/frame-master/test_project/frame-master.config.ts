@@ -147,7 +147,6 @@ export default {
 			},
 		},
 		...BuildUnifier({
-			id: "preview",
 			label: "Preview pipeline",
 			plugins: [
 				{
