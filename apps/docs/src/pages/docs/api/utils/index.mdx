@@ -7,7 +7,8 @@ Utility functions and helpers provided by Frame-Master.
 ## Import
 
 ```ts
-import { onRoute, join, pluginRegex, directiveManager } from "frame-master";
+import { onRoute, join, pluginRegex } from "frame-master/utils";
+import { directiveManager } from "frame-master/plugin/utils";
 ```
 
 ## onRoute
@@ -138,11 +139,11 @@ const myPlugin: BunPlugin = {
 
 ## directiveManager
 
-Manage file directives across plugins.
+Manage file directives across plugins. Import this from `frame-master/plugin/utils`, not `frame-master/utils` — the helper module stays free of plugin/server code so Worker and browser bundles can use `join` / `isProd` safely.
 
 ```ts
-import { directiveManager } from "frame-master";
-import type { FrameMasterPlugin } from "frame-master";
+import { directiveManager } from "frame-master/plugin/utils";
+import type { FrameMasterPlugin } from "frame-master/plugin";
 
 const hasUseClient = directiveManager.hasDirective(fileContent, "use-client");
 

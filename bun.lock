@@ -16,7 +16,7 @@
         "clsx": "^2.1.1",
         "drizzle-orm": "^0.44.7",
         "frame-master": "workspace:*",
-        "frame-master-plugin-apply-react": "https://github.com/shpaw415/frame-master-plugin-apply-react.git#feat/v4-api",
+        "frame-master-plugin-apply-react": "https://github.com/shpaw415/frame-master-plugin-apply-react.git#deb42cb",
         "frame-master-plugin-assets-to-build": "^0.1.1",
         "frame-master-plugin-auto-sitemap": "^0.1.0",
         "frame-master-plugin-cloudflare-pages-dynamic-ssr": "https://github.com/shpaw415/frame-master-plugin-cloudflare-pages-dynamic-ssr.git#feat/v4-api",
@@ -927,7 +927,7 @@
 
     "frame-master-docs": ["frame-master-docs@workspace:apps/docs"],
 
-    "frame-master-plugin-apply-react": ["frame-master-plugin-apply-react@github:shpaw415/frame-master-plugin-apply-react#e75ec33", { "dependencies": { "@babel/core": "^8.0.1", "@babel/types": "^8.0.4", "bun-file-system-router-browser": "^1.3.13", "react-refresh": "^0.18.0" }, "peerDependencies": { "frame-master": "^4.0.0-0", "react": "19.2.8", "react-dom": "19.2.8", "typescript": "^5.9.3" } }, "shpaw415-frame-master-plugin-apply-react-e75ec33", "sha512-xM4wmwwgqDUjXBiqen/BPNxGCOHdSqvSo596dC5YeN9K27RCR7WWZ9datXLT+HYjj+j+/oyx2prij76uTdXVTg=="],
+    "frame-master-plugin-apply-react": ["frame-master-plugin-apply-react@github:shpaw415/frame-master-plugin-apply-react#deb42cb", { "dependencies": { "@babel/core": "^8.0.1", "@babel/types": "^8.0.4", "bun-file-system-router-browser": "^1.3.13", "react-refresh": "^0.18.0" }, "peerDependencies": { "frame-master": "^4.0.0-0", "react": "19.2.8", "react-dom": "19.2.8", "typescript": "^5.9.3" } }, "shpaw415-frame-master-plugin-apply-react-deb42cb", "sha512-RLKvklxM29p7qdh8XEGn0q4iwdwgIn5xTiFw0dFiYHrA7h31U4qX4eS/Ippt4c9eaa/EXIzsEbnfDftJC/HZLg=="],
 
     "frame-master-plugin-assets-to-build": ["frame-master-plugin-assets-to-build@0.1.1", "", { "peerDependencies": { "frame-master": "^3.1.1", "typescript": "^5" } }, "sha512-VQDzoJVKcgPpPScaRw75AXn4CVXKObPsSGpTPjSdZTaZlh79A2PfIaTrF31xk4Zqne0dsd6axJyZgM4r3clsug=="],
 

@@ -1,7 +1,4 @@
-import { directiveToolSingleton } from "./plugins";
 import type { masterRequest } from "./server/request-manager";
-
-export { directiveToolSingleton as directiveManager };
 
 type RouteCallback = (master: masterRequest) => void | Promise<void>;
 type MethodKeys =
