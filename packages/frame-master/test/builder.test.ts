@@ -18,7 +18,11 @@ import {
 	BuildTraceSessionStore,
 } from "../src/build/debug-trace";
 import { PluginLoader } from "../src/plugins";
-import { getGlobalPluginContext } from "../src/plugins/utils";
+import {
+	deleteGlobalPluginContext,
+	getGlobalPluginContext,
+	setGlobalPluginContext,
+} from "../src/plugins/utils";
 
 const TEMP_DIR = ".test-temp";
 const TEXT_ENTRYPOINT = join(TEMP_DIR, "entry.txt");
@@ -114,15 +118,15 @@ describe("builder", () => {
 		await initializeBuildPipelines();
 		const coreBuilder = await createBuilder(config, loader);
 		await coreBuilder.build();
-		await (await getBuildPipeline("pipeline").getBuilder("pipeline-plugin")).build();
+		await (await getBuildPipeline("pipeline-plugin").getBuilder("pipeline-plugin")).build();
 
 		expect(defaultCalls).toEqual(["default"]);
 		expect(pipelineCalls).toEqual(["pipeline", "before"]);
-		expect(getBuildPipelines().map((pipeline) => pipeline.id)).toEqual([
-			"pipeline",
+		expect(getBuildPipelines().map((pipeline) => pipeline.label)).toEqual([
+			"Pipeline",
 		]);
 		expect(getBuildUnifierContext()).toBe(getGlobalPluginContext("build-unifier"));
-		expect(getBuildUnifierContext("pipeline")).toBe(getBuildPipeline("pipeline"));
+		expect(getBuildPipeline("pipeline-plugin").label).toBe("Pipeline");
 		globalThis.__GLOBAL_CONTEXT__ = {};
 		expect(getBuildUnifierContext()?.setBuildConfig).toBeTypeOf("function");
 	});
@@ -240,7 +244,7 @@ describe("builder", () => {
 			},
 		);
 		await initializeBuildPipelines();
-		const bucketBuilder = await getBuildPipeline("virtual-bucket").getBuilder(
+		const bucketBuilder = await getBuildPipeline("unifier-virtual-consumer").getBuilder(
 			"unifier-virtual-consumer",
 		);
 		bucketBuilder.startDebugSession({ watch: false, includeTextSnapshots: true });
@@ -264,6 +268,87 @@ describe("builder", () => {
 		expect(
 			build?.snapshots[virtualFile?.finalSnapshotId as string]?.text,
 		).toContain("export const transformed = true;");
+	});
+
+	test("keeps leftover build-unifier context after configureBuildPipelines", async () => {
+		const pluginName = "leftover-consumer";
+		const builderId = "leftover-bucket";
+		const registered: string[] = [];
+		const leftoverBuilder = { id: builderId } as never;
+		const _id_list = new Map<string, string>([[pluginName, builderId]]);
+		setGlobalPluginContext("build-unifier", {
+			_id_list,
+			builders: { [builderId]: Promise.resolve(leftoverBuilder) },
+			setBuildConfig(name) {
+				if (!_id_list.has(name)) {
+					throw new Error(`No builder found for plugin: ${name}`);
+				}
+				registered.push(name);
+			},
+			getBuilder(name) {
+				const id = _id_list.get(name);
+				if (!id) {
+					return Promise.reject(new Error(`No builder found for plugin: ${name}`));
+				}
+				return Promise.resolve(leftoverBuilder);
+			},
+		});
+		const config: FrameMasterConfig = {
+			HTTPServer: { port: 0 },
+			plugins: [],
+		};
+		try {
+			await configureBuildPipelines(config, new PluginLoader(config));
+			getGlobalPluginContext("build-unifier")?.setBuildConfig?.(pluginName, {
+				buildConfig: { entrypoints: [TEXT_ENTRYPOINT] },
+			});
+			const builder = await getGlobalPluginContext("build-unifier")?.getBuilder?.(
+				pluginName,
+			);
+			expect(registered).toEqual([pluginName]);
+			expect(builder).toBe(leftoverBuilder);
+			expect(getBuildPipelines()).toEqual([]);
+			expect(getBuildPipeline(pluginName).pluginNames).toEqual([pluginName]);
+			expect(() => getBuildPipeline("not-wrapped")).toThrow(
+				'Plugin "not-wrapped" is not wrapped by BuildUnifier.',
+			);
+		} finally {
+			deleteGlobalPluginContext("build-unifier");
+		}
+	});
+
+	test("routes leftover-style setBuildConfig through a core wrap", async () => {
+		const wrapped = { name: "migrated-plugin", version: "1.0.0" };
+		const config: FrameMasterConfig = {
+			HTTPServer: { port: 0 },
+			plugins: [
+				...BuildUnifier({
+					label: "Migrated pipeline",
+					plugins: [wrapped],
+				}),
+			],
+		};
+		await configureBuildPipelines(config, new PluginLoader(config));
+		getGlobalPluginContext("build-unifier")?.setBuildConfig?.(wrapped.name, {
+			buildConfig: {
+				outdir: `${TEMP_DIR}/migrated`,
+				entrypoints: [TEXT_ENTRYPOINT],
+			},
+		});
+		const migrated = getBuildPipelines().find((pipeline) =>
+			pipeline.pluginNames.includes(wrapped.name),
+		);
+		if (!migrated) throw new Error("migrated pipeline was not registered");
+		expect(getBuildPipeline(wrapped.name).label).toBe("Migrated pipeline");
+		expect(getBuildPipeline(wrapped.name)).toBe(migrated);
+	});
+
+	test("throws when the same plugin is wrapped twice", () => {
+		const plugin = { name: "shared-plugin", version: "1.0.0" };
+		BuildUnifier({ label: "First", plugins: [plugin] });
+		expect(() =>
+			BuildUnifier({ label: "Second", plugins: [{ ...plugin }] }),
+		).toThrow('Plugin "shared-plugin" is already in build pipeline "First".');
 	});
 
 	test("should merge configs", async () => {

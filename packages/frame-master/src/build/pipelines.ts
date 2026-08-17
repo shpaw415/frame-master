@@ -33,42 +33,162 @@ export type BuildPipelineOptions = BuildUnifierOptions & {
 
 export type BuildUnifierContext = PluginGlobalContext<"build-unifier">;
 
+type LeftoverUnifierContext = BuildUnifierContext &
+	Partial<{
+		_id_list: Map<string, string>;
+		setBuildConfig: (pluginName: string, config: BuildOptionsPlugin) => void;
+		getBuilder: (pluginName: string) => Promise<Builder>;
+	}>;
+
 let unifierIndex = 0;
 let pipelines = new Map<string, CoreBuildPipeline>();
 let contextBound = false;
+let leftoverSetBuildConfig:
+	| ((pluginName: string, config: BuildOptionsPlugin) => void)
+	| undefined;
+let leftoverGetBuilder:
+	| ((pluginName: string) => Promise<Builder>)
+	| undefined;
+let leftoverIdList: Map<string, string> | undefined;
 
 function pluginNameList(plugins: FrameMasterPlugin[]): string[] {
 	return plugins.map((plugin) => plugin.name);
 }
 
-function ensureUnifierContext(): void {
-	const existing = getGlobalPluginContext("build-unifier");
-	if (contextBound && existing?.setBuildConfig && existing?.getBuilder) return;
-	const legacy = existing ?? {};
-	setGlobalPluginContext("build-unifier", {
-		...legacy,
-		setBuildConfig(pluginName, buildConfig) {
-			const pipeline = [...pipelines.values()].find((entry) =>
-				entry.pluginNames.includes(pluginName),
-			);
-			if (!pipeline) {
-				throw new Error(`No build pipeline found for plugin: ${pluginName}`);
+function leftoverContext(): LeftoverUnifierContext | undefined {
+	return getGlobalPluginContext("build-unifier") as
+		| LeftoverUnifierContext
+		| undefined;
+}
+
+function currentLeftoverIdList(): Map<string, string> | undefined {
+	return leftoverIdList ?? leftoverContext()?._id_list;
+}
+
+function leftoverOwns(pluginName: string): boolean {
+	return currentLeftoverIdList()?.has(pluginName) === true;
+}
+
+function findCorePipeline(pluginName: string): CoreBuildPipeline | undefined {
+	return [...pipelines.values()].find((entry) =>
+		entry.pluginNames.includes(pluginName),
+	);
+}
+
+function notWrappedError(pluginName: string): Error {
+	return new Error(`Plugin "${pluginName}" is not wrapped by BuildUnifier.`);
+}
+
+function alreadyWrappedError(pluginName: string, pipelineLabel: string): Error {
+	return new Error(
+		`Plugin "${pluginName}" is already in build pipeline "${pipelineLabel}".`,
+	);
+}
+
+function captureLeftoverApi(existing: LeftoverUnifierContext | undefined): void {
+	if (leftoverIdList || !existing?._id_list) return;
+	leftoverIdList = existing._id_list;
+	leftoverSetBuildConfig = existing.setBuildConfig;
+	leftoverGetBuilder = existing.getBuilder;
+}
+
+function leftoverPipelineFor(pluginName: string): BuildPipeline | undefined {
+	const idList = currentLeftoverIdList();
+	const builderId = idList?.get(pluginName);
+	if (!idList || !builderId) return undefined;
+	const pluginNames = [...idList.entries()]
+		.filter(([, id]) => id === builderId)
+		.map(([name]) => name);
+	return {
+		id: "build-unifier",
+		label: "build-unifier",
+		pluginNames,
+		setBuildConfig(name, config) {
+			const pipeline = findCorePipeline(name);
+			if (pipeline) {
+				pipeline.setBuildConfig(name, config);
+				return;
 			}
-			pipeline.setBuildConfig(pluginName, buildConfig);
+			if (leftoverOwns(name) && leftoverSetBuildConfig) {
+				leftoverSetBuildConfig(name, config);
+				return;
+			}
+			throw notWrappedError(name);
+		},
+		getBuilder(name) {
+			const key = name ?? pluginName;
+			const pipeline = findCorePipeline(key);
+			if (pipeline) return pipeline.getBuilder(key);
+			if (leftoverOwns(key) && leftoverGetBuilder) {
+				return leftoverGetBuilder(key);
+			}
+			return Promise.reject(notWrappedError(key));
+		},
+		async initialize() {},
+	};
+}
+
+function ensureUnifierContext(): void {
+	const existing = leftoverContext();
+	captureLeftoverApi(existing);
+	if (contextBound && existing?.setBuildConfig && existing?.getBuilder) return;
+	const leftover = existing ?? {};
+	setGlobalPluginContext("build-unifier", {
+		...leftover,
+		setBuildConfig(pluginName, buildConfig) {
+			const pipeline = findCorePipeline(pluginName);
+			if (pipeline) {
+				pipeline.setBuildConfig(pluginName, buildConfig);
+				return;
+			}
+			if (leftoverOwns(pluginName) && leftoverSetBuildConfig) {
+				leftoverSetBuildConfig(pluginName, buildConfig);
+				return;
+			}
+			throw notWrappedError(pluginName);
 		},
 		getBuilder(pluginName) {
-			const pipeline = [...pipelines.values()].find((entry) =>
-				entry.pluginNames.includes(pluginName),
-			);
-			if (!pipeline) {
-				return Promise.reject(
-					new Error(`No build pipeline found for plugin: ${pluginName}`),
-				);
+			const pipeline = findCorePipeline(pluginName);
+			if (pipeline) return pipeline.getBuilder(pluginName);
+			if (leftoverOwns(pluginName) && leftoverGetBuilder) {
+				return leftoverGetBuilder(pluginName);
 			}
-			return pipeline.getBuilder(pluginName);
+			return Promise.reject(notWrappedError(pluginName));
 		},
 	});
 	contextBound = true;
+}
+
+function assertPluginNamesAvailable(
+	pluginNames: string[],
+	pipelineLabel: string,
+): void {
+	const seen = new Set<string>();
+	for (const pluginName of pluginNames) {
+		if (seen.has(pluginName)) {
+			throw alreadyWrappedError(pluginName, pipelineLabel);
+		}
+		seen.add(pluginName);
+		const owner = findCorePipeline(pluginName);
+		if (owner) {
+			throw alreadyWrappedError(pluginName, owner.label);
+		}
+		if (leftoverOwns(pluginName)) {
+			throw alreadyWrappedError(pluginName, "build-unifier");
+		}
+	}
+}
+
+function assertNoLeftoverCoreOverlap(): void {
+	const idList = currentLeftoverIdList();
+	if (!idList) return;
+	for (const pipeline of pipelines.values()) {
+		for (const pluginName of pipeline.pluginNames) {
+			if (idList.has(pluginName)) {
+				throw alreadyWrappedError(pluginName, "build-unifier");
+			}
+		}
+	}
 }
 
 function registerPipeline(
@@ -77,9 +197,11 @@ function registerPipeline(
 	pluginNames: string[],
 	logging?: boolean,
 ): CoreBuildPipeline {
+	captureLeftoverApi(leftoverContext());
 	if (pipelines.has(id)) {
 		throw new Error(`Duplicate build pipeline: ${id}`);
 	}
+	assertPluginNamesAvailable(pluginNames, label);
 	const pipeline = new CoreBuildPipeline(id, label, pluginNames, logging);
 	pipelines.set(id, pipeline);
 	ensureUnifierContext();
@@ -97,7 +219,7 @@ export function BuildUnifier(options: BuildUnifierOptions): FrameMasterPlugin[] 
 	}
 	const pluginNames = pluginNameList(options.plugins);
 	const id = options.id ?? `unifier-${unifierIndex}`;
-	const label = options.label ?? id;
+	const label = options.label ?? `Build pipeline ${unifierIndex + 1}`;
 	unifierIndex += 1;
 	registerPipeline(id, label, pluginNames, options.logging);
 	const highestPriority = Math.max(
@@ -129,10 +251,9 @@ export function BuildUnifier(options: BuildUnifierOptions): FrameMasterPlugin[] 
 					if (!builder.isBuilding()) {
 						const result = await builder.build();
 						if (!result.success) {
-							throw new Error(
-								`Build pipeline "${id}" failed`,
-								{ cause: result.logs },
-							);
+							throw new Error(`Build pipeline "${label}" failed`, {
+								cause: result.logs,
+							});
 						}
 					}
 				},
@@ -177,7 +298,7 @@ class CoreBuildPipeline implements BuildPipeline {
 	setBuildConfig(pluginName: string, config: BuildOptionsPlugin): void {
 		if (!this.pluginNames.includes(pluginName)) {
 			throw new Error(
-				`Plugin "${pluginName}" is not in build pipeline "${this.id}".`,
+				`Plugin "${pluginName}" is not in build pipeline "${this.label}".`,
 			);
 		}
 		this.configs.push(config);
@@ -187,7 +308,7 @@ class CoreBuildPipeline implements BuildPipeline {
 		if (pluginName && !this.pluginNames.includes(pluginName)) {
 			return Promise.reject(
 				new Error(
-					`Plugin "${pluginName}" is not in build pipeline "${this.id}".`,
+					`Plugin "${pluginName}" is not in build pipeline "${this.label}".`,
 				),
 			);
 		}
@@ -202,7 +323,7 @@ class CoreBuildPipeline implements BuildPipeline {
 			(await import("../plugins/plugin-loader")).pluginLoader;
 		if (!config || !pluginLoader) {
 			throw new Error(
-				`Cannot initialize build pipeline "${this.id}": Frame-Master config or plugin loader is not ready.`,
+				`Cannot initialize build pipeline "${this.label}": Frame-Master config or plugin loader is not ready.`,
 			);
 		}
 		this.config = config;
@@ -231,6 +352,9 @@ export function resetBuildPipelines(): void {
 	pipelines = new Map();
 	unifierIndex = 0;
 	contextBound = false;
+	leftoverSetBuildConfig = undefined;
+	leftoverGetBuilder = undefined;
+	leftoverIdList = undefined;
 }
 
 export async function configureBuildPipelines(
@@ -249,29 +373,25 @@ export async function configureBuildPipelines(
 		);
 	}
 	ensureUnifierContext();
+	assertNoLeftoverCoreOverlap();
 }
 
 export function getBuildPipeline<K extends keyof BuildPipelinePluginMap>(
-	id: K,
-): BuildPipeline<BuildPipelinePluginMap[K] & string>;
-export function getBuildPipeline(id: string): BuildPipeline;
-export function getBuildPipeline(id: string): BuildPipeline {
-	const pipeline = pipelines.get(id);
-	if (!pipeline) throw new Error(`Unknown build pipeline: ${id}`);
-	return pipeline;
+	pluginName: K,
+): BuildPipeline;
+export function getBuildPipeline(pluginName: string): BuildPipeline;
+export function getBuildPipeline(pluginName: string): BuildPipeline {
+	ensureUnifierContext();
+	const pipeline = findCorePipeline(pluginName);
+	if (pipeline) return pipeline;
+	const leftover = leftoverPipelineFor(pluginName);
+	if (leftover) return leftover;
+	throw notWrappedError(pluginName);
 }
 
-export function getBuildUnifierContext(): BuildUnifierContext | undefined;
-export function getBuildUnifierContext<K extends keyof BuildPipelinePluginMap>(
-	pipelineId: K,
-): BuildPipeline<BuildPipelinePluginMap[K] & string>;
-export function getBuildUnifierContext(pipelineId: string): BuildPipeline;
-export function getBuildUnifierContext(pipelineId?: string) {
-	if (pipelineId === undefined) {
-		ensureUnifierContext();
-		return getGlobalPluginContext("build-unifier");
-	}
-	return getBuildPipeline(pipelineId);
+export function getBuildUnifierContext(): BuildUnifierContext | undefined {
+	ensureUnifierContext();
+	return getGlobalPluginContext("build-unifier");
 }
 
 export function getBuildPipelines(): BuildPipeline[] {

@@ -128,17 +128,17 @@ In view mode, the UI is read-only:
 
 `BuildUnifier()` is the core build-unifier: it groups plugins into an isolated
 builder bucket. `frame-master debug build` always shows **Default build** (the
-global `plugin.build` merge) plus one selector entry per unifier bucket.
-Each bucket inherits the same virtual-module registry as the default builder.
+global `plugin.build` merge) plus one selector entry per unifier bucket, using
+the wrap `label`. Each bucket inherits the same virtual-module registry as the
+default builder.
 
 ```ts
-import { BuildUnifier, getBuildPipeline, getBuildUnifierContext } from "frame-master/plugin";
+import { BuildUnifier } from "frame-master/plugin";
 
 export default {
   HTTPServer: { port: 3000 },
   plugins: [
     ...BuildUnifier({
-      id: "functions",
       label: "Cloudflare Functions",
       plugins: [actionsPlugin, ssrPlugin],
     }),
@@ -146,10 +146,13 @@ export default {
 };
 ```
 
-Bucket plugins register fragments with `getBuildUnifierContext()?.setBuildConfig`
-in `createContext`, then await `getBuildUnifierContext("functions").getBuilder(name)`
-or `getBuildPipeline("functions")`. Legacy `getGlobalPluginContext("build-unifier")`
-still works. `buildPipeline()` remains as a deprecated alias.
+Consumer plugins register fragments in `createContext` with
+`getGlobalPluginContext("build-unifier")?.setBuildConfig(pluginName, fragment)`
+(or `getBuildUnifierContext()?.setBuildConfig`). Trigger a dev build later from
+`serverReady` / `serverStart.main` with `getBuildPipeline(pluginName).getBuilder(pluginName)`
+and `builder.build()`. `getBuildPipeline(pluginName)` throws if that plugin is
+not wrapped. See [Isolated build pipelines](/docs/core/build#isolated-build-pipelines)
+for the full consumer lifecycle. `buildPipeline()` remains as a deprecated alias.
 
 - The rebuild action is disabled while the saved trace is open
 

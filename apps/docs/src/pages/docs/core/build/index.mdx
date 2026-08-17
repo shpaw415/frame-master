@@ -445,14 +445,18 @@ Use `BuildUnifier()` when several plugins must share one builder that stays
 separate from the default global `builder`. This is the same contract as
 `frame-master-plugin-build-unifier`, now exported from `frame-master/plugin`.
 
+The global context key is always `"build-unifier"`. Pipelines are separated by
+the **wrapped plugin `name`**, not by a pipeline id. A plugin can belong to one
+custom bucket plus the default/global builder. Wrapping the same plugin name
+twice throws.
+
 ```ts
-import { BuildUnifier, getBuildPipeline, getBuildUnifierContext } from "frame-master/plugin";
+import { BuildUnifier } from "frame-master/plugin";
 
 export default {
   HTTPServer: { port: 3000 },
   plugins: [
     ...BuildUnifier({
-      id: "functions",
       label: "Cloudflare Functions",
       plugins: [actionsPlugin, ssrPlugin],
     }),
@@ -460,16 +464,66 @@ export default {
 };
 ```
 
-- `getBuildUnifierContext()?.setBuildConfig(pluginName, fragment)` in
-  `createContext` contributes `buildConfig` / `beforeBuild` / `afterBuild`
-  to that bucket only.
-- `getBuildUnifierContext("functions")` or `getBuildPipeline("functions")`
-  returns the isolated pipeline (`getBuilder(name)`). The untyped
-  `getGlobalPluginContext("build-unifier")` path still works.
-- Every bucket receives the active virtual-module registry, so declared
-  `virtualModules` resolve the same way they do on the default builder.
-- `frame-master build` runs bucket builds from the unifier `beforeBuild` hook.
-- `frame-master debug build` lists **Default build** plus each named bucket.
+`label` is the name shown in `frame-master debug build`. `id` is optional and
+only used as a stable debug/trace key.
+
+### Consumer plugin: when to set config, when to build
+
+| When | What |
+| --- | --- |
+| `createContext` | Register a fragment with `setBuildConfig(plugin.name, { buildConfig, beforeBuild?, afterBuild? })`. Do **not** call `build()` here. |
+| `serverReady` or `serverStart.main` | `await getBuilder(plugin.name)`, then `if (!builder.isBuilding()) await builder.build()`. |
+| `frame-master build` | The unifier `beforeBuild` hook runs the bucket. Do not call `build()` yourself. |
+| Any hook except `createContext` | `getBuildPipeline(plugin.name)` returns that bucket, or throws if the plugin is not wrapped. |
+
+Use the exact plugin `name` as the key. Leftover
+`getGlobalPluginContext("build-unifier")` still works.
+
+```ts
+import {
+  getBuildPipeline,
+  getBuildUnifierContext,
+  getGlobalPluginContext,
+} from "frame-master/plugin";
+
+const pluginName = "functions-action";
+
+export default function functionsAction() {
+  return {
+    name: pluginName,
+    version: "1.0.0",
+    createContext() {
+      getGlobalPluginContext("build-unifier")?.setBuildConfig?.(pluginName, {
+        beforeBuild() {
+          console.log("functions-action beforeBuild");
+        },
+        buildConfig: {
+          entrypoints: ["src/actions/index.ts"],
+          outdir: ".frame-master/functions",
+        },
+      });
+    },
+    async serverReady() {
+      const builder = await getBuildPipeline(pluginName).getBuilder(pluginName);
+      if (!builder.isBuilding()) {
+        await builder.build();
+      }
+    },
+  };
+}
+```
+
+`getBuildUnifierContext()?.setBuildConfig(pluginName, fragment)` and
+`getBuildUnifierContext()?.getBuilder(pluginName)` are the same leftover-compatible
+API. `getBuildPipeline(pluginName)` throws
+`Plugin "…" is not wrapped by BuildUnifier` when this plugin was not passed to
+`BuildUnifier({ plugins })` (or leftover `frame-master-plugin-build-unifier`).
+
+Check `builder.isBuilding()` before `builder.build()` when several plugins in
+the same wrap reach `serverReady`.
+
+Every bucket receives the active virtual-module registry. `frame-master debug build`
+lists **Default build** plus each core wrap, labeled by `label`.
 
 `buildPipeline()` is a deprecated alias of `BuildUnifier()`.
 
