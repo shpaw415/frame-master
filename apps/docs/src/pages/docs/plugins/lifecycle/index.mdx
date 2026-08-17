@@ -9,15 +9,23 @@ Understanding how plugins are loaded, initialized, and executed in Frame-Master.
 Plugins move through distinct phases:
 
 1. Initialization — Plugins loaded, sorted by priority, requirements validated
-2. Server Startup — `serverStart` hooks execute, runtime plugins loaded
-3. Request Processing — Router hooks handle each HTTP request
-4. Build Process — Build hooks customize compilation
+2. Context — `createContext` seeds `getGlobalPluginContext`
+3. Server Startup — `serverStart` hooks execute, then `Bun.serve`, then `serverReady`
+4. Request Processing — Router hooks handle each HTTP request
+5. Shutdown / reload — `serverStop` on the current generation (reverse priority)
+6. Build Process — Build hooks customize compilation
 
 ## 📋 Execution Flow
 
 ```text
-// Server Start (once)
-serverStart.main() → serverStart.dev_main()
+// Server Start
+createContext → serverStart.main → serverStart.dev_main → Bun.serve → serverReady
+
+// Config reload
+serverStop(old plugins) → HTTP stop → reinit → onConfigReload → Bun.serve → serverReady
+
+// Process signal (dev/start)
+serverStop(reason: signal) → HTTP stop(true) → process.exit
 
 // Each Request
 before_request → request → after_request → html_rewrite → global_value_injection

@@ -65,6 +65,7 @@ Creates an in-memory `FrameMasterConfig` (default `HTTPServer.port: 0`), `Plugin
 | `startServer` | `true` | Start HTTP server on create |
 | `runCreateContext` | `true` | Run `createContext` hooks |
 | `runServerStart` | `true` | Run `serverStart` hooks |
+| `runServerStop` | `true` | Run `serverStop` on `dispose()` |
 
 ### `PluginTestEnv` methods
 
@@ -74,7 +75,7 @@ Creates an in-memory `FrameMasterConfig` (default `HTTPServer.port: 0`), `Plugin
 | `env.handleRequest(request)` | Request pipeline without network (returns `{ response, master }`) |
 | `env.build({ entrypoints?, buildConfig? })` | Unified build pipeline |
 | `env.start()` | Start server if not already running |
-| `env.dispose()` | Stop servers / release resources |
+| `env.dispose()` | Run `serverStop`, then stop servers / release resources |
 | `env.config` / `env.builder` / `env.pluginLoader` / `env.server` / `env.baseUrl` | Escape hatches |
 
 ### Fixtures

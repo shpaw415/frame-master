@@ -161,6 +161,9 @@ export function myPlugin(): FrameMasterPlugin {
       main: async () => {}, // Runs on server start
       dev_main: async () => {}, // Dev mode only
     },
+    serverStop: async ({ reason }) => {
+      // Close pools / watchers. reason: reload | dispose | signal | explicit
+    },
 
     // REQUEST LIFECYCLE
     router: {
@@ -313,7 +316,7 @@ serverReady: () => {
 }
 ```
 
-`master.setContext()` and `master.getContext()` remain request-scoped. Global plugin context is shared across plugins and is initialized from `createContext()`.
+`master.setContext()` and `master.getContext()` remain request-scoped. Global plugin context is shared across plugins and is initialized from `createContext()`. Close those resources in `serverStop`.
 
 ### Runtime vs Build Plugins
 

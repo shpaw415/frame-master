@@ -66,6 +66,8 @@ export async function runServerStartHooks(params: {
 /**
  * Run `serverReady` hooks (errors are logged, not rethrown — matches production).
  */
+export { runServerStopHooks } from "frame-master/server/init";
+
 export async function runServerReadyHooks(params: {
 	server: Bun.Server<unknown>;
 	config: FrameMasterConfig;

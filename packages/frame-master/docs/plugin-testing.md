@@ -15,7 +15,7 @@ Related:
 - [test Command (GUI)](/docs/cli/test) — interactive request debugger
 - [Creating Plugins](/docs/plugins/creating) — scaffold with `frame-master plugin create`
 - [Plugin Hooks](/docs/plugins/hooks) — lifecycle surfaces you can assert on
-- [Plugin Lifecycle](/docs/plugins/lifecycle) — startup order (`createContext`, `serverStart`, `serverReady`)
+- [Plugin Lifecycle](/docs/plugins/lifecycle) — startup and shutdown order (`createContext`, `serverStart`, `serverReady`, `serverStop`)
 
 ---
 
@@ -163,6 +163,7 @@ function createPluginTestEnv(
 | `startServer` | `boolean` | `true` | Start the HTTP server during env creation |
 | `runCreateContext` | `boolean` | `true` | Run all `createContext` hooks |
 | `runServerStart` | `boolean` | `true` | Run `serverStart.main` and (non-production) `dev_main` |
+| `runServerStop` | `boolean` | `true` | Run `serverStop` during `dispose()` |
 
 **Defaults applied for you:**
 
@@ -242,7 +243,7 @@ Ensures the HTTP server is running (idempotent). Useful after `startServer: fals
 
 ##### `env.dispose()`
 
-Stops the live server and any internal dummy server used by `handleRequest`. Safe to call multiple times. After dispose, further `fetch` / `build` / `handleRequest` throw.
+Runs `serverStop` (`reason: "dispose"`) unless `runServerStop: false`, then stops the live server and any internal dummy server used by `handleRequest`. Safe to call multiple times. After dispose, further `fetch` / `build` / `handleRequest` throw. `server` is `null` when the env never listened (`startServer: false`).
 
 ---
 
@@ -575,7 +576,7 @@ test("serverReady receives builder and server", async () => {
 });
 ```
 
-`serverStart.main` always runs when `runServerStart` is true. `serverStart.dev_main` runs when `NODE_ENV !== "production"`.
+`serverStart.main` always runs when `runServerStart` is true. `serverStart.dev_main` runs when `NODE_ENV !== "production"`. `dispose()` runs `serverStop` with `reason: "dispose"` unless `runServerStop` is `false`.
 
 ---
 

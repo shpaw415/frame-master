@@ -26,6 +26,7 @@ export {
 	runCreateContextHooks,
 	runServerReadyHooks,
 	runServerStartHooks,
+	runServerStopHooks,
 } from "./src/lifecycle";
 export type {
 	CreatePluginTestEnvOptions,

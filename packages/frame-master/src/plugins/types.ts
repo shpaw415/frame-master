@@ -30,6 +30,27 @@ export type IPCMain = ClientIPCManager<"main">;
  */
 export type IPCCluster = ClientIPCManager<"cluster">;
 
+/**
+ * Why Frame-Master is stopping the current server generation.
+ *
+ * - `reload` — config hot-reload, old plugins, before the HTTP server stops
+ * - `dispose` — `createPluginTestEnv().dispose()`
+ * - `signal` — SIGINT / SIGTERM after `Serve()`
+ * - `explicit` — `stopServer()` called by user code
+ */
+export type ServerStopReason = "reload" | "dispose" | "signal" | "explicit";
+
+/**
+ * Arguments passed to a plugin `serverStop` hook.
+ */
+export type ServerStopProps = {
+	builder: Builder;
+	pluginLoader: PluginLoader;
+	config: FrameMasterConfig;
+	server: Bun.Server<unknown> | null;
+	reason: ServerStopReason;
+};
+
 export type ServerStart = Partial<{
 	/**
 	 * **executed on the main thread**
@@ -684,6 +705,22 @@ export type FrameMasterPlugin<
 			config: FrameMasterConfig;
 			server: Bun.Server<unknown>;
 		}) => void | Promise<void>;
+		/**
+		 * Inverse of `serverStart` / `serverReady`. Runs against the generation
+		 * that started — before the plugin loader is replaced on config reload,
+		 * before `createPluginTestEnv().dispose()` stops sockets, and on
+		 * SIGINT/SIGTERM after `Serve()`.
+		 *
+		 * Hooks run sequentially in reverse priority (highest number first).
+		 * Errors are logged and do not block remaining plugins or shutdown.
+		 *
+		 * `server` is the instance about to stop, or `null` when no HTTP server
+		 * was started (for example `startServer: false` in the test harness).
+		 *
+		 * Close resources from `createContext` here. Do not throw to abort
+		 * reload or process exit.
+		 */
+		serverStop: (props: ServerStopProps) => void | Promise<void>;
 
 		/**
 		 * 0 has higher priority than 1

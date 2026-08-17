@@ -10,7 +10,7 @@ Complete reference guide for all available hooks in Frame-Master plugins.
 
 ## 📋 Quick Reference
 
-- **Server Hooks**: `serverStart.main`, `serverStart.dev_main`
+- **Server Hooks**: `serverStart.main`, `serverStart.dev_main`, `serverReady`, `serverStop`, `createContext`
 - **Router Hooks**: `router.before_request`, `router.request`, `router.after_request`, `router.html_rewrite`
 - **Build Hooks**: `build.buildConfig`, `build.beforeBuild`, `build.afterBuild`
 - **File System Hooks**: `fileSystemWatchDir`, `onFileSystemChange`
@@ -67,6 +67,37 @@ serverStart: {
   },
 }
 ```
+
+### serverReady
+
+Runs after `Bun.serve` is listening. Receives `{ builder, pluginLoader, config, server }`. Runs again after a config reload creates a new server.
+
+### serverStop
+
+Inverse of start/ready. Runs on the **old** plugin generation before the loader is replaced, on `createPluginTestEnv().dispose()`, and on SIGINT/SIGTERM after `Serve()`.
+
+Hooks run sequentially in **reverse priority** (highest number first). Errors are logged and do not block shutdown.
+
+```ts
+import { deleteGlobalPluginContext, getGlobalPluginContext } from "frame-master/plugin";
+
+{
+  name: "db",
+  version: "1.0.0",
+  createContext: async () => ({ pool: await openPool() }),
+  serverStop: async ({ reason }) => {
+    const ctx = getGlobalPluginContext("db");
+    await ctx?.pool.close();
+    deleteGlobalPluginContext("db");
+  },
+}
+```
+
+`reason` is `"reload" | "dispose" | "signal" | "explicit"`. `server` is the instance about to stop, or `null` when no HTTP server was started.
+
+### createContext
+
+Runs after the plugin loader and builder are ready. Return value is stored in `getGlobalPluginContext(plugin.name)`.
 
 ## 🔀 Router Hooks
 
@@ -517,8 +548,14 @@ export function myPlugin(): FrameMasterPlugin {
 ## 🔄 Plugin Lifecycle (execution order)
 
 ```text
-// Startup (once)
-serverStart.main() → serverStart.dev_main()
+// Startup
+createContext → serverStart.main → serverStart.dev_main → Bun.serve → serverReady
+
+// Config reload
+serverStop(old) → stop HTTP → reinit → onConfigReload(new) → Bun.serve → serverReady
+
+// Ctrl+C / SIGTERM after Serve()
+serverStop(reason: signal) → stop HTTP (force) → process.exit
 
 // Each Request
 before_request → request → after_request → html_rewrite

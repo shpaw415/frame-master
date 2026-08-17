@@ -5,11 +5,15 @@ import {
 	configureBuildPipelines,
 	initializeBuildPipelines,
 } from "../build/pipelines";
-import type { PluginLoader } from "../plugins";
+import type {
+	PluginLoader,
+	ServerStopProps,
+	ServerStopReason,
+} from "../plugins";
 import { InitPluginLoader, pluginLoader, reloadPluginLoader } from "../plugins";
 import { mergeGlobalPluginContext } from "../plugins/utils";
 import { getConfig, InitConfig, reloadConfig } from "./config";
-import { startConfigWatcher } from "./config-watcher";
+import { startConfigWatcher, stopConfigWatcher } from "./config-watcher";
 import type { FrameMasterConfig } from "./type";
 import { createWatcher } from "./watch";
 
@@ -72,7 +76,8 @@ export async function InitBuild() {
 	await InitBuilder();
 	const config = getConfig();
 	const loader = pluginLoader;
-	if (!config || !loader) throw new Error("Frame Master configuration not initialized.");
+	if (!config || !loader)
+		throw new Error("Frame Master configuration not initialized.");
 	await configureBuildPipelines(config, loader);
 	await runCreateContextHooks();
 	await initializeBuildPipelines();
@@ -86,7 +91,8 @@ export async function InitCLIPlugins() {
 	await InitBuilder();
 	const config = getConfig();
 	const loader = pluginLoader;
-	if (!config || !loader) throw new Error("Frame Master configuration not initialized.");
+	if (!config || !loader)
+		throw new Error("Frame Master configuration not initialized.");
 	await configureBuildPipelines(config, loader);
 	await runCreateContextHooks();
 	await initializeBuildPipelines();
@@ -138,9 +144,96 @@ export async function reinitAll(): Promise<void> {
 }
 
 /**
+ * Run `serverStop` hooks in reverse priority (highest number first).
+ * Errors are logged and do not reject.
+ */
+export async function runServerStopHooks(params: {
+	reason: ServerStopReason;
+	server: Bun.Server<unknown> | null;
+	config?: FrameMasterConfig;
+	pluginLoader?: PluginLoader;
+	builder?: Builder;
+}): Promise<void> {
+	const _pluginLoader = params.pluginLoader ?? pluginLoader;
+	const _config = params.config ?? getConfig();
+	const _builder = params.builder ?? getBuilder();
+
+	if (!_pluginLoader || !_config || !_builder) return;
+
+	const hooks = _pluginLoader.getPluginByName("serverStop").slice().reverse();
+	for (const plugin of hooks) {
+		try {
+			const props: ServerStopProps = {
+				builder: _builder,
+				pluginLoader: _pluginLoader,
+				config: _config,
+				server: params.server,
+				reason: params.reason,
+			};
+			await plugin.pluginParent(props);
+		} catch (error) {
+			console.error(`Error in plugin ${plugin.name} serverStop():`, error);
+		}
+	}
+}
+
+/**
+ * Stop the current HTTP generation: run `serverStop`, then stop Bun.serve.
+ *
+ * Does not replace the plugin loader. Config reload should call this before
+ * `reinitAll()`. Process shutdown should pass `stopWatchers: true`.
+ */
+export async function stopCurrentGeneration(options: {
+	reason: ServerStopReason;
+	force?: boolean;
+	stopWatchers?: boolean;
+}): Promise<void> {
+	const server = globalThis.__SERVER_INSTANCE__ ?? null;
+	await runServerStopHooks({
+		reason: options.reason,
+		server,
+	});
+	if (server) {
+		try {
+			await server.stop(options.force ?? false);
+		} catch {
+			// already stopped
+		}
+		if (globalThis.__SERVER_INSTANCE__ === server) {
+			globalThis.__SERVER_INSTANCE__ = undefined;
+		}
+	}
+	if (options.stopWatchers) {
+		cleanupFileSystemWatchers();
+	}
+}
+
+/**
+ * Stop the current server generation.
+ *
+ * `signal` and `explicit` also stop the config watcher and plugin FS watchers.
+ * `reload` only stops hooks + HTTP so `reinitAll()` can recreate watchers.
+ */
+export async function stopServer(options?: {
+	reason?: ServerStopReason;
+	force?: boolean;
+}): Promise<void> {
+	const reason = options?.reason ?? "explicit";
+	const force = options?.force ?? (reason === "signal" || reason === "dispose");
+	await stopCurrentGeneration({
+		reason,
+		force,
+		stopWatchers: reason === "signal" || reason === "explicit",
+	});
+	if (reason === "signal" || reason === "explicit") {
+		stopConfigWatcher();
+	}
+}
+
+/**
  * Cleanup all active file system watchers.
  */
-function cleanupFileSystemWatchers(): void {
+export function cleanupFileSystemWatchers(): void {
 	if (globalThis.__FILESYSTEM_WATCHER__) {
 		for (const watcher of globalThis.__FILESYSTEM_WATCHER__) {
 			watcher.stop();
