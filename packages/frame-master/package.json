@@ -43,7 +43,7 @@
 	},
 	"dependencies": {
 		"@monaco-editor/react": "^4.7.0",
-		"@shpaw415/mui-lite": "^0.1.4",
+		"@shpaw415/mui-lite": "^0.1.5",
 		"@shpaw415/webtoken": "^2.0.0",
 		"chalk": "^5.6.2",
 		"commander": "^14.0.3",

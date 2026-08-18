@@ -5,6 +5,10 @@ import type { BunPlugin } from "bun";
 import type { FrameMasterConfig } from "frame-master/server/type";
 import { createBuilder } from "../src/build";
 import {
+	type BuildTraceSession,
+	BuildTraceSessionStore,
+} from "../src/build/debug-trace";
+import {
 	BuildUnifier,
 	configureBuildPipelines,
 	getBuildPipeline,
@@ -13,10 +17,6 @@ import {
 	initializeBuildPipelines,
 	resetBuildPipelines,
 } from "../src/build/pipelines";
-import {
-	type BuildTraceSession,
-	BuildTraceSessionStore,
-} from "../src/build/debug-trace";
 import { PluginLoader } from "../src/plugins";
 import {
 	deleteGlobalPluginContext,
@@ -94,11 +94,22 @@ describe("builder", () => {
 						buildConfig: {
 							outdir: `${TEMP_DIR}/default`,
 							entrypoints: [TEXT_ENTRYPOINT],
-							plugins: [{ name: "default-plugin", setup: () => { defaultCalls.push("default"); } }],
+							plugins: [
+								{
+									name: "default-plugin",
+									setup: () => {
+										defaultCalls.push("default");
+									},
+								},
+							],
 						},
 					},
 				},
-				...BuildUnifier({ id: "pipeline", label: "Pipeline", plugins: [pipelinePlugin] }),
+				...BuildUnifier({
+					id: "pipeline",
+					label: "Pipeline",
+					plugins: [pipelinePlugin],
+				}),
 			],
 		};
 		const loader = new PluginLoader(config);
@@ -108,24 +119,37 @@ describe("builder", () => {
 			throw new Error("build-unifier context was not initialized");
 		}
 		unifier.setBuildConfig("pipeline-plugin", {
-			beforeBuild: () => { pipelineCalls.push("before"); },
+			beforeBuild: () => {
+				pipelineCalls.push("before");
+			},
 			buildConfig: {
 				outdir: `${TEMP_DIR}/pipeline`,
 				entrypoints: [TEXT_ENTRYPOINT],
-				plugins: [{ name: "pipeline-plugin", setup: () => { pipelineCalls.push("pipeline"); } }],
+				plugins: [
+					{
+						name: "pipeline-plugin",
+						setup: () => {
+							pipelineCalls.push("pipeline");
+						},
+					},
+				],
 			},
 		});
 		await initializeBuildPipelines();
 		const coreBuilder = await createBuilder(config, loader);
 		await coreBuilder.build();
-		await (await getBuildPipeline("pipeline-plugin").getBuilder("pipeline-plugin")).build();
+		await (
+			await getBuildPipeline("pipeline-plugin").getBuilder("pipeline-plugin")
+		).build();
 
 		expect(defaultCalls).toEqual(["default"]);
 		expect(pipelineCalls).toEqual(["pipeline", "before"]);
 		expect(getBuildPipelines().map((pipeline) => pipeline.label)).toEqual([
 			"Pipeline",
 		]);
-		expect(getBuildUnifierContext()).toBe(getGlobalPluginContext("build-unifier"));
+		expect(getBuildUnifierContext()).toBe(
+			getGlobalPluginContext("build-unifier"),
+		);
 		expect(getBuildPipeline("pipeline-plugin").label).toBe("Pipeline");
 		globalThis.__GLOBAL_CONTEXT__ = {};
 		expect(getBuildUnifierContext()?.setBuildConfig).toBeTypeOf("function");
@@ -156,26 +180,23 @@ describe("builder", () => {
 		};
 		const loader = new PluginLoader(config);
 		await configureBuildPipelines(config, loader);
-		getBuildUnifierContext()?.setBuildConfig?.(
-			"cli-pipeline-plugin",
-			{
-				beforeBuild: () => {
-					pipelineCalls.push("before");
-				},
-				buildConfig: {
-					outdir: `${TEMP_DIR}/cli-pipeline`,
-					entrypoints: [TEXT_ENTRYPOINT],
-					plugins: [
-						{
-							name: "cli-pipeline-plugin",
-							setup: () => {
-								pipelineCalls.push("pipeline");
-							},
-						},
-					],
-				},
+		getBuildUnifierContext()?.setBuildConfig?.("cli-pipeline-plugin", {
+			beforeBuild: () => {
+				pipelineCalls.push("before");
 			},
-		);
+			buildConfig: {
+				outdir: `${TEMP_DIR}/cli-pipeline`,
+				entrypoints: [TEXT_ENTRYPOINT],
+				plugins: [
+					{
+						name: "cli-pipeline-plugin",
+						setup: () => {
+							pipelineCalls.push("pipeline");
+						},
+					},
+				],
+			},
+		});
 		await initializeBuildPipelines();
 		try {
 			const coreBuilder = await createBuilder(config, loader);
@@ -313,31 +334,31 @@ describe("builder", () => {
 		};
 		const loader = new PluginLoader(config);
 		await configureBuildPipelines(config, loader);
-		getBuildUnifierContext()?.setBuildConfig?.(
-			"unifier-virtual-consumer",
-			{
-				buildConfig: {
-					outdir: `${TEMP_DIR}/unifier-virtual`,
-					entrypoints: [entrypoint],
-					plugins: [
-						{
-							name: "unifier-virtual-transform",
-							setup(build) {
-								build.onLoad({ filter: /^@test\/unifier-virtual$/ }, (args) => ({
-									contents: `${args.__chainedContents}\nexport const transformed = true;`,
-									loader: "ts",
-								}));
-							},
+		getBuildUnifierContext()?.setBuildConfig?.("unifier-virtual-consumer", {
+			buildConfig: {
+				outdir: `${TEMP_DIR}/unifier-virtual`,
+				entrypoints: [entrypoint],
+				plugins: [
+					{
+						name: "unifier-virtual-transform",
+						setup(build) {
+							build.onLoad({ filter: /^@test\/unifier-virtual$/ }, (args) => ({
+								contents: `${args.__chainedContents}\nexport const transformed = true;`,
+								loader: "ts",
+							}));
 						},
-					],
-				},
+					},
+				],
 			},
-		);
+		});
 		await initializeBuildPipelines();
-		const bucketBuilder = await getBuildPipeline("unifier-virtual-consumer").getBuilder(
+		const bucketBuilder = await getBuildPipeline(
 			"unifier-virtual-consumer",
-		);
-		bucketBuilder.startDebugSession({ watch: false, includeTextSnapshots: true });
+		).getBuilder("unifier-virtual-consumer");
+		bucketBuilder.startDebugSession({
+			watch: false,
+			includeTextSnapshots: true,
+		});
 		const result = await bucketBuilder.build();
 		const build = bucketBuilder.getDebugSession()?.builds[0];
 		const virtualFile = build?.files.find(
@@ -346,7 +367,9 @@ describe("builder", () => {
 
 		expect(result.success).toBeTrue();
 		expect(virtualFile?.namespace).toBe("frame-master-virtual-module");
-		expect(virtualFile?.steps.map((step) => [step.kind, step.pluginName])).toEqual([
+		expect(
+			virtualFile?.steps.map((step) => [step.kind, step.pluginName]),
+		).toEqual([
 			["source", undefined],
 			["onLoad", "frame-master-virtual-modules"],
 			["onLoad", "unifier-virtual-transform"],
@@ -378,7 +401,9 @@ describe("builder", () => {
 			getBuilder(name) {
 				const id = _id_list.get(name);
 				if (!id) {
-					return Promise.reject(new Error(`No builder found for plugin: ${name}`));
+					return Promise.reject(
+						new Error(`No builder found for plugin: ${name}`),
+					);
 				}
 				return Promise.resolve(leftoverBuilder);
 			},
@@ -392,9 +417,8 @@ describe("builder", () => {
 			getGlobalPluginContext("build-unifier")?.setBuildConfig?.(pluginName, {
 				buildConfig: { entrypoints: [TEXT_ENTRYPOINT] },
 			});
-			const builder = await getGlobalPluginContext("build-unifier")?.getBuilder?.(
-				pluginName,
-			);
+			const builder =
+				await getGlobalPluginContext("build-unifier")?.getBuilder?.(pluginName);
 			expect(registered).toEqual([pluginName]);
 			expect(builder).toBe(leftoverBuilder);
 			expect(getBuildPipelines()).toEqual([]);
@@ -707,10 +731,13 @@ describe("builder", () => {
 								{
 									name: "debug-virtual-transform",
 									setup(build) {
-										build.onLoad({ filter: /^@test\/debug-virtual$/ }, (args) => ({
-											contents: `${args.__chainedContents}\nexport const transformed = true;`,
-											loader: "ts",
-										}));
+										build.onLoad(
+											{ filter: /^@test\/debug-virtual$/ },
+											(args) => ({
+												contents: `${args.__chainedContents}\nexport const transformed = true;`,
+												loader: "ts",
+											}),
+										);
 									},
 								},
 							],
@@ -731,7 +758,9 @@ describe("builder", () => {
 
 		expect(result.success).toBeTrue();
 		expect(virtualFile?.namespace).toBe("frame-master-virtual-module");
-		expect(virtualFile?.steps.map((step) => [step.kind, step.pluginName])).toEqual([
+		expect(
+			virtualFile?.steps.map((step) => [step.kind, step.pluginName]),
+		).toEqual([
 			["source", undefined],
 			["onLoad", "frame-master-virtual-modules"],
 			["onLoad", "debug-virtual-transform"],

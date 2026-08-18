@@ -3,10 +3,7 @@ import { isAbsolute, join } from "node:path";
 import { cwd } from "node:process";
 import chalk from "chalk";
 import type { FrameMasterConfig } from "frame-master/server/type";
-import {
-	type PluginLoader,
-	type VirtualModuleRegistry,
-} from "../plugins";
+import type { PluginLoader, VirtualModuleRegistry } from "../plugins";
 import { chainPlugins } from "../plugins/plugin-chaining";
 import type { BuildOptionsPlugin } from "../plugins/types";
 import { getConfig } from "../server/config";
@@ -618,10 +615,7 @@ export class Builder {
 			...(this.virtualModulePlugin ? [this.virtualModulePlugin] : []),
 			...(config.plugins ?? []),
 		];
-		if (
-			this.disableOnLoadChaining ||
-			plugins.length === 0
-		) {
+		if (this.disableOnLoadChaining || plugins.length === 0) {
 			return plugins.length > 0 ? { ...config, plugins } : config;
 		}
 
@@ -1162,7 +1156,9 @@ export async function InitBuilder(
 		);
 	}
 
-	const _pluginLoader = loaders?.pluginLoader ?? (await import("../plugins/plugin-loader")).pluginLoader;
+	const _pluginLoader =
+		loaders?.pluginLoader ??
+		(await import("../plugins/plugin-loader")).pluginLoader;
 
 	if (!_pluginLoader) {
 		throw new Error("Plugin loader not initialized. Cannot create builder.");

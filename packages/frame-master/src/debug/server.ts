@@ -15,13 +15,13 @@ import type {
 } from "frame-master/build/debug-trace";
 import { pluginLoader } from "../../src/plugins";
 import { createWatcher, type FileSystemWatcher } from "../../src/server/watch";
+import type { DebugBuildMessage, DebugRegistryEntry } from "./types";
 import {
 	buildDebugUiAssets,
 	isDebugUiIndexHtml,
 	serveDebugUiAsset,
 	toDebugUiPathname,
 } from "./ui-assets";
-import type { DebugBuildMessage, DebugRegistryEntry } from "./types";
 
 type DebugPipelineBuilder = { id: string; label: string; builder: Builder };
 
@@ -183,7 +183,9 @@ export class DebugBuildServer {
 			/^\/api\/builds\/([^/]+)\/snapshots\/([^/]+)$/,
 		);
 		if (snapshotMatch?.[1] && snapshotMatch[2]) {
-			return Response.json(this.getSnapshot(snapshotMatch[1], snapshotMatch[2]));
+			return Response.json(
+				this.getSnapshot(snapshotMatch[1], snapshotMatch[2]),
+			);
 		}
 
 		return new Response("Not found", { status: 404 });
@@ -216,9 +218,7 @@ export class DebugBuildServer {
 				case "select-build":
 					this.send(ws, {
 						type: "build-details",
-						data: payload.buildId
-							? this.getBuild(payload.buildId)
-							: null,
+						data: payload.buildId ? this.getBuild(payload.buildId) : null,
 					});
 					break;
 				case "request-step-snapshot":
@@ -316,7 +316,10 @@ export class DebugBuildServer {
 				? join(this.getDebugTraceDirectory(), basename(savePath))
 				: savePath;
 			mkdirIfNeeded(dirname(finalSavePath));
-			await Bun.write(finalSavePath, JSON.stringify(this.getSession(), null, 2));
+			await Bun.write(
+				finalSavePath,
+				JSON.stringify(this.getSession(), null, 2),
+			);
 			this.broadcast({ type: "trace-saved", data: { path: finalSavePath } });
 		}
 		return result;
@@ -325,7 +328,9 @@ export class DebugBuildServer {
 	private getSession() {
 		const stubBuilder = this.builder as Partial<Builder>;
 		if (!stubBuilder.getDebugSession) {
-			return JSON.parse(stubBuilder.exportDebugTrace?.() ?? "null") as BuildTraceSession;
+			return JSON.parse(
+				stubBuilder.exportDebugTrace?.() ?? "null",
+			) as BuildTraceSession;
 		}
 		const session = this.builder.getDebugSession();
 		if (!session) return null;
@@ -345,36 +350,58 @@ export class DebugBuildServer {
 
 	private listBuilds() {
 		return [
-			...this.annotateBuilds("default", "Default build", this.builder.listDebugBuilds()),
+			...this.annotateBuilds(
+				"default",
+				"Default build",
+				this.builder.listDebugBuilds(),
+			),
 			...this.pipelines.flatMap((pipeline) =>
-				this.annotateBuilds(pipeline.id, pipeline.label, pipeline.builder.listDebugBuilds()),
+				this.annotateBuilds(
+					pipeline.id,
+					pipeline.label,
+					pipeline.builder.listDebugBuilds(),
+				),
 			),
 		].sort((left, right) => right.startedAt - left.startedAt);
 	}
 
-	private annotateBuilds(pipelineId: string, pipelineLabel: string, builds: ReturnType<Builder["listDebugBuilds"]>) {
-		return builds.map((build) => ({ ...build, id: `${pipelineId}:${build.id}`, pipelineId, pipelineLabel }));
+	private annotateBuilds(
+		pipelineId: string,
+		pipelineLabel: string,
+		builds: ReturnType<Builder["listDebugBuilds"]>,
+	) {
+		return builds.map((build) => ({
+			...build,
+			id: `${pipelineId}:${build.id}`,
+			pipelineId,
+			pipelineLabel,
+		}));
 	}
 
 	private resolvePipelineBuild(id: string) {
 		const separator = id.indexOf(":");
 		const pipelineId = separator === -1 ? "default" : id.slice(0, separator);
 		const buildId = separator === -1 ? id : id.slice(separator + 1);
-		const pipeline = pipelineId === "default"
-			? { id: pipelineId, label: "Default build", builder: this.builder }
-			: this.pipelines.find((entry) => entry.id === pipelineId);
+		const pipeline =
+			pipelineId === "default"
+				? { id: pipelineId, label: "Default build", builder: this.builder }
+				: this.pipelines.find((entry) => entry.id === pipelineId);
 		return pipeline ? { ...pipeline, buildId } : null;
 	}
 
 	private getBuild(id: string) {
 		const resolved = this.resolvePipelineBuild(id);
 		const build = resolved?.builder.getDebugBuild(resolved.buildId);
-		return build && resolved ? { ...build, id, pipelineId: resolved.id, pipelineLabel: resolved.label } : null;
+		return build && resolved
+			? { ...build, id, pipelineId: resolved.id, pipelineLabel: resolved.label }
+			: null;
 	}
 
 	private getSnapshot(buildId: string, snapshotId: string) {
 		const resolved = this.resolvePipelineBuild(buildId);
-		return resolved?.builder.getDebugSnapshot(resolved.buildId, snapshotId) ?? null;
+		return (
+			resolved?.builder.getDebugSnapshot(resolved.buildId, snapshotId) ?? null
+		);
 	}
 
 	private resolveTracePath() {

@@ -1,14 +1,14 @@
-import type { FrameMasterConfig } from "../server/type";
-import type { PluginLoader } from "../plugins/plugin-loader";
 import {
 	getGlobalPluginContext,
 	setGlobalPluginContext,
 } from "../plugins/global-context";
+import type { PluginLoader } from "../plugins/plugin-loader";
 import type {
 	BuildOptionsPlugin,
 	FrameMasterPlugin,
 	PluginGlobalContext,
 } from "../plugins/types";
+import type { FrameMasterConfig } from "../server/type";
 import type { Builder } from "./index";
 
 export interface BuildPipelinePluginMap {}
@@ -48,9 +48,7 @@ let contextBound = false;
 let leftoverSetBuildConfig:
 	| ((pluginName: string, config: BuildOptionsPlugin) => void)
 	| undefined;
-let leftoverGetBuilder:
-	| ((pluginName: string) => Promise<Builder>)
-	| undefined;
+let leftoverGetBuilder: ((pluginName: string) => Promise<Builder>) | undefined;
 let leftoverIdList: Map<string, string> | undefined;
 
 function pluginNameList(plugins: FrameMasterPlugin[]): string[] {
@@ -87,7 +85,9 @@ function alreadyWrappedError(pluginName: string, pipelineLabel: string): Error {
 	);
 }
 
-function captureLeftoverApi(existing: LeftoverUnifierContext | undefined): void {
+function captureLeftoverApi(
+	existing: LeftoverUnifierContext | undefined,
+): void {
 	if (leftoverIdList || !existing?._id_list) return;
 	leftoverIdList = existing._id_list;
 	leftoverSetBuildConfig = existing.setBuildConfig;
@@ -215,7 +215,9 @@ function registerPipeline(
  * `frame-master-plugin-build-unifier`. Each bucket is listed in
  * `frame-master debug build` next to the default global builder.
  */
-export function BuildUnifier(options: BuildUnifierOptions): FrameMasterPlugin[] {
+export function BuildUnifier(
+	options: BuildUnifierOptions,
+): FrameMasterPlugin[] {
 	if (options.plugins.length === 0) {
 		throw new Error("A build pipeline must contain at least one plugin.");
 	}
@@ -271,7 +273,9 @@ export function BuildUnifier(options: BuildUnifierOptions): FrameMasterPlugin[] 
 /**
  * @deprecated Use `BuildUnifier()` from `frame-master/plugin`.
  */
-export function buildPipeline(options: BuildPipelineOptions): FrameMasterPlugin[] {
+export function buildPipeline(
+	options: BuildPipelineOptions,
+): FrameMasterPlugin[] {
 	return BuildUnifier(options);
 }
 
@@ -406,5 +410,7 @@ export function getBuildPipelines(): BuildPipeline[] {
 }
 
 export async function initializeBuildPipelines(): Promise<void> {
-	await Promise.all(getBuildPipelines().map((pipeline) => pipeline.initialize()));
+	await Promise.all(
+		getBuildPipelines().map((pipeline) => pipeline.initialize()),
+	);
 }

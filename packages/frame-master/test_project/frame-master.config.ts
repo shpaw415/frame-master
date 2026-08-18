@@ -1,5 +1,5 @@
-import type { FrameMasterConfig } from "frame-master/server/type";
 import { BuildUnifier, getGlobalPluginContext } from "frame-master/plugin";
+import type { FrameMasterConfig } from "frame-master/server/type";
 
 export default {
 	HTTPServer: {

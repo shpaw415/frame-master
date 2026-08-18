@@ -14,5 +14,7 @@ export async function loadRuntimePluginFromPlugins(
 
 	if (runtimePlugins.length === 0) return;
 
-	await Bun.plugin(chainPlugins(runtimePlugins, { suffix: "test-suite-runtime" }));
+	await Bun.plugin(
+		chainPlugins(runtimePlugins, { suffix: "test-suite-runtime" }),
+	);
 }
