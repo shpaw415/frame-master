@@ -12,7 +12,7 @@ describe("frame-master/plugin export path", () => {
 		expect(source).toContain('from "frame-master/plugin"');
 	});
 
-	test('frame-master/server/request resolves via package exports', async () => {
+	test("frame-master/server/request resolves via package exports", async () => {
 		const mod = await import("frame-master/server/request");
 		expect(mod).toBeDefined();
 		expect(typeof mod.masterRequest).toBe("function");

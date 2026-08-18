@@ -12,7 +12,8 @@ if (!rootElement) {
 const root = rootElement;
 
 function showStartupError(error: unknown) {
-	const message = error instanceof Error ? error.stack ?? error.message : String(error);
+	const message =
+		error instanceof Error ? (error.stack ?? error.message) : String(error);
 	root.replaceChildren();
 
 	const heading = document.createElement("h1");
@@ -41,12 +42,14 @@ void Promise.all([
 	import("./DebugApp"),
 	import("./ErrorBoundary"),
 ])
-	.then(([{ createRoot }, { default: DebugApp }, { default: ErrorBoundary }]) => {
-		window.__FM_DEBUG_BOOTED = true;
-		createRoot(root).render(
-			<ErrorBoundary>
-				<DebugApp />
-			</ErrorBoundary>,
-		);
-	})
+	.then(
+		([{ createRoot }, { default: DebugApp }, { default: ErrorBoundary }]) => {
+			window.__FM_DEBUG_BOOTED = true;
+			createRoot(root).render(
+				<ErrorBoundary>
+					<DebugApp />
+				</ErrorBoundary>,
+			);
+		},
+	)
 	.catch(showStartupError);

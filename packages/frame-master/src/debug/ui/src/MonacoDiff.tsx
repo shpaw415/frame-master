@@ -9,7 +9,10 @@ type DiffEditorInstance = {
 
 type StandaloneEditor = {
 	getAction: (id: string) => { run: () => void | Promise<void> } | null;
-	updateOptions: (options: { readOnly?: boolean; domReadOnly?: boolean }) => void;
+	updateOptions: (options: {
+		readOnly?: boolean;
+		domReadOnly?: boolean;
+	}) => void;
 };
 
 const THEME_DARK = "fm-dark";
@@ -192,9 +195,7 @@ export default function MonacoDiff({
 					fontLigatures: true,
 					fontSize: compact ? 13 : 15,
 					lineHeight: compact ? 18 : 20,
-					padding: compact
-						? { top: 8, bottom: 8 }
-						: { top: 14, bottom: 14 },
+					padding: compact ? { top: 8, bottom: 8 } : { top: 14, bottom: 14 },
 					minimap: { enabled: false },
 					scrollBeyondLastLine: false,
 					wordWrap: "on",

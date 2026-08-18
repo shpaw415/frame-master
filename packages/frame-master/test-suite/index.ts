@@ -15,7 +15,6 @@
  */
 
 export { createPluginTestEnv } from "./src/create-env";
-export { loadRuntimePluginFromPlugins } from "./src/runtime";
 export {
 	createTempDir,
 	removeTempDir,
@@ -28,6 +27,7 @@ export {
 	runServerStartHooks,
 	runServerStopHooks,
 } from "./src/lifecycle";
+export { loadRuntimePluginFromPlugins } from "./src/runtime";
 export type {
 	CreatePluginTestEnvOptions,
 	HandleRequestResult,

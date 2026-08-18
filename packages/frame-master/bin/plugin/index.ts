@@ -173,9 +173,14 @@ pluginCommand
 				);
 			}
 
-			if (plugin.virtualModules && Object.keys(plugin.virtualModules).length > 0) {
+			if (
+				plugin.virtualModules &&
+				Object.keys(plugin.virtualModules).length > 0
+			) {
 				console.log(chalk.gray("  Virtual Modules:"));
-				for (const [specifier, module] of Object.entries(plugin.virtualModules)) {
+				for (const [specifier, module] of Object.entries(
+					plugin.virtualModules,
+				)) {
 					const pipeline = module.injectRuntime
 						? "runtime and build"
 						: "build only";
