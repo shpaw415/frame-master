@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { join } from "node:path";
-import type { FrameMasterConfig } from "frame-master/server/type";
-import { createBuilder } from "../src/build";
-import { PluginLoader } from "../src/plugins/plugin-loader";
-import type { VirtualModuleContentsFactory } from "../src/plugins/types";
+import { createBuilder } from "frame-master/build";
 import {
 	createVirtualModuleResolveFilter,
+	PluginLoader,
 	resolveVirtualModuleContents,
-} from "../src/plugins/virtual-modules";
+} from "frame-master/plugin";
+import type { VirtualModuleContentsFactory } from "frame-master/plugin/types";
+import type { FrameMasterConfig } from "frame-master/server/type";
 
 const TEST_DIR = join(import.meta.dir, ".test-virtual-modules-tmp");
 
