@@ -5,7 +5,10 @@ import type { FrameMasterConfig } from "frame-master/server/type";
 import { createBuilder } from "../src/build";
 import { PluginLoader } from "../src/plugins/plugin-loader";
 import type { VirtualModuleContentsFactory } from "../src/plugins/types";
-import { resolveVirtualModuleContents } from "../src/plugins/virtual-modules";
+import {
+	createVirtualModuleResolveFilter,
+	resolveVirtualModuleContents,
+} from "../src/plugins/virtual-modules";
 
 const TEST_DIR = join(import.meta.dir, ".test-virtual-modules-tmp");
 
@@ -424,6 +427,110 @@ describe("plugin virtual modules", () => {
 		expect(Bun.file("@test/virtual").size).toBe(
 			new TextEncoder().encode(`export const value = "proxy";`).byteLength,
 		);
+	});
+
+	test("resolve filter matches only registered specifiers", () => {
+		const filter = createVirtualModuleResolveFilter([
+			"@registry/mod",
+			"dynamic-ssr:entrypoints",
+			"foo.bar+baz",
+		]);
+
+		expect(filter.test("@registry/mod")).toBeTrue();
+		expect(filter.test("dynamic-ssr:entrypoints")).toBeTrue();
+		expect(filter.test("foo.bar+baz")).toBeTrue();
+		expect(filter.test("@registry/mod/extra")).toBeFalse();
+		expect(filter.test("virtual:hook")).toBeFalse();
+		expect(filter.test("src/page.cfdynamicssr")).toBeFalse();
+		expect(filter.test("foo.barXbaz")).toBeFalse();
+	});
+
+	test("keeps hook-based and files virtual modules when a registry module exists", async () => {
+		const entry = join(TEST_DIR, "coexist-entry.ts");
+		await Bun.write(
+			entry,
+			[
+				`import { value as registry } from "@registry/mod";`,
+				`import { value as hook } from "virtual:hook";`,
+				`import { value as files } from "@files/mod.ts";`,
+				`console.log(registry, hook, files);`,
+			].join("\n"),
+		);
+		const resolved: string[] = [];
+		const loaded: string[] = [];
+		const config: FrameMasterConfig = {
+			HTTPServer: { port: 0 },
+			plugins: [
+				{
+					name: "registry-provider",
+					version: "1.0.0",
+					virtualModules: {
+						"@registry/mod": {
+							contents: `export const value = "registry";`,
+							loader: "ts",
+							injectRuntime: false,
+						},
+					},
+				},
+				{
+					name: "hook-and-files-provider",
+					version: "1.0.0",
+					build: {
+						buildConfig: {
+							outdir: join(TEST_DIR, "coexist-out"),
+							files: {
+								"@files/mod.ts": `export const value = "files";`,
+							},
+							plugins: [
+								{
+									name: "hook-virtual",
+									setup(build) {
+										build.onResolve({ filter: /^virtual:hook$/ }, (args) => {
+											resolved.push(args.path);
+											return {
+												path: args.path,
+												namespace: "hook-virtual",
+											};
+										});
+										build.onLoad(
+											{
+												filter: /^virtual:hook$/,
+												namespace: "hook-virtual",
+											},
+											() => {
+												loaded.push("virtual:hook");
+												return {
+													contents: `export const value = "hook";`,
+													loader: "ts",
+												};
+											},
+										);
+									},
+								},
+							],
+						},
+					},
+				},
+			],
+		};
+
+		const builder = await createBuilder(config, new PluginLoader(config));
+		builder.startDebugSession({
+			watch: false,
+			includeTextSnapshots: true,
+		});
+		const result = await builder.build(entry);
+		const build = builder.getDebugSession()?.builds[0];
+		const registryFile = build?.files.find(
+			(file) => file.path === "@registry/mod",
+		);
+		const hookFile = build?.files.find((file) => file.path === "virtual:hook");
+
+		expect(result.success).toBeTrue();
+		expect(resolved).toEqual(["virtual:hook"]);
+		expect(loaded).toEqual(["virtual:hook"]);
+		expect(registryFile?.namespace).toBe("frame-master-virtual-module");
+		expect(hookFile?.namespace).toBe("hook-virtual");
 	});
 
 	test("async factory Bun.file text works and sync size throws", async () => {

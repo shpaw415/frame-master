@@ -7,6 +7,16 @@ import type {
 
 export const VIRTUAL_MODULE_NAMESPACE = "frame-master-virtual-module";
 
+export function escapeRegExp(value: string): string {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function createVirtualModuleResolveFilter(
+	specifiers: Iterable<string>,
+): RegExp {
+	return new RegExp(`^(?:${[...specifiers].map(escapeRegExp).join("|")})$`);
+}
+
 export type RegisteredVirtualModule = VirtualModuleDeclaration & {
 	pluginName: string;
 };
@@ -262,12 +272,14 @@ export class VirtualModuleRegistry {
 		);
 		if (modules.size === 0) return null;
 
+		const resolveFilter = createVirtualModuleResolveFilter(modules.keys());
+
 		return {
 			name: runtimeOnly
 				? "frame-master-runtime-virtual-modules"
 				: "frame-master-virtual-modules",
 			setup(build) {
-				build.onResolve({ filter: /.*/ }, (args) => {
+				build.onResolve({ filter: resolveFilter }, (args) => {
 					if (!modules.has(args.path)) return undefined;
 					return { path: args.path, namespace: VIRTUAL_MODULE_NAMESPACE };
 				});

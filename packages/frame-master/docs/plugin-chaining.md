@@ -167,6 +167,12 @@ All declared modules are available to Frame-Master builds. Only declarations wit
 `injectRuntime: true` are registered through `frame-master/runtime`. A plugin can
 therefore publish both runtime and build-only modules.
 
+The managed resolver claims **only declared specifiers**. Other plugins can
+still publish virtual modules with `onResolve` / `onLoad` or Bun `files`; those
+handlers keep their own namespace and are not remapped to
+`frame-master-virtual-module`. This applies to the default builder and to
+custom BuildUnifier buckets.
+
 Registered module contents and their declared loader are the initial
 `args.__chainedContents` and `args.__chainedLoader` values for chained transforms.
 Frame-Master's managed virtual-module provider runs first, reads the declaration
