@@ -67,6 +67,12 @@ Declaring the entry is enough. Frame-Master internally resolves and loads the
 module; plugin authors do **not** add a separate `onResolve` or `onLoad` merely
 to return its declared contents.
 
+The managed resolver claims **only declared specifiers**. Other plugins can
+still publish virtual modules with `onResolve` / `onLoad` or Bun `files`; those
+handlers keep their own namespace and are not remapped to
+`frame-master-virtual-module`. This applies to the default builder and to
+custom BuildUnifier buckets.
+
 All declared modules are available during builds. `injectRuntime: true` also
 makes that individual module available through `frame-master/runtime`, while
 `injectRuntime: false` keeps it build-only.
@@ -115,3 +121,4 @@ must preserve the rest of the chain. Unregistered paths retain native
 - Registry contents are rebuilt when `frame-master.config.ts` reloads.
 - Use `string` for text modules, `Uint8Array` when byte preservation matters, or a factory to generate source on each build load or runtime import.
 - Prefer specific `onLoad` filters when a transform does not need every module.
+- The managed virtual-module `onResolve` matches declared specifiers only, so hook-based and `files` virtual modules keep working.

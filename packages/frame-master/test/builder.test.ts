@@ -383,6 +383,106 @@ describe("builder", () => {
 		).toContain("export const transformed = true;");
 	});
 
+	test("keeps hook-based virtual modules in unifier buckets with a registry", async () => {
+		const entrypoint = join(TEMP_DIR, "unifier-coexist-entry.ts");
+		writeFileSync(
+			entrypoint,
+			[
+				`import { value as registry } from "@test/unifier-registry";`,
+				`import { value as hook } from "virtual:unifier-hook";`,
+				`import { value as files } from "@files/unifier.ts";`,
+				`console.log(registry, hook, files);`,
+			].join("\n"),
+		);
+		const resolved: string[] = [];
+		const loaded: string[] = [];
+		const bucketPlugin = {
+			name: "unifier-coexist-consumer",
+			version: "1.0.0",
+		};
+		const config: FrameMasterConfig = {
+			HTTPServer: { port: 0 },
+			plugins: [
+				{
+					name: "unifier-coexist-provider",
+					version: "1.0.0",
+					virtualModules: {
+						"@test/unifier-registry": {
+							contents: `export const value = "registry";`,
+							loader: "ts",
+							injectRuntime: false,
+						},
+					},
+				},
+				...BuildUnifier({
+					id: "coexist-bucket",
+					label: "Coexist bucket",
+					plugins: [bucketPlugin],
+				}),
+			],
+		};
+		const loader = new PluginLoader(config);
+		await configureBuildPipelines(config, loader);
+		getBuildUnifierContext()?.setBuildConfig?.("unifier-coexist-consumer", {
+			buildConfig: {
+				outdir: `${TEMP_DIR}/unifier-coexist`,
+				entrypoints: [entrypoint],
+				files: {
+					"@files/unifier.ts": `export const value = "files";`,
+				},
+				plugins: [
+					{
+						name: "unifier-hook-virtual",
+						setup(build) {
+							build.onResolve({ filter: /^virtual:unifier-hook$/ }, (args) => {
+								resolved.push(args.path);
+								return {
+									path: args.path,
+									namespace: "unifier-hook",
+								};
+							});
+							build.onLoad(
+								{
+									filter: /^virtual:unifier-hook$/,
+									namespace: "unifier-hook",
+								},
+								() => {
+									loaded.push("virtual:unifier-hook");
+									return {
+										contents: `export const value = "hook";`,
+										loader: "ts",
+									};
+								},
+							);
+						},
+					},
+				],
+			},
+		});
+		await initializeBuildPipelines();
+		const bucketBuilder = await getBuildPipeline(
+			"unifier-coexist-consumer",
+		).getBuilder("unifier-coexist-consumer");
+		bucketBuilder.startDebugSession({
+			watch: false,
+			includeTextSnapshots: true,
+		});
+		const result = await bucketBuilder.build();
+		const build = bucketBuilder.getDebugSession()?.builds[0];
+		const registryFile = build?.files.find(
+			(file) => file.path === "@test/unifier-registry",
+		);
+		const hookFile = build?.files.find(
+			(file) => file.path === "virtual:unifier-hook",
+		);
+
+		expect(result.success).toBeTrue();
+		expect(resolved).toEqual(["virtual:unifier-hook"]);
+		expect(loaded).toEqual(["virtual:unifier-hook"]);
+		expect(registryFile?.namespace).toBe("frame-master-virtual-module");
+		expect(hookFile?.namespace).toBe("unifier-hook");
+	});
+
 	test("keeps leftover build-unifier context after configureBuildPipelines", async () => {
 		const pluginName = "leftover-consumer";
 		const builderId = "leftover-bucket";
