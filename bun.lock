@@ -65,7 +65,7 @@
     },
     "packages/frame-master": {
       "name": "frame-master",
-      "version": "4.0.0-beta.7",
+      "version": "4.0.0",
       "bin": {
         "frame-master": "bin/index.ts",
       },
