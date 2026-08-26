@@ -179,14 +179,14 @@ More: https://bun.sh/docs/api/websockets
 
 ### File System Watchers
 
-> `absolutePath` refers to the full path from the root of the project, while `filePath` is relative to the watched directory.
+> `filePath` is the filename relative to the watched directory. `projectRootPath` is relative to the project root (cwd). `absolutePath` is the OS absolute path. Existing 3-argument callbacks remain valid.
 
 ```ts
 const myPlugin: FrameMasterPlugin = {
   name: "my-plugin",
   version: "1.0.0",
   fileSystemWatchDir: ["src/pages", "src/components"],
-  onFileSystemChange(event, file, absolutePath) {
+  onFileSystemChange(event, file, projectRootPath, absolutePath) {
     console.log(`${event}: ${file}`);
     if (event === "change" && file.endsWith(".tsx"))
       rebuildComponent(absolutePath);

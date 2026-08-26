@@ -267,9 +267,9 @@ export default {
 			name: "dev-plugin",
 			version: "1.0.0",
 			fileSystemWatchDir: ["src"],
-			async onFileSystemChange(_ev, _fp, abs) {
+			async onFileSystemChange(_ev, _fp, projectRootPath) {
 				const builder = getBuilder();
-				if (!abs.startsWith("src/") || builder?.isBuilding()) return;
+				if (!projectRootPath.startsWith("src/") || builder?.isBuilding()) return;
 				await builder?.build();
 			},
 		},

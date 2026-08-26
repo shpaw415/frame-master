@@ -78,6 +78,7 @@ export type DebugBuildMessage =
 			data: {
 				eventType: WatchEventType;
 				filePath: string;
+				projectRootPath: string;
 				absolutePath: string;
 			};
 	  }

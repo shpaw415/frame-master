@@ -16,7 +16,7 @@ import { mergeGlobalPluginContext } from "../plugins/utils";
 import { getConfig, InitConfig, reloadConfig } from "./config";
 import { startConfigWatcher, stopConfigWatcher } from "./config-watcher";
 import type { FrameMasterConfig } from "./type";
-import { createWatcher } from "./watch";
+import { createWatcher, dispatchFileChangeCallbacks } from "./watch";
 
 let inited = false;
 
@@ -387,10 +387,14 @@ async function runFileSystemWatcherPlugin(
 		DirToWatch.map((DirToWatch) =>
 			createWatcher({
 				path: DirToWatch,
-				callback(event, file, absolutePath) {
-					OnFileSystemChangeCallbacks.forEach((callback) => {
-						callback(event, file, absolutePath);
-					});
+				callback(event, file, projectRootPath, absolutePath) {
+					return dispatchFileChangeCallbacks(
+						OnFileSystemChangeCallbacks,
+						event,
+						file,
+						projectRootPath,
+						absolutePath,
+					);
 				},
 			}),
 		),

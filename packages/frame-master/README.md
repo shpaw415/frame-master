@@ -210,7 +210,7 @@ export function myPlugin(): FrameMasterPlugin {
 
     // FILE WATCHING (dev mode)
     fileSystemWatchDir: ["./src"],
-    onFileSystemChange: async (type, path, abs) => {},
+    onFileSystemChange: async (type, path, projectRootPath, absolutePath) => {},
 
     // WEBSOCKETS
     websocket: {

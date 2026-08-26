@@ -14,6 +14,7 @@ export type WatchEventType = "change" | "rename";
 export type FileChangeCallback = (
 	eventType: WatchEventType,
 	filePath: string,
+	projectRootPath: string,
 	absolutePath: string,
 ) => void | Promise<void>;
 
@@ -811,8 +812,9 @@ export type FrameMasterPlugin<
 		 * **ONLY DEV MODE**
 		 *
 		 * @param eventType - Type of file system event ("change" | "rename")
-		 * @param filePath - Relative path to the changed file
-		 * @param absolutePath - Absolute path to the changed file
+		 * @param filePath - Filename relative to the watched directory
+		 * @param projectRootPath - Path relative to the project root (cwd)
+		 * @param absolutePath - OS absolute path to the changed file
 		 */
 		onFileSystemChange?: FileChangeCallback;
 		/**
