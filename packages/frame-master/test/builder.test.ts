@@ -24,7 +24,7 @@ import {
 	setGlobalPluginContext,
 } from "../src/plugins/utils";
 
-const TEMP_DIR = ".test-temp";
+const TEMP_DIR = join(import.meta.dir, ".test-temp");
 const TEXT_ENTRYPOINT = join(TEMP_DIR, "entry.txt");
 
 function createTrackedTextPlugin(
@@ -1269,5 +1269,29 @@ describe("builder", () => {
 		const builder = await createBuilder(fmConfig, new PluginLoader(fmConfig));
 		const newConfig = await builder.createConfigs();
 		expect(newConfig.outdir).toBe(`${TEMP_DIR}/custom-build`);
+	});
+
+	test("cleanUpOutputDir does not throw when the outdir is missing", async () => {
+		const outdir = join(TEMP_DIR, "missing-cleanup");
+		const fmConfig: FrameMasterConfig = {
+			HTTPServer: { port: 0 },
+			plugins: [
+				{
+					name: "cleanup-plugin",
+					version: "1.0.0",
+					build: {
+						enableLoging: false,
+						buildConfig: {
+							outdir,
+							entrypoints: [TEXT_ENTRYPOINT],
+						},
+					},
+				},
+			],
+		};
+		const builder = await createBuilder(fmConfig, new PluginLoader(fmConfig));
+		rmSync(outdir, { recursive: true, force: true });
+		builder.outputs = [];
+		await expect(builder.cleanUpOutputDir()).resolves.toBeUndefined();
 	});
 });

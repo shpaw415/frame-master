@@ -317,16 +317,24 @@ export class Builder {
 		if (!outDir || !this.outputs) return Promise.resolve();
 		const filesInResult = this.outputs.map((output) => output.path);
 		const resolvedOutDir = resolveOutDir(outDir);
-		const fileToRemove = Array.from(
-			new Bun.Glob("**/*").scanSync({
-				cwd: resolvedOutDir,
-				onlyFiles: true,
-				absolute: true,
-			}),
-		).filter((filePath) => !filesInResult.includes(filePath));
+		if (!existsSync(resolvedOutDir)) return Promise.resolve();
+
+		let leftoverFiles: string[] = [];
+		try {
+			leftoverFiles = Array.from(
+				new Bun.Glob("**/*").scanSync({
+					cwd: resolvedOutDir,
+					onlyFiles: true,
+					absolute: true,
+				}),
+			).filter((filePath) => !filesInResult.includes(filePath));
+		} catch (e) {
+			if ((e as { code?: string }).code === "ENOENT") return;
+			throw e;
+		}
 
 		await Promise.all(
-			fileToRemove.map((output) => {
+			leftoverFiles.map((output) => {
 				try {
 					return Bun.file(output).delete();
 				} catch (_e) {
