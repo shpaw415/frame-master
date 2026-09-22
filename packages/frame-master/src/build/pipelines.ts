@@ -368,6 +368,27 @@ export function resetBuildPipelines(): void {
 	leftoverIdList = undefined;
 }
 
+/**
+ * Drop pipelines created while materializing plugins for a test preload.
+ * A full reset runs only when nothing else remains, so the next `BuildUnifier()`
+ * starts again at `unifier-0` / "Build pipeline 1".
+ */
+export function releaseBuildPipelines(pluginNames: string[]): void {
+	const names = new Set(pluginNames);
+	if (names.size === 0) return;
+	for (const [id, pipeline] of pipelines) {
+		if (
+			pipeline.pluginNames.some((name) => names.has(name)) ||
+			names.has(`frame-master-build-unifier:${id}`)
+		) {
+			pipelines.delete(id);
+		}
+	}
+	if (pipelines.size === 0) {
+		resetBuildPipelines();
+	}
+}
+
 export async function configureBuildPipelines(
 	config: FrameMasterConfig,
 	pluginLoader: PluginLoader,

@@ -1,5 +1,7 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
+import { BuildUnifier, getBuildPipelines } from "frame-master/plugin";
 import type { FrameMasterPlugin } from "frame-master/plugin/types";
+import { resetBuildPipelines } from "../../src/build/pipelines";
 import { loadRuntimePluginFromPlugins } from "../src/runtime";
 
 describe("plugin test suite - runtime plugins", () => {
@@ -43,5 +45,67 @@ describe("plugin test suite - runtime plugins", () => {
 		await loadRuntimePluginFromPlugins(plugins);
 
 		expect(setupCalls).toEqual(["resolver", "loader"]);
+	});
+});
+
+describe("plugin test suite - preload build pipelines", () => {
+	afterEach(() => {
+		resetBuildPipelines();
+	});
+
+	test("drops a BuildUnifier registration so the test path can register it again", async () => {
+		const plugin = {
+			name: "preload-auto-plugin",
+			version: "1.0.0",
+			runtimePlugins: [
+				{
+					name: "preload-auto-runtime",
+					setup() {},
+				},
+			],
+		} satisfies FrameMasterPlugin;
+		const load = () => BuildUnifier({ plugins: [plugin] });
+
+		await loadRuntimePluginFromPlugins(load());
+
+		expect(getBuildPipelines()).toEqual([]);
+		expect(() => load()).not.toThrow();
+		expect(getBuildPipelines().map((pipeline) => pipeline.label)).toEqual([
+			"Build pipeline 1",
+		]);
+	});
+
+	test("drops an explicit pipeline id so the test path can reuse it", async () => {
+		const plugin = {
+			name: "cloudflare-update-manager",
+			version: "1.0.0",
+		} satisfies FrameMasterPlugin;
+		const load = () =>
+			BuildUnifier({ id: "test", label: "test", plugins: [plugin] });
+
+		await loadRuntimePluginFromPlugins(load());
+
+		expect(getBuildPipelines()).toEqual([]);
+		expect(() => load()).not.toThrow();
+		expect(getBuildPipelines().map((pipeline) => pipeline.id)).toEqual([
+			"test",
+		]);
+	});
+
+	test("does not drop pipelines that the preload plugins do not own", async () => {
+		BuildUnifier({
+			id: "keep",
+			plugins: [{ name: "kept-plugin", version: "1.0.0" }],
+		});
+		const owned = BuildUnifier({
+			id: "drop",
+			plugins: [{ name: "dropped-plugin", version: "1.0.0" }],
+		});
+
+		await loadRuntimePluginFromPlugins(owned);
+
+		expect(getBuildPipelines().map((pipeline) => pipeline.id)).toEqual([
+			"keep",
+		]);
 	});
 });

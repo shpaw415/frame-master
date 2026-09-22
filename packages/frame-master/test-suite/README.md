@@ -55,7 +55,7 @@ test("route responds", async () => {
 
 ### `createPluginTestEnv(options)`
 
-Creates an in-memory `FrameMasterConfig` (default `HTTPServer.port: 0`), `PluginLoader`, and builder.
+Creates an in-memory `FrameMasterConfig` (default `HTTPServer.port: 0`), `PluginLoader`, and builder. `BuildUnifier()` pipelines in the plugin list are attached and initialized before `serverStart`. `dispose()` clears that process-global registry so the next test can construct the same pipeline.
 
 | Option | Default | Description |
 | ------ | ------- | ----------- |
@@ -111,7 +111,9 @@ await loadRuntimePluginFromPlugins([
 
 The helper preserves Frame-Master's runtime `onLoad` chaining behavior. It only
 registers `runtimePlugins` declared by the provided plugins and does not load a
-project configuration or create a test environment.
+project configuration or create a test environment. Constructing those plugins
+may register a `BuildUnifier` pipeline; the helper drops that registration so
+the test phase can register the same pipeline again.
 
 ## Build testing (priority)
 

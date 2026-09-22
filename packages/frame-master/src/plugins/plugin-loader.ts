@@ -221,6 +221,11 @@ export function InitPluginLoader(_pluginLoader?: PluginLoader) {
 	return pluginLoader;
 }
 
+export function clearPluginLoader(current?: PluginLoader): void {
+	if (current && pluginLoader !== current) return;
+	pluginLoader = null;
+}
+
 export function reloadPluginLoader() {
 	const config = getConfig();
 	if (!config) {
