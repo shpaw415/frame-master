@@ -137,8 +137,6 @@ export class DebugBuildServer {
 		);
 
 		this.logStartup();
-		await this.runBuild();
-
 		if (this.options.watch) {
 			this.watcher = await createWatcher({
 				path: process.cwd(),
@@ -152,6 +150,7 @@ export class DebugBuildServer {
 				},
 			});
 		}
+		await this.runBuild();
 	}
 
 	async startWithDefaultUI() {
