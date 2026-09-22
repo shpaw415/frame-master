@@ -213,11 +213,21 @@ export async function createPluginTestEnv(
 				});
 			}
 
-			const entrypoints = buildOptions?.entrypoints;
-			if (entrypoints && entrypoints.length > 0) {
-				return builder.build(...entrypoints);
+			const previousBuildMode = process.env.BUILD_MODE;
+			process.env.BUILD_MODE = "true";
+			try {
+				const entrypoints = buildOptions?.entrypoints;
+				if (entrypoints && entrypoints.length > 0) {
+					return await builder.build(...entrypoints);
+				}
+				return await builder.build();
+			} finally {
+				if (previousBuildMode === undefined) {
+					delete process.env.BUILD_MODE;
+				} else {
+					process.env.BUILD_MODE = previousBuildMode;
+				}
 			}
-			return builder.build();
 		},
 
 		async dispose() {

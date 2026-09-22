@@ -90,7 +90,8 @@ export type PluginTestEnv = {
 	handleRequest: (request: Request) => Promise<HandleRequestResult>;
 
 	/**
-	 * Run the unified build pipeline for this env's plugins.
+	 * Run the default builder and every `BuildUnifier` pipeline, matching
+	 * `frame-master build`. Returns the default builder output.
 	 */
 	build: (options?: PluginTestEnvBuildOptions) => Promise<Bun.BuildOutput>;
 
