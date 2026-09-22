@@ -172,6 +172,7 @@ function createPluginTestEnv(
 - `HTTPServer.hostname`: `127.0.0.1`
 - In-memory config via `setMockConfig` (no disk `frame-master.config.ts` required)
 - `WEB_TOKEN_SECRET` is set automatically if missing (cookie helpers work)
+- `BuildUnifier()` pipelines are attached and initialized before `serverStart`. `dispose()` clears that registry so the next test can construct the same pipeline.
 
 `config.plugins`, when provided, replaces `options.plugins`.
 
@@ -319,7 +320,7 @@ Register that preload in your package's `bunfig.toml` so Bun loads it before tes
 preload = ["./test/preload.ts"]
 ```
 
-Now test files can import modules handled by the runtime plugins normally. `loadRuntimePluginFromPlugins(plugins)` collects only the `runtimePlugins` declared by the provided `FrameMasterPlugin` instances and registers them with the same `onLoad` chaining behavior as the production runtime loader. It does not read `frame-master.config.ts`, create a `PluginLoader`, or start a `PluginTestEnv`.
+Now test files can import modules handled by the runtime plugins normally. `loadRuntimePluginFromPlugins(plugins)` collects only the `runtimePlugins` declared by the provided `FrameMasterPlugin` instances and registers them with the same `onLoad` chaining behavior as the production runtime loader. It does not read `frame-master.config.ts`, create a `PluginLoader`, or start a `PluginTestEnv`. Constructing those plugins may register a `BuildUnifier` pipeline; the helper drops that registration so the test phase can register the same pipeline again.
 
 Because Bun runtime plugin registrations cannot be removed, load a stable plugin set once per test process. Avoid parallel test files that register overlapping runtime plugin filters.
 

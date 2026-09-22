@@ -1,12 +1,21 @@
 import { webToken } from "@shpaw415/webtoken";
 import { type Builder, createBuilder } from "frame-master/build";
 import { setMockConfig } from "frame-master/config";
-import { PluginLoader } from "frame-master/plugin";
+import {
+	clearPluginLoader,
+	InitPluginLoader,
+	PluginLoader,
+} from "frame-master/plugin";
 import type { FrameMasterPlugin } from "frame-master/plugin/types";
 import { createServer } from "frame-master/server";
 import { runServerStopHooks } from "frame-master/server/init";
 import { masterRequest } from "frame-master/server/request";
 import type { FrameMasterConfig } from "frame-master/server/types";
+import {
+	configureBuildPipelines,
+	initializeBuildPipelines,
+	resetBuildPipelines,
+} from "../../src/build/pipelines";
 import {
 	runCreateContextHooks,
 	runServerReadyHooks,
@@ -89,11 +98,14 @@ export async function createPluginTestEnv(
 	setMockConfig(config);
 
 	const pluginLoader = new PluginLoader(config);
+	InitPluginLoader(pluginLoader);
 	const builder = await createBuilder(config, pluginLoader);
+	await configureBuildPipelines(config, pluginLoader);
 
 	if (options.runCreateContext !== false) {
 		await runCreateContextHooks({ config, pluginLoader });
 	}
+	await initializeBuildPipelines();
 	if (options.runServerStart !== false) {
 		await runServerStartHooks({ pluginLoader });
 	}
@@ -220,6 +232,8 @@ export async function createPluginTestEnv(
 					builder,
 				});
 			}
+			resetBuildPipelines();
+			clearPluginLoader(pluginLoader);
 			try {
 				server?.stop(true);
 			} catch {
