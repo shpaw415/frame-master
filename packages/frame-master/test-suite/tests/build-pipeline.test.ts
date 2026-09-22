@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { BuildUnifier, getBuildPipeline } from "frame-master/plugin";
+import { join } from "node:path";
+import {
+	BuildUnifier,
+	getBuildPipeline,
+	getBuildUnifierContext,
+} from "frame-master/plugin";
 import { createPluginTestEnv } from "../src/create-env";
+import { withTempDir, writeFixture } from "../src/fixtures";
 import type { PluginTestEnv } from "../src/types";
 
 describe("plugin test suite - build pipeline env", () => {
@@ -62,5 +68,63 @@ describe("plugin test suite - build pipeline env", () => {
 		await expect(
 			getBuildPipeline("sequential-pipeline-plugin").getBuilder(),
 		).resolves.toBeDefined();
+	});
+
+	test("env.build runs every BuildUnifier pipeline", async () => {
+		await withTempDir(async (dir) => {
+			const entry = await writeFixture(
+				dir,
+				"entry.ts",
+				"export const n = 1;\n",
+			);
+			const calls: string[] = [];
+			const pluginName = "env-build-pipeline-plugin";
+
+			env = await createPluginTestEnv({
+				cwd: dir,
+				startServer: false,
+				plugins: [
+					{
+						name: "default-build-plugin",
+						version: "1.0.0",
+						build: {
+							buildConfig: {
+								outdir: join(dir, "default-out"),
+								entrypoints: [entry],
+							},
+						},
+					},
+					...BuildUnifier({
+						plugins: [
+							{
+								name: pluginName,
+								version: "1.0.0",
+								createContext() {
+									getBuildUnifierContext()?.setBuildConfig?.(pluginName, {
+										buildConfig: {
+											outdir: join(dir, "pipeline-out"),
+											entrypoints: [entry],
+											plugins: [
+												{
+													name: "pipeline-marker",
+													setup() {
+														calls.push("pipeline");
+													},
+												},
+											],
+										},
+									});
+								},
+							},
+						],
+					}),
+				],
+			});
+
+			const result = await env.build();
+			expect(result.success).toBe(true);
+			expect(calls).toEqual(["pipeline"]);
+			expect(process.env.BUILD_MODE).toBeUndefined();
+		});
 	});
 });

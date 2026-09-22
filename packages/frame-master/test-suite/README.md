@@ -73,7 +73,7 @@ Creates an in-memory `FrameMasterConfig` (default `HTTPServer.port: 0`), `Plugin
 | ------ | ----------- |
 | `env.fetch(path, init?)` | HTTP request against the live server |
 | `env.handleRequest(request)` | Request pipeline without network (returns `{ response, master }`) |
-| `env.build({ entrypoints?, buildConfig? })` | Unified build pipeline |
+| `env.build({ entrypoints?, buildConfig? })` | Default builder plus every `BuildUnifier` pipeline (`BUILD_MODE`) |
 | `env.start()` | Start server if not already running |
 | `env.dispose()` | Run `serverStop`, then stop servers / release resources |
 | `env.config` / `env.builder` / `env.pluginLoader` / `env.server` / `env.baseUrl` | Escape hatches |

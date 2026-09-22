@@ -230,10 +230,11 @@ build(options?: {
 }): Promise<Bun.BuildOutput>
 ```
 
-Runs Frame-Master’s **unified build** for plugins registered with a `build` section:
+Runs Frame-Master’s **unified build** for plugins registered with a `build` section, with `BUILD_MODE` set for the call (same as `frame-master build`):
 
 - Merges static and dynamic `buildConfig` from all plugins
 - Runs `beforeBuild` / `afterBuild` hooks
+- Builds every `BuildUnifier` pipeline, not only the default builder
 - Applies onLoad chaining (unless disabled in config)
 
 Optional `entrypoints` are passed to `builder.build(...entrypoints)`.  
