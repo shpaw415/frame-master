@@ -1,9 +1,9 @@
 import { getBuilder } from "frame-master/build";
+import { BuildUnifier } from "frame-master/plugin";
 import {
 	directiveToolSingleton,
 	getGlobalPluginContext,
 } from "frame-master/plugin/utils";
-import { BuildUnifier } from "frame-master/plugin";
 import type { FrameMasterConfig } from "frame-master/server/types";
 import { isProd } from "frame-master/utils";
 import ApplyReact from "frame-master-plugin-apply-react/plugin";
@@ -12,6 +12,7 @@ import AutoSiteMap from "frame-master-plugin-auto-sitemap";
 import SSRPlugin from "frame-master-plugin-cloudflare-pages-dynamic-ssr";
 import CFActionPlugin from "frame-master-plugin-cloudflare-pages-functions-action";
 import CloudflareRouteFilePlugin from "frame-master-plugin-cloudflare-route-file-generator";
+import UpdateManager from "frame-master-plugin-cloudflare-update-manager";
 import EnvInHTML from "frame-master-plugin-env-in-html";
 import searchIndex from "frame-master-plugin-html-search-engine";
 import imageOptimizer from "frame-master-plugin-image-optimizer";
@@ -161,6 +162,13 @@ export default {
 						);
 					},
 				},
+				UpdateManager({
+					paths: {
+						notFound: "404.html",
+						actionBasePath: "src/actions",
+					},
+					autoInjectCheckVersion: true,
+				}),
 			],
 		}),
 		{
@@ -240,10 +248,6 @@ export default {
 				{
 					src: "robots.txt",
 					dist: "robots.txt",
-				},
-				{
-					src: "404.html",
-					dist: "404.html",
 				},
 			],
 		}),
