@@ -213,7 +213,7 @@ export default function AddModifyPluginPage() {
 							version: plugin.version,
 							author: plugin.author,
 							category: plugin.category,
-							tags: plugin.tags,
+							tags: Array.isArray(plugin.tags) ? plugin.tags : [],
 							npmPackage: toNpmPackageUrl(plugin.npmPackage),
 							githubUrl: plugin.githubUrl || "",
 							docsUrl: plugin.docsUrl || "",
@@ -223,7 +223,9 @@ export default function AddModifyPluginPage() {
 							configuration: plugin.configuration || "",
 							compatibleVersions: plugin.compatibleVersions,
 							published: plugin.published || false,
-							dependencies: plugin.dependencies || [],
+							dependencies: Array.isArray(plugin.dependencies)
+								? plugin.dependencies
+								: [],
 							upvote: plugin.upvote,
 							downvote: plugin.downvote,
 						});

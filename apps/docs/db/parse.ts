@@ -11,8 +11,25 @@ import type {
 	templates,
 } from "./schema";
 
+function asJsonArray<T>(value: unknown): T[] {
+	if (Array.isArray(value)) return value as T[];
+	if (typeof value === "string") {
+		try {
+			const parsed = JSON.parse(value) as unknown;
+			if (Array.isArray(parsed)) return parsed as T[];
+		} catch {
+			return [];
+		}
+	}
+	return [];
+}
+
 export function parsePlugin(plugin: typeof plugins.$inferSelect): parsedPlugin {
-	return plugin;
+	return {
+		...plugin,
+		dependencies: asJsonArray(plugin.dependencies),
+		tags: asJsonArray(plugin.tags),
+	};
 }
 
 export function parsePluginsToDB(

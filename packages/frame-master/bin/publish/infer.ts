@@ -200,6 +200,7 @@ export function toRegistryListing(listing: InferredListing) {
 			category: listing.category,
 			compatibleVersions: listing.compatibleVersions,
 			configuration: listing.configuration,
+			dependencies: [],
 			description: listing.description,
 			docsUrl: listing.docsUrl,
 			githubUrl: listing.githubUrl,

@@ -85,6 +85,9 @@ async function insertPlugin(params: {
 				name: name || "",
 				npmPackage: metadata.npmPackage,
 				ownerId: params.userId,
+				dependencies: Array.isArray(authorizedUserInput.dependencies)
+					? authorizedUserInput.dependencies
+					: [],
 				tags: tags || [],
 				updatedAt: now,
 				version: metadata.latestVersion,

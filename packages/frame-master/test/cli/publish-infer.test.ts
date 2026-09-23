@@ -56,6 +56,7 @@ describe("publish infer", () => {
 		expect(toRegistryListing(listing).npmPackage).toBe(
 			"frame-master-plugin-seo",
 		);
+		expect(toRegistryListing(listing).dependencies).toEqual([]);
 	});
 
 	test("infers a draft template listing", () => {
