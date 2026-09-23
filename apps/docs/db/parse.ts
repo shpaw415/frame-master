@@ -59,7 +59,12 @@ export function parseReleaseNote(
 export function parseTemplate(
 	template: typeof templates.$inferSelect,
 ): parsedTemplate {
-	return template;
+	return {
+		...template,
+		features: asJsonArray(template.features),
+		includedPlugins: asJsonArray(template.includedPlugins),
+		tags: asJsonArray(template.tags),
+	};
 }
 
 export function parseTemplateToDB(

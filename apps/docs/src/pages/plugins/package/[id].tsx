@@ -5,7 +5,7 @@ import { useLoader } from "@next/ssr/hooks";
 import type { parsedPlugin } from "db/schema";
 import { ThrowNotFound } from "frame-master-plugin-apply-react/utils";
 import { useMemo, useState } from "react";
-import { APIError } from "@/action_ext/utils";
+import { APIError, jsonForInlineScript } from "@/action_ext/utils";
 import { getExample } from "@/actions/api/plugins/examples";
 import { getReadme } from "@/actions/api/plugins/readme";
 import { getVersions } from "@/actions/api/plugins/versions";
@@ -55,14 +55,14 @@ export const loader_plugin = createLoader({
 			});
 		}
 
-		return {
+		return jsonForInlineScript({
 			exempleDoc: exemple instanceof APIError ? exemple.defaultRes : exemple,
 			readmeDoc: readme instanceof APIError ? readme.defaultRes : readme,
 			versions: versions instanceof APIError ? versions.defaultRes : versions,
 			plugin: plugin.plugins.at(0),
 			success: true,
 			message: "Plugin data fetched successfully",
-		};
+		});
 	},
 });
 
@@ -79,13 +79,18 @@ const markdownContentClassName =
 export default function ShowPluginInfoPage() {
 	const pluginData = useLoader(loader_plugin);
 
-	if (!pluginData?.success)
+	if (!pluginData) return null;
+	if (!pluginData.success)
 		throw new Error(
-			`Failed to fetch plugin data: ${pluginData?.message || "Unknown error"}`,
+			`Failed to fetch plugin data: ${pluginData.message || "Unknown error"}`,
 		);
-	else if (!pluginData.plugin) ThrowNotFound();
+	if (!pluginData.plugin) ThrowNotFound();
 
 	const plugin = pluginData.plugin as parsedPlugin;
+	const tags = Array.isArray(plugin.tags) ? plugin.tags : [];
+	const dependencies = Array.isArray(plugin.dependencies)
+		? plugin.dependencies
+		: [];
 
 	const [copied, setCopied] = useState(false);
 	const [activeTab, setActiveTab] = useState<
@@ -191,7 +196,7 @@ export default function ShowPluginInfoPage() {
 
 							{/* Tags */}
 							<div className="flex flex-wrap gap-2 mt-6">
-								{plugin.tags.map((tag) => (
+								{tags.map((tag) => (
 									<span
 										key={tag}
 										className="px-3 py-1 bg-theme-input text-theme-muted rounded-md text-sm hover:bg-theme-input hover:text-theme-text transition-colors"
@@ -320,13 +325,13 @@ export default function ShowPluginInfoPage() {
 									}}
 								/>
 
-								{plugin.dependencies && plugin.dependencies.length > 0 && (
+								{dependencies.length > 0 && (
 									<div className="mt-8">
 										<h4 className="text-xl font-bold text-theme-text mb-4">
 											Dependencies
 										</h4>
 										<div className="space-y-2">
-											{plugin.dependencies.map((dep) => (
+											{dependencies.map((dep) => (
 												<div
 													key={dep.pluginName}
 													className="px-4 py-2 bg-theme-input rounded-lg text-theme-secondary font-mono text-sm"

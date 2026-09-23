@@ -4,6 +4,27 @@ import { errorLogs, plugins, rateLimits, releaseNotes } from "db/schema";
 import { and, desc, eq } from "openauthster-shared/drizzle";
 import type { ClientType, Roles } from "@/auth";
 
+export function jsonForInlineScript<T>(value: T): T {
+	return walkStrings(value, (text) =>
+		text.replace(/<\/script/gi, "<\\/script"),
+	) as T;
+}
+
+function walkStrings(value: unknown, map: (text: string) => string): unknown {
+	if (typeof value === "string") return map(value);
+	if (Array.isArray(value)) return value.map((item) => walkStrings(item, map));
+	if (value instanceof Date) return value;
+	if (value && typeof value === "object") {
+		return Object.fromEntries(
+			Object.entries(value).map(([key, nested]) => [
+				key,
+				walkStrings(nested, map),
+			]),
+		);
+	}
+	return value;
+}
+
 export function verifyAccess(
 	role: Roles | null,
 	allowedRoles: Roles[],

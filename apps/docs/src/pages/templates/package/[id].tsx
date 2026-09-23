@@ -5,7 +5,7 @@ import { ThrowNotFound } from "@next/client";
 import { createLoader, createPageConfig } from "@next/ssr";
 import { useLoader } from "@next/ssr/hooks";
 import { useMemo, useState } from "react";
-import { APIError } from "@/action_ext/utils";
+import { APIError, jsonForInlineScript } from "@/action_ext/utils";
 import { navigate, routes } from "@/utils";
 
 export const ssr_configs = createPageConfig({
@@ -42,10 +42,10 @@ export const loader_template = createLoader({
 			});
 		}
 
-		return {
+		return jsonForInlineScript({
 			template: template instanceof APIError ? template.defaultRes : template,
 			readme: readme instanceof APIError ? readme.defaultRes : readme,
-		};
+		});
 	},
 });
 
@@ -60,12 +60,19 @@ const markdownContentClassName =
 
 export default function ShowTemplateInfoPage() {
 	const templateData = useLoader(loader_template);
+	if (!templateData) return null;
 
-	const template = templateData?.template.templates.at(0) || null;
+	const template = templateData.template.templates.at(0) || null;
 
 	if (!template) {
 		ThrowNotFound();
 	}
+
+	const tags = Array.isArray(template.tags) ? template.tags : [];
+	const features = Array.isArray(template.features) ? template.features : [];
+	const includedPlugins = Array.isArray(template.includedPlugins)
+		? template.includedPlugins
+		: [];
 
 	const overviewDoc = templateData?.readme;
 
@@ -167,11 +174,11 @@ export default function ShowTemplateInfoPage() {
 									<span className="text-yellow-400">📂</span>
 									<span>{template.category}</span>
 								</div>
-								{template.includedPlugins.length > 0 && (
+								{includedPlugins.length > 0 && (
 									<div className="flex items-center gap-2">
 										<span className="text-purple-400">🔌</span>
 										<span>
-											{template.includedPlugins.length} plugins included
+											{includedPlugins.length} plugins included
 										</span>
 									</div>
 								)}
@@ -179,7 +186,7 @@ export default function ShowTemplateInfoPage() {
 
 							{/* Tags */}
 							<div className="flex flex-wrap gap-2 mt-6">
-								{template.tags.map((tag) => (
+								{tags.map((tag) => (
 									<span
 										key={tag}
 										className="px-3 py-1 bg-theme-input text-theme-muted rounded-md text-sm hover:bg-theme-input hover:text-theme-text transition-colors"
@@ -346,15 +353,13 @@ export default function ShowTemplateInfoPage() {
 							</div>
 						)}
 
-						{activeTab === "features" &&
-							template.features &&
-							template.features.length > 0 && (
+						{activeTab === "features" && features.length > 0 && (
 								<div className="bg-theme-card border border-theme-border rounded-xl p-8">
 									<h3 className="text-2xl font-bold text-theme-text mb-6">
 										Template Features
 									</h3>
 									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-										{template.features.map((feature) => (
+										{features.map((feature) => (
 											<div
 												key={feature}
 												className="flex items-start gap-3 p-4 bg-theme-input rounded-lg"
@@ -367,7 +372,7 @@ export default function ShowTemplateInfoPage() {
 								</div>
 							)}
 
-						{activeTab === "plugins" && template.includedPlugins.length > 0 && (
+						{activeTab === "plugins" && includedPlugins.length > 0 && (
 							<div className="bg-theme-card border border-theme-border rounded-xl p-8">
 								<h3 className="text-2xl font-bold text-theme-text mb-6">
 									Pre-configured Plugins
@@ -377,7 +382,7 @@ export default function ShowTemplateInfoPage() {
 									and configured:
 								</p>
 								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-									{template.includedPlugins.map((plugin) => (
+									{includedPlugins.map((plugin) => (
 										<div
 											key={plugin}
 											className="flex items-center gap-3 p-4 bg-theme-input rounded-lg hover:bg-theme-card transition-colors"

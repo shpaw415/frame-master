@@ -26,6 +26,7 @@
         "frame-master-plugin-cloudflare-pages-dynamic-ssr": "0.3.1",
         "frame-master-plugin-cloudflare-pages-functions-action": "4.0.1",
         "frame-master-plugin-cloudflare-route-file-generator": "^0.1.2",
+        "frame-master-plugin-cloudflare-update-manager": "^0.1.0",
         "frame-master-plugin-env-in-html": "^0.1.2",
         "frame-master-plugin-html-search-engine": "0.1.0",
         "frame-master-plugin-image-optimizer": "^0.2.0",
@@ -946,6 +947,8 @@
     "frame-master-plugin-cloudflare-pages-functions-action": ["frame-master-plugin-cloudflare-pages-functions-action@4.0.1", "", { "dependencies": { "frame-master-plugin-cloudflare-pages-functions-action": "^4.0.0", "superjson": "^2.2.6" }, "peerDependencies": { "frame-master": "^4.0.0-0", "npm": "11.6.2", "wrangler": "^4.83.0" } }, "sha512-COgG+KFlvlmEv1NjemlKVpiUOTnX1EruPUkMNTpfW2Ty6JJY11Cg45cLbP7IffqaRyEf2NZSFjHX1J/4lFqJMg=="],
 
     "frame-master-plugin-cloudflare-route-file-generator": ["frame-master-plugin-cloudflare-route-file-generator@0.1.2", "", { "peerDependencies": { "frame-master": "^3.1.5", "typescript": "^6.0.3" } }, "sha512-OslPe9+TDBVdXXnxK0hUFy/FjYocuq14OcWfgnyd6FZa9Cxawi9UYTEfIksZe2YdKfylfdkzPO03Vvrf+O8Tmg=="],
+
+    "frame-master-plugin-cloudflare-update-manager": ["frame-master-plugin-cloudflare-update-manager@0.1.0", "", { "peerDependencies": { "frame-master": "^4.0.2", "frame-master-plugin-cloudflare-pages-functions-action": "^4.0.1", "typescript": "^7" } }, "sha512-LlxkY6M5m/Qoe2zvFtfeZDWd2d6KzM6uJ78YQ30deGTTeizgLVwH0PYhYVbB20e9l3udPiTxPnmqqTq/P0d+lw=="],
 
     "frame-master-plugin-env-in-html": ["frame-master-plugin-env-in-html@0.1.2", "", { "peerDependencies": { "frame-master": "^3.0.0", "typescript": "^5" } }, "sha512-KGkMuaEdjVQvmQ73h9ZCy3izMYQlFvvLpv21Twl4Tbufh2C5GK3k7BOWmJ2cT4smYyleqsDQzBMc6PtSCqOipg=="],
 
