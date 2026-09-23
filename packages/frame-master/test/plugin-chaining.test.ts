@@ -12,6 +12,7 @@ import {
 	hasChainedTextContent,
 	PluginProxy,
 } from "../src/plugins/plugin-chaining";
+import { VIRTUAL_MODULE_NAMESPACE } from "../src/plugins/virtual-modules";
 
 const TEST_DIR = join(import.meta.dir, ".test-chaining-tmp");
 const TEST_FILE = join(TEST_DIR, "test.txt");
@@ -1678,6 +1679,64 @@ describe("Integration scenarios", () => {
 
 			expect(asyncResult).toContain("[ASYNC]");
 			expect(asyncResult).toContain("original content");
+		});
+
+		test("finally-only html runs for disk entrypoints beside a namespaced virtual onLoad", async () => {
+			const marker = "<!--fm-finally-html-->";
+			const virtualToken = "<!--virtual-404-->";
+			const indexHtml = join(TEST_DIR, "index.html");
+			writeFileSync(indexHtml, "<head></head>");
+
+			const virtualModulesPlugin: BunPlugin = {
+				name: "frame-master-virtual-modules",
+				setup(build) {
+					build.onLoad(
+						{ filter: /.*/, namespace: VIRTUAL_MODULE_NAMESPACE },
+						() => undefined,
+					);
+				},
+			};
+
+			const finallyPlugin: BunPlugin = {
+				name: "html-finally-only",
+				setup(build) {
+					build.finally("html", ({ contents }) => {
+						const text =
+							typeof contents === "string"
+								? contents
+								: new TextDecoder().decode(contents);
+						return { contents: `${text}${marker}` };
+					});
+				},
+			};
+
+			const chained = chainPlugins([virtualModulesPlugin, finallyPlugin]);
+			const result = await Bun.build({
+				entrypoints: [indexHtml, "404.html"],
+				files: {
+					"404.html": `<head></head>${virtualToken}`,
+				},
+				plugins: [chained],
+				outdir: join(TEST_DIR, "out-finally-html-virtual"),
+			});
+
+			expect(result.success).toBe(true);
+			const baseName = (path: string) => path.split("/").pop();
+			const indexOut = result.outputs.find(
+				(output) => baseName(output.path) === "index.html",
+			);
+			const notFoundOut = result.outputs.find(
+				(output) => baseName(output.path) === "404.html",
+			);
+			expect(indexOut).toBeDefined();
+			expect(notFoundOut).toBeDefined();
+			const indexText = await indexOut?.text();
+			const notFoundText = await notFoundOut?.text();
+			expect(indexText).toContain("<head>");
+			expect(indexText).toContain(marker);
+			expect(indexText).not.toContain(virtualToken);
+			expect(notFoundText).toContain(virtualToken);
+			expect(notFoundText).toContain(marker);
 		});
 	});
 });

@@ -85,6 +85,40 @@ interface RegisteredFinally {
 	pluginName: string;
 }
 
+function onLoadCoversFileLoader(
+	handler: RegisteredOnLoad,
+	loader: string,
+): boolean {
+	if (handler.namespace && handler.namespace !== "file") return false;
+	const extension = loader === "text" ? "txt" : loader;
+	return handler.filter.test(`.test.${extension}`);
+}
+
+type BuildConfigFile = NonNullable<PluginBuilder["config"]["files"]>[string];
+
+async function readBuildConfigFile(
+	value: BuildConfigFile,
+): Promise<string | Uint8Array> {
+	if (typeof value === "string") return value;
+	if (value instanceof Blob) return value.text();
+	if (value instanceof ArrayBuffer) return new Uint8Array(value);
+	if (ArrayBuffer.isView(value)) {
+		return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+	}
+	return new Uint8Array(value);
+}
+
+async function readFinallyOnlyContents(
+	build: PluginBuilder,
+	path: string,
+): Promise<string | Uint8Array | undefined> {
+	const fromFiles = build.config.files?.[path];
+	if (fromFiles !== undefined) return readBuildConfigFile(fromFiles);
+	const disk = Bun.file(path);
+	if (!(await disk.exists())) return undefined;
+	return disk.text();
+}
+
 /**
  * PluginProxy intercepts BunPlugin onLoad handlers and chains them together.
  *
@@ -336,12 +370,9 @@ export class PluginProxy {
 			const extensionPattern = loaderToExtension[loader];
 			if (!extensionPattern) continue;
 
-			// Check if any existing onLoad handler already covers this pattern
-			const hasExistingHandler = this.onLoadHandlers.some((h) => {
-				// Check if the handler's filter would match files of this loader type
-				const testPath = `.test.${loader === "text" ? "txt" : loader}`;
-				return h.filter.test(testPath);
-			});
+			const hasExistingHandler = this.onLoadHandlers.some((h) =>
+				onLoadCoversFileLoader(h, loader),
+			);
 
 			if (hasExistingHandler) continue;
 
@@ -353,8 +384,8 @@ export class PluginProxy {
 			);
 
 			build.onLoad({ filter: extensionPattern }, async (args) => {
-				const contents = await Bun.file(args.path).text();
-				// Execute with empty handlers array - this will just apply finally handlers
+				const contents = await readFinallyOnlyContents(build, args.path);
+				if (contents === undefined) return undefined;
 				return this.executeChainedOnLoad(
 					{
 						...args,
