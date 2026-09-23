@@ -201,7 +201,7 @@ React to file changes in development mode:
 fileSystemWatchDir: ["src/styles/", "config/"],
 
 // Handle changes
-onFileSystemChange: async (eventType, filePath, absolutePath) => {
+onFileSystemChange: async (eventType, filePath, projectRootPath, absolutePath) => {
   if (filePath.endsWith(".css")) {
     await rebuildStyles();
   }

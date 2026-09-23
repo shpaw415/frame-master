@@ -320,10 +320,10 @@ export function myPlugin(): FrameMasterPlugin {
 
 ### onFileSystemChange
 
-Respond to watched file changes (dev mode only).
+Respond to watched file changes (dev mode only). Callbacks may omit `absolutePath`; 3-argument plugins stay compatible.
 
 ```ts
-onFileSystemChange: async (eventType, filePath, absolutePath) => {
+onFileSystemChange: async (eventType, filePath, projectRootPath, absolutePath) => {
   console.log(`File ${eventType}: ${filePath}`);
 
   if (filePath.endsWith(".css")) {

@@ -1,6 +1,6 @@
 import { type FSWatcher, watch } from "fs";
 import { readdir, stat } from "fs/promises";
-import { join, relative } from "path";
+import { basename, isAbsolute, join, relative, resolve } from "path";
 import type { FileChangeCallback, WatchEventType } from "../plugins";
 
 export interface WatchOptions {
@@ -29,6 +29,80 @@ export interface WatchOptions {
 	verbose?: boolean;
 }
 
+export type ResolvedFileChangePaths = {
+	filePath: string;
+	projectRootPath: string;
+	absolutePath: string;
+};
+
+export function resolveFileChangePaths(
+	watchPath: string,
+	filename: string | null,
+	projectRoot: string = process.cwd(),
+	options?: { watchTargetIsFile?: boolean },
+): ResolvedFileChangePaths | null {
+	const resolvedWatchPath = isAbsolute(watchPath)
+		? watchPath
+		: resolve(projectRoot, watchPath);
+
+	if (options?.watchTargetIsFile) {
+		const absolutePath = resolve(resolvedWatchPath);
+		if (!isAbsolute(absolutePath)) return null;
+		let projectRootPath = relative(projectRoot, absolutePath).replaceAll(
+			"\\",
+			"/",
+		);
+		if (!projectRootPath) projectRootPath = ".";
+		const filePath =
+			filename &&
+			filename.trim() !== "" &&
+			filename !== "." &&
+			filename !== ".."
+				? filename
+				: basename(absolutePath);
+		return { filePath, projectRootPath, absolutePath };
+	}
+
+	if (filename == null) return null;
+	const trimmed = filename.trim();
+	if (trimmed === "" || trimmed === "." || trimmed === "..") return null;
+
+	const absolutePath = resolve(resolvedWatchPath, filename);
+	if (!isAbsolute(absolutePath)) return null;
+
+	let projectRootPath = relative(projectRoot, absolutePath).replaceAll(
+		"\\",
+		"/",
+	);
+	if (!projectRootPath) projectRootPath = ".";
+
+	return {
+		filePath: filename,
+		projectRootPath,
+		absolutePath,
+	};
+}
+
+export async function dispatchFileChangeCallbacks(
+	callbacks: FileChangeCallback[],
+	eventType: WatchEventType,
+	filePath: string,
+	projectRootPath: string,
+	absolutePath: string,
+): Promise<void> {
+	const results = await Promise.allSettled(
+		callbacks.map(async (callback) =>
+			callback(eventType, filePath, projectRootPath, absolutePath),
+		),
+	);
+
+	for (const result of results) {
+		if (result.status === "rejected") {
+			console.error("[FileSystemWatcher] Error in callback:", result.reason);
+		}
+	}
+}
+
 export class FileSystemWatcher {
 	private watchers: Map<string, FSWatcher> = new Map();
 	private debounceTimers: Map<string, NodeJS.Timeout> = new Map();
@@ -37,10 +111,11 @@ export class FileSystemWatcher {
 		callback: FileChangeCallback;
 	};
 	private isWatching: boolean = false;
+	private watchTargetIsFile: boolean = false;
 
 	constructor(options: WatchOptions) {
 		this.options = {
-			path: options.path,
+			path: resolve(options.path),
 			callback: options.callback,
 			debounceDelay: options.debounceDelay ?? 100,
 			ignore: options.ignore ?? [".git", "node_modules", ".DS_Store"],
@@ -48,53 +123,47 @@ export class FileSystemWatcher {
 		};
 	}
 
-	/**
-	 * Check if a path should be ignored based on ignore patterns
-	 */
 	private shouldIgnore(filePath: string): boolean {
-		const relativePath = relative(this.options.path, filePath);
+		const relativePath = relative(this.options.path, filePath).replaceAll(
+			"\\",
+			"/",
+		);
 
 		return this.options.ignore.some((pattern) => {
-			// Simple glob-like matching
 			if (pattern.startsWith("*")) {
 				const ext = pattern.slice(1);
 				return relativePath.endsWith(ext);
 			}
 
-			// Check if path contains the ignore pattern
 			const pathParts = relativePath.split("/");
 			return pathParts.some((part) => part === pattern);
 		});
 	}
 
-	/**
-	 * Log messages if verbose mode is enabled
-	 */
 	private log(...args: any[]): void {
 		if (this.options.verbose) {
 			console.log("[FileSystemWatcher]", ...args);
 		}
 	}
 
-	/**
-	 * Handle file system events with debouncing
-	 */
 	private handleEvent(
 		eventType: WatchEventType,
 		filename: string | null,
 		watchPath: string,
 	): void {
-		if (!filename) return;
+		const resolved = resolveFileChangePaths(
+			watchPath,
+			filename,
+			process.cwd(),
+			{ watchTargetIsFile: this.watchTargetIsFile },
+		);
+		if (!resolved) return;
 
-		const absolutePath = join(watchPath, filename);
-
-		// Check if should be ignored
-		if (this.shouldIgnore(absolutePath)) {
+		if (this.shouldIgnore(resolved.absolutePath)) {
 			return;
 		}
 
-		// Debounce the event
-		const debounceKey = `${eventType}:${absolutePath}`;
+		const debounceKey = `${eventType}:${resolved.absolutePath}`;
 
 		if (this.debounceTimers.has(debounceKey)) {
 			clearTimeout(this.debounceTimers.get(debounceKey)!);
@@ -103,10 +172,15 @@ export class FileSystemWatcher {
 		const timer = setTimeout(async () => {
 			this.debounceTimers.delete(debounceKey);
 
-			this.log(`${eventType} detected:`, absolutePath);
+			this.log(`${eventType} detected:`, resolved.absolutePath);
 
 			try {
-				await this.options.callback(eventType, filename, absolutePath);
+				await this.options.callback(
+					eventType,
+					resolved.filePath,
+					resolved.projectRootPath,
+					resolved.absolutePath,
+				);
 			} catch (error) {
 				console.error("[FileSystemWatcher] Error in callback:", error);
 			}
@@ -115,11 +189,7 @@ export class FileSystemWatcher {
 		this.debounceTimers.set(debounceKey, timer);
 	}
 
-	/**
-	 * Recursively watch a directory and all its subdirectories
-	 */
 	private async watchDirectory(dirPath: string): Promise<void> {
-		// Don't watch if already watching this directory
 		if (this.watchers.has(dirPath)) {
 			return;
 		}
@@ -131,14 +201,12 @@ export class FileSystemWatcher {
 				return;
 			}
 
-			// Check if should be ignored
 			if (this.shouldIgnore(dirPath)) {
 				return;
 			}
 
 			this.log("Watching directory:", dirPath);
 
-			// Create watcher for this directory
 			const watcher = watch(
 				dirPath,
 				{ persistent: true, recursive: false },
@@ -149,7 +217,6 @@ export class FileSystemWatcher {
 
 			this.watchers.set(dirPath, watcher);
 
-			// Recursively watch subdirectories
 			const entries = await readdir(dirPath, { withFileTypes: true });
 
 			for (const entry of entries) {
@@ -159,16 +226,12 @@ export class FileSystemWatcher {
 				}
 			}
 		} catch (error) {
-			// Silently ignore errors for files that don't exist or can't be accessed
 			if (this.options.verbose) {
 				console.error(`[FileSystemWatcher] Error watching ${dirPath}:`, error);
 			}
 		}
 	}
 
-	/**
-	 * Start watching the configured path
-	 */
 	async start(): Promise<void> {
 		if (this.isWatching) {
 			this.log("Already watching");
@@ -181,9 +244,10 @@ export class FileSystemWatcher {
 			const stats = await stat(this.options.path);
 
 			if (stats.isDirectory()) {
+				this.watchTargetIsFile = false;
 				await this.watchDirectory(this.options.path);
 			} else if (stats.isFile()) {
-				// Watch single file
+				this.watchTargetIsFile = true;
 				const watcher = watch(this.options.path, (eventType, filename) => {
 					this.handleEvent(eventType, filename, this.options.path);
 				});
@@ -198,9 +262,6 @@ export class FileSystemWatcher {
 		}
 	}
 
-	/**
-	 * Stop watching and clean up all watchers
-	 */
 	stop(): void {
 		if (!this.isWatching) {
 			return;
@@ -208,13 +269,11 @@ export class FileSystemWatcher {
 
 		this.log("Stopping file system watcher");
 
-		// Clear all debounce timers
 		for (const timer of this.debounceTimers.values()) {
 			clearTimeout(timer);
 		}
 		this.debounceTimers.clear();
 
-		// Close all watchers
 		for (const [path, watcher] of this.watchers.entries()) {
 			try {
 				watcher.close();
@@ -233,24 +292,15 @@ export class FileSystemWatcher {
 		this.log("File system watcher stopped");
 	}
 
-	/**
-	 * Check if the watcher is currently active
-	 */
 	isActive(): boolean {
 		return this.isWatching;
 	}
 
-	/**
-	 * Get the number of paths being watched
-	 */
 	getWatchCount(): number {
 		return this.watchers.size;
 	}
 }
 
-/**
- * Convenience function to create and start a file system watcher
- */
 export async function createWatcher(
 	options: WatchOptions,
 ): Promise<FileSystemWatcher> {
@@ -258,21 +308,3 @@ export async function createWatcher(
 	await watcher.start();
 	return watcher;
 }
-
-/**
- * Example usage:
- *
- * const watcher = await createWatcher({
- *   path: "./src",
- *   callback: async (eventType, filename, absolutePath) => {
- *     console.log(`File ${eventType}:`, filename);
- *     console.log(`Absolute path:`, absolutePath);
- *   },
- *   debounceDelay: 200,
- *   ignore: ["node_modules", ".git", "*.log"],
- *   verbose: true
- * });
- *
- * // Later, to stop watching:
- * watcher.stop();
- */

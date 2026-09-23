@@ -141,10 +141,15 @@ export class DebugBuildServer {
 			this.watcher = await createWatcher({
 				path: process.cwd(),
 				ignore: [".git", "node_modules", ".frame-master"],
-				callback: async (eventType, filePath, absolutePath) => {
+				callback: async (
+					eventType,
+					filePath,
+					projectRootPath,
+					absolutePath,
+				) => {
 					this.broadcast({
 						type: "watcher-change",
-						data: { eventType, filePath, absolutePath },
+						data: { eventType, filePath, projectRootPath, absolutePath },
 					});
 					await this.scheduleBuild();
 				},
