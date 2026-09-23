@@ -19,6 +19,7 @@
 		"@tailwindcss/cli": "^4.3.0",
 		"@tailwindcss/typography": "^0.5.19",
 		"clsx": "^2.1.1",
+		"dotenv": "^18.0.3",
 		"drizzle-orm": "^0.45.2",
 		"frame-master": "workspace:*",
 		"frame-master-plugin-apply-react": "3.0.1",
@@ -40,7 +41,7 @@
 		"markdown-it": "^14.1.1",
 		"mermaid": "^11.15.0",
 		"octokit": "^5.0.5",
-		"openauthster-shared": "^1.0.3",
+		"openauthster-shared": "^1.0.4",
 		"prism-react-renderer": "^2.4.1",
 		"qrcode": "^1.5.4",
 		"react": "^19.2.6",
@@ -60,6 +61,8 @@
 		"dev": "NODE_ENV=development bun frame-master start",
 		"build": "NODE_ENV=production bun frame-master build",
 		"build:dev": "NODE_ENV=development bun frame-master build",
-		"dev:debug": "NODE_ENV=development bun frame-master debug build"
+		"dev:debug": "NODE_ENV=development bun frame-master debug build",
+		"db:generate": "drizzle-kit generate",
+		"db:migrate": "drizzle-kit migrate"
 	}
 }
