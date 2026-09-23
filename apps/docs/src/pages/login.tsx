@@ -185,9 +185,16 @@ export default function LoginPage() {
 	const [hovering, setHovering] = useState<AuthMethod | null>(null);
 
 	useEffect(() => {
-		if (auth.isAuthenticated) {
-			navigate(routes.home);
+		if (!auth.isAuthenticated) return;
+		const pendingCliCode =
+			typeof sessionStorage === "undefined"
+				? null
+				: sessionStorage.getItem("fm-cli-user-code");
+		if (pendingCliCode) {
+			navigate(`/cli/login?code=${encodeURIComponent(pendingCliCode)}`);
+			return;
 		}
+		navigate(routes.home);
 	}, [auth.isAuthenticated]);
 
 	const handleSelect = async (method: AuthMethod) => {

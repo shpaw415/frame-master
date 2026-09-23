@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks";
-import { searchParams } from "@/utils";
+import { navigate, routes, searchParams } from "@/utils";
 
 const CLI_LOGIN_CODE_KEY = "fm-cli-user-code";
 
@@ -13,10 +13,11 @@ export default function CliLoginPage() {
 	const [message, setMessage] = useState("");
 
 	useEffect(() => {
-		if (!code || !auth.isLoaded || auth.isAuthenticated) return;
-		sessionStorage.setItem(CLI_LOGIN_CODE_KEY, code);
-		void auth.login();
-	}, [auth, code]);
+		if (!auth.isLoaded || auth.isAuthenticated) return;
+		if (code) sessionStorage.setItem(CLI_LOGIN_CODE_KEY, code);
+		alert("need to login first");
+		navigate(routes.login);
+	}, [auth.isAuthenticated, auth.isLoaded, code]);
 
 	async function approve() {
 		setStatus("approving");
