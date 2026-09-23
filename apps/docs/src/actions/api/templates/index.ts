@@ -1,12 +1,15 @@
 import { getDb } from "db/index";
-import { parseTemplate, parseTemplateToDB } from "db/parse";
+import { parseTemplate } from "db/parse";
 import { templates as DBTemplates, type parsedTemplate } from "db/schema";
 import { and, eq, like, or } from "drizzle-orm";
 import { getContext } from "frame-master-plugin-cloudflare-pages-functions-action/context";
 import { APIError, logError, verifyAccess } from "@/action_ext/utils";
-import { requireActiveGitHubAppLinkForRepo } from "@/actions/api/github/app/utils";
 import { createClient } from "@/auth";
-import { resolveTemplateMetadata } from "./metadata";
+import {
+	createTemplateListing,
+	type CreateTemplateUserInput,
+	updateTemplateListing,
+} from "./listing";
 
 type TemplateParams = {
 	id?: string;
@@ -241,28 +244,16 @@ export async function GET(params?: TemplateParams): Promise<TemplateResponse> {
 // ============================================================================
 // POST - Create a new template
 // ============================================================================
-type CreateTemplateFields = parsedTemplate;
-type CreateTemplateUserInput = Omit<
-	CreateTemplateFields,
-	| "id"
-	| "ownerId"
-	| "createdAt"
-	| "updatedAt"
-	| "defaultVersion"
-	| "githubReleaseUrl"
->;
-
 export async function POST(data: CreateTemplateUserInput): Promise<{
 	success: boolean;
 	message: string;
 	redirect?: string;
-	fields?: Array<keyof CreateTemplateFields>;
+	fields?: Array<keyof parsedTemplate>;
 }> {
 	const context = getContext<Cloudflare.Env, "", never>(arguments);
 	const db = getDb(context.env.DB);
 
 	try {
-		// Get authenticated user
 		const session = await createClient().setTokenFromRequest(
 			context.request as unknown as Request,
 		);
@@ -274,68 +265,12 @@ export async function POST(data: CreateTemplateUserInput): Promise<{
 				redirect: "/login",
 			};
 		}
-		// Check if template with same name already exists
-		const existing = await db
-			.select()
-			.from(DBTemplates)
-			.where(eq(DBTemplates.name, data.name))
-			.get();
 
-		if (existing) {
-			return {
-				success: false,
-				message: "Template with this name already exists",
-				fields: ["name"],
-			};
-		}
-
-		await requireActiveGitHubAppLinkForRepo({
+		return await createTemplateListing({
+			data,
 			db,
-			githubUrl: data.githubRepoUrl || "",
 			userId: session.userMeta.id,
 		});
-
-		const metadata = await resolveTemplateMetadata({
-			githubRepoUrl: data.githubRepoUrl || "",
-		});
-
-		const now = new Date();
-
-		const {
-			id,
-			createdAt,
-			updatedAt,
-			// required fields
-			name,
-			description,
-			author,
-			category,
-			tags,
-			...authorizedUserInput
-		} = data as CreateTemplateFields;
-
-		const parsedData = parseTemplateToDB({
-			...authorizedUserInput,
-			name: name || "",
-			description: description || "",
-			author: author || "",
-			category: category || "",
-			tags: tags || [],
-			githubReleaseUrl: metadata.githubReleaseUrl,
-			githubRepoUrl: metadata.githubRepoUrl,
-			defaultVersion: metadata.defaultVersion,
-			ownerId: session.userMeta.id,
-			createdAt: now,
-			updatedAt: now,
-		}) as typeof DBTemplates.$inferInsert;
-
-		// Create template
-		await db.insert(DBTemplates).values(parsedData);
-
-		return {
-			success: true,
-			message: "Template created successfully",
-		};
 	} catch (error: any) {
 		console.error("POST template error:", error);
 		await logError({
@@ -369,7 +304,6 @@ export async function PUT(data: UpdateTemplateFields): Promise<{
 	const context = getContext<Cloudflare.Env, "", never>(arguments);
 
 	try {
-		// Get authenticated user
 		const client = await createClient({
 			secret: context.env.AUTH_SECRET,
 		}).setTokenFromRequest(context.request as unknown as Request);
@@ -382,77 +316,12 @@ export async function PUT(data: UpdateTemplateFields): Promise<{
 		}
 
 		const db = getDb(context.env.DB);
-
-		// Check if template exists and belongs to user
-		const existing = await db
-			.select()
-			.from(DBTemplates)
-			.where(
-				client.userMeta.role === "admin"
-					? eq(DBTemplates.id, data.id)
-					: and(
-							eq(DBTemplates.id, data.id),
-							eq(DBTemplates.ownerId, client.userMeta.id),
-						),
-			)
-			.get();
-
-		if (!existing) {
-			return {
-				success: false,
-				error: "Template not found",
-			};
-		}
-
-		await requireActiveGitHubAppLinkForRepo({
+		return await updateTemplateListing({
+			data,
 			db,
-			githubUrl: data.githubRepoUrl || existing.githubRepoUrl,
+			role: client.userMeta.role,
 			userId: client.userMeta.id,
 		});
-
-		const metadata = await resolveTemplateMetadata({
-			githubRepoUrl: data.githubRepoUrl || existing.githubRepoUrl,
-		});
-
-		const {
-			id,
-			ownerId,
-			createdAt,
-			updatedAt,
-			defaultVersion,
-			githubReleaseUrl,
-			...acceptedFields
-		} = data;
-
-		// Build update data
-		const updateData: Partial<parsedTemplate> = {
-			...acceptedFields,
-			defaultVersion: metadata.defaultVersion,
-			githubReleaseUrl: metadata.githubReleaseUrl,
-			githubRepoUrl: metadata.githubRepoUrl,
-			updatedAt: new Date(),
-		};
-
-		// Update template
-		const updatedTemplate = await db
-			.update(DBTemplates)
-			.set(parseTemplateToDB(updateData))
-			.where(eq(DBTemplates.id, data.id))
-			.returning()
-			.get();
-
-		if (!updatedTemplate) {
-			return {
-				success: false,
-				error: "Failed to fetch updated template",
-			};
-		}
-
-		return {
-			success: true,
-			message: "Template updated successfully",
-			data: parseTemplate(updatedTemplate),
-		};
 	} catch (error: any) {
 		console.error("PUT template error:", error);
 		await logError({

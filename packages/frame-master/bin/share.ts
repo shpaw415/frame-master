@@ -1,6 +1,7 @@
 import chalk from "chalk";
 
-export const BASE_URL = "https://frame-master.com";
+export const BASE_URL =
+	process.env.FRAME_MASTER_BASE_URL || "https://frame-master.com";
 
 export const ensureNodeEnv = () => {
 	if (process.env.NODE_ENV === undefined) {

@@ -1,7 +1,7 @@
 import FMLogo from "@images/fm-logo.png";
 import { usePath } from "frame-master-plugin-react-to-html/hooks";
 import type { JSX } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { useAuth } from "@/hooks";
 import { useTheme } from "@/theme";
@@ -18,6 +18,7 @@ export default function LayoutPage({ children }: { children: JSX.Element }) {
 
 	return (
 		<div className="min-h-screen bg-theme-bg flex flex-col">
+			<ResumeCliLogin />
 			{/* Header */}
 			<header className="sticky top-0 z-50 bg-theme-bg/95 backdrop-blur-sm border-b border-theme-border">
 				<div className="max-w-7xl mx-auto px-6">
@@ -482,6 +483,25 @@ function ErrorFallback({
 			</div>
 		</div>
 	);
+}
+
+const CLI_LOGIN_CODE_KEY = "fm-cli-user-code";
+
+function ResumeCliLogin() {
+	const auth = useAuth();
+	const currentPath = usePath();
+
+	useEffect(() => {
+		if (!auth.isAuthenticated || typeof sessionStorage === "undefined") return;
+		const pending = sessionStorage.getItem(CLI_LOGIN_CODE_KEY);
+		if (!pending || currentPath === "/cli/login") return;
+		sessionStorage.removeItem(CLI_LOGIN_CODE_KEY);
+		window.location.assign(
+			`/cli/login?code=${encodeURIComponent(pending)}`,
+		);
+	}, [auth.isAuthenticated, currentPath]);
+
+	return null;
 }
 
 function ThemeToggle() {

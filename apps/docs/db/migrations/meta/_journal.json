@@ -78,6 +78,13 @@
 			"when": 1775670880018,
 			"tag": "0010_needy_sunfire",
 			"breakpoints": true
+		},
+		{
+			"idx": 11,
+			"version": "6",
+			"when": 1779000000000,
+			"tag": "0011_cli_auth",
+			"breakpoints": true
 		}
 	]
 }

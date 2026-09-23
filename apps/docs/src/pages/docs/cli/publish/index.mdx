@@ -1,0 +1,63 @@
+<title>publish Command - Publish Plugins and Templates | Frame-Master CLI</title>
+
+# publish Command
+
+Register or update a plugin or template listing on [frame-master.com](https://frame-master.com). This does **not** run `npm publish`.
+
+## 📖 Usage
+
+```bash
+frame-master login
+frame-master publish
+frame-master publish --type plugin --category utilities
+frame-master publish --draft
+frame-master publish --dry-run
+```
+
+## 🔍 Detection
+
+The command infers kind from `package.json`:
+
+- Plugin: name starts with `frame-master-plugin-`, or keywords include `frame-master-plugin`
+- Template: name starts with `frame-master-template-`, or keywords include `frame-master-template`
+
+Pass `--type plugin` or `--type template` to override.
+
+## 📦 Fields
+
+Filled from the current directory:
+
+| Source | Used for |
+| ------ | -------- |
+| `package.json` | name, description, author, keywords/tags, homepage, peer `frame-master` range |
+| `git remote origin` or `package.json` repository | GitHub URL |
+| `README.md` | long description |
+| `QUICK_EXEMPLE.md` | quick start (plugins) |
+| `CONFIG_EXEMPLE.md` | configuration example |
+
+Category is required. Pass `--category` or pick one interactively.
+
+Plugin versions still come from npm (or GitHub releases as a fallback). Template versions come from GitHub releases. Publish a package/release first, then run this command.
+
+## ⚙️ Options
+
+- `--type <kind>` — `plugin` or `template`
+- `--category <category>` — Listing category
+- `--draft` — Save without publishing (`published: false`)
+- `--dry-run` — Print the payload and do not send it
+- `--json` — Print the API response as JSON
+- `-h, --help` — Show help
+
+Default is `published: true`.
+
+## 🔗 After publish
+
+- Plugin: `https://frame-master.com/plugins/package/<id>`
+- Template: `https://frame-master.com/templates/package/<id>`
+
+The repository must be a **personal** GitHub repo whose owner matches your linked GitHub App. If the App is missing, the CLI prints the install URL and stops.
+
+## 🎯 Next Steps
+
+- [login](/docs/cli/login) — Authenticate the CLI
+- [Creating Plugins](/docs/plugins/creating) — Scaffold, npm publish, then list on the site

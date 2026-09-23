@@ -1,12 +1,15 @@
 import { getDb } from "db/index";
-import { parsePlugin, parsePluginsToDB } from "db/parse";
+import { parsePlugin } from "db/parse";
 import { plugins as DBPlugins, type parsedPlugin, plugins } from "db/schema";
 import { and, eq, gt, like, lt, or } from "drizzle-orm";
 import { getContext } from "frame-master-plugin-cloudflare-pages-functions-action/context";
 import { logError, verifyAccess } from "@/action_ext/utils";
-import { requireActiveGitHubAppLinkForRepo } from "@/actions/api/github/app/utils";
 import { createClient } from "@/auth";
-import { replacePluginVersionHistory, resolvePluginMetadata } from "./metadata";
+import {
+	createPluginListing,
+	type CreatePluginUserInput,
+	updatePluginListing,
+} from "./listing";
 
 // ============================================================================
 // GET - Fetch all plugins or specific plugin
@@ -158,29 +161,15 @@ export async function GET(params?: GetPluginsParams): Promise<{
 // POST - Create new plugin
 // ============================================================================
 
-type CreatePluginFields = parsedPlugin;
-type CreatePluginUserInput = Omit<
-	CreatePluginFields,
-	| "id"
-	| "downloads"
-	| "ownerId"
-	| "createdAt"
-	| "updatedAt"
-	| "upvote"
-	| "downvote"
-	| "version"
->;
-
 export async function POST(data: CreatePluginUserInput): Promise<{
 	success: boolean;
 	message: string;
 	redirect?: string;
-	fields?: Array<keyof CreatePluginFields>;
+	fields?: Array<keyof parsedPlugin>;
 }> {
 	const context = getContext<Cloudflare.Env, "", never>(arguments);
 	const db = getDb(context.env.DB);
 	try {
-		// Get authenticated user
 		const client = await createClient().setTokenFromRequest(
 			context.request as unknown as Request,
 		);
@@ -193,88 +182,11 @@ export async function POST(data: CreatePluginUserInput): Promise<{
 			};
 		}
 
-		// Check if plugin with same name already exists
-		const existing = await db
-			.select()
-			.from(DBPlugins)
-			.where(eq(DBPlugins.name, data.name))
-			.get();
-
-		if (existing) {
-			return {
-				success: false,
-				message: "Plugin with this name already exists",
-				fields: ["name"],
-			};
-		}
-
-		await requireActiveGitHubAppLinkForRepo({
+		return await createPluginListing({
+			data,
 			db,
-			githubUrl: data.githubUrl || "",
 			userId: client.userMeta.id,
 		});
-
-		const metadata = await resolvePluginMetadata({
-			githubUrl: data.githubUrl || "",
-			npmPackage: data.npmPackage || "",
-		});
-
-		const now = new Date();
-
-		const {
-			id,
-			downloads,
-			createdAt,
-			updatedAt,
-			downvote,
-			upvote,
-			// check for exists
-			name,
-			description,
-			compatibleVersions,
-			author,
-			category,
-			tags,
-			...authorizedUserInput
-		} = data as CreatePluginFields;
-
-		const parsedData = parsePluginsToDB({
-			...authorizedUserInput,
-			githubUrl: metadata.githubUrl,
-			name: name || "",
-			description: description || "",
-			version: metadata.latestVersion,
-			compatibleVersions: compatibleVersions || "",
-			author: author || "",
-			category: category || "",
-			tags: tags || [],
-			npmPackage: metadata.npmPackage,
-			ownerId: client.userMeta.id,
-			createdAt: now,
-			updatedAt: now,
-		}) as typeof DBPlugins.$inferInsert;
-
-		// Create plugin
-		const createdPlugin = await db
-			.insert(DBPlugins)
-			.values(parsedData)
-			.returning({ id: DBPlugins.id })
-			.get();
-
-		if (!createdPlugin) {
-			throw new Error("Failed to create plugin record");
-		}
-
-		await replacePluginVersionHistory({
-			db,
-			pluginId: createdPlugin.id,
-			versions: metadata.versions,
-		});
-
-		return {
-			success: true,
-			message: "Plugin created successfully",
-		};
 	} catch (error) {
 		console.error("POST plugin error:", error);
 		await logError({
@@ -307,7 +219,6 @@ export async function PUT(data: UpdatePluginFields): Promise<{
 	const context = getContext<Cloudflare.Env, "", never>(arguments);
 
 	try {
-		// Get authenticated user
 		const client = await createClient({
 			secret: context.env.AUTH_SECRET,
 		}).setTokenFromRequest(context.request as unknown as Request);
@@ -320,87 +231,12 @@ export async function PUT(data: UpdatePluginFields): Promise<{
 		}
 
 		const db = getDb(context.env.DB);
-
-		const whereStatement =
-			client.userMeta.role === "admin"
-				? eq(DBPlugins.id, data.id)
-				: and(
-						eq(DBPlugins.id, data.id),
-						eq(DBPlugins.ownerId, client.userMeta.id),
-					);
-
-		// Check if plugin exists and belongs to user
-		const existing = await db
-			.select()
-			.from(plugins)
-			.where(whereStatement)
-			.get();
-
-		if (!existing) {
-			return {
-				success: false,
-				error: "Plugin not found",
-			};
-		}
-
-		await requireActiveGitHubAppLinkForRepo({
+		return await updatePluginListing({
+			data,
 			db,
-			githubUrl: data.githubUrl || existing.githubUrl || "",
+			role: client.userMeta.role,
 			userId: client.userMeta.id,
 		});
-
-		const metadata = await resolvePluginMetadata({
-			githubUrl: data.githubUrl || existing.githubUrl || "",
-			npmPackage: data.npmPackage || existing.npmPackage,
-		});
-
-		const {
-			id,
-			downloads,
-			ownerId,
-			createdAt,
-			updatedAt,
-			upvote,
-			downvote,
-			version,
-			...acceptedFields
-		} = data;
-
-		// Build update data
-		const updateData: Partial<parsedPlugin> = {
-			...acceptedFields,
-			githubUrl: metadata.githubUrl,
-			npmPackage: metadata.npmPackage,
-			version: metadata.latestVersion,
-			updatedAt: new Date(),
-		};
-
-		// Update plugin
-		const updatedPlugin = await db
-			.update(plugins)
-			.set(parsePluginsToDB(updateData))
-			.where(eq(plugins.id, data.id))
-			.returning()
-			.get();
-
-		if (!updatedPlugin) {
-			return {
-				success: false,
-				error: "Failed to fetch updated plugin",
-			};
-		}
-
-		await replacePluginVersionHistory({
-			db,
-			pluginId: updatedPlugin.id,
-			versions: metadata.versions,
-		});
-
-		return {
-			success: true,
-			message: "Plugin updated successfully",
-			data: parsePlugin(updatedPlugin),
-		};
 	} catch (error) {
 		console.error("PUT plugin error:", error);
 		await logError({

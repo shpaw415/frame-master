@@ -8,8 +8,12 @@ import { buildCommand } from "./build";
 import type { CreateProjectProps } from "./create";
 import debugCommand from "./debug";
 import ExtendCli from "./extend-cli";
+import loginCommand from "./login";
+import logoutCommand from "./logout";
 import pluginCommand from "./plugin";
+import publishCommand from "./publish";
 import searchCommand from "./search";
+import whoamiCommand from "./whoami";
 import { ensureNodeEnv } from "./share";
 import { testCommand } from "./testing";
 
@@ -109,6 +113,10 @@ program
 
 program.addCommand(pluginCommand);
 program.addCommand(searchCommand);
+program.addCommand(loginCommand);
+program.addCommand(logoutCommand);
+program.addCommand(whoamiCommand);
+program.addCommand(publishCommand);
 program.addCommand(testCommand);
 program.addCommand(buildCommand);
 program.addCommand(debugCommand);

@@ -108,6 +108,8 @@ export const routes = {
 			plugin: "/docs/cli/plugin",
 			test: "/docs/cli/test",
 			extended: "/docs/cli/extended",
+			login: "/docs/cli/login",
+			publish: "/docs/cli/publish",
 		},
 		apireference: {
 			configType: "/docs/api/config-types",

@@ -218,6 +218,40 @@ my-custom-plugin/
 └── README.md
 ```
 
+### Marketplace
+
+#### `frame-master login`
+
+Log in to [frame-master.com](https://frame-master.com) with a device code. Stores a token in `~/.config/frame-master/credentials.json`.
+
+```bash
+frame-master login
+frame-master login --no-browser
+frame-master logout
+frame-master whoami
+```
+
+#### `frame-master publish`
+
+Register or update a plugin or template listing. Does not run `npm publish`. Versions come from npm or GitHub releases.
+
+```bash
+frame-master publish
+frame-master publish --type plugin --category utilities
+frame-master publish --draft
+frame-master publish --dry-run
+```
+
+**Options:**
+
+- `--type <kind>` - `plugin` or `template` (otherwise inferred from `package.json`)
+- `--category <category>` - Listing category
+- `--draft` - Save unpublished
+- `--dry-run` - Print the payload without sending it
+- `--json` - Print the API response as JSON
+
+Detection uses `frame-master-plugin-*` / `frame-master-template-*` names or those keywords. Fields come from `package.json`, `git remote`, `README.md`, `QUICK_EXEMPLE.md`, and `CONFIG_EXEMPLE.md`. The GitHub repo must be a personal account matching the linked GitHub App.
+
 ## Common Workflows
 
 ### Starting a New Project
@@ -363,6 +397,7 @@ Get help for any command:
 frame-master --help
 frame-master plugin --help
 frame-master plugin create --help
+frame-master publish --help
 ```
 
 ## Version

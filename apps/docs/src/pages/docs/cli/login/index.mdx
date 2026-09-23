@@ -1,0 +1,41 @@
+<title>login Command - Authenticate the CLI | Frame-Master CLI</title>
+
+# login Command
+
+Log the Frame-Master CLI in to [frame-master.com](https://frame-master.com) so you can publish plugins and templates.
+
+## 📖 Usage
+
+```bash
+frame-master login
+frame-master login --no-browser
+frame-master logout
+frame-master whoami
+```
+
+## 🔐 How it works
+
+1. The CLI starts a device login and prints a short code plus a verification URL.
+2. Your browser opens `https://frame-master.com/cli/login`.
+3. Sign in if needed, confirm the code, and approve the CLI.
+4. The CLI stores a token in `~/.config/frame-master/credentials.json` (`0600`).
+
+The token is only used against `https://frame-master.com`. Override the site with `FRAME_MASTER_BASE_URL` for local docs, or pass `FRAME_MASTER_TOKEN` instead of the credentials file.
+
+## ⚙️ Options
+
+- `--no-browser` — Print the URL without opening a browser
+- `-h, --help` — Show help
+
+## 👤 Related commands
+
+- `frame-master logout` — Revoke the stored token
+- `frame-master whoami` — Show the logged-in user and GitHub App status
+- `frame-master whoami --json` — Print the same data as JSON
+
+Publishing requires an active GitHub App link whose login matches the repository owner. If `whoami` says GitHub is not connected, open the printed install URL (usually `/settings`) and install the Frame-Master GitHub App on your personal account.
+
+## 🎯 Next Steps
+
+- [publish](/docs/cli/publish) — Publish a plugin or template listing
+- [plugin](/docs/cli/plugin) — Scaffold and inspect plugins

@@ -54,6 +54,8 @@ export const docSections = [
 			{ title: "build", href: routes.docs.cli.build },
 			{ title: "debug", href: routes.docs.cli.debug },
 			{ title: "plugin", href: routes.docs.cli.plugin },
+			{ title: "login", href: routes.docs.cli.login },
+			{ title: "publish", href: routes.docs.cli.publish },
 			{ title: "test", href: routes.docs.cli.test },
 		],
 	},

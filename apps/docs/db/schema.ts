@@ -211,3 +211,35 @@ export type NewGitHubAppLink = typeof githubAppLinks.$inferInsert;
 
 export type ErrorLog = typeof errorLogs.$inferSelect;
 export type NewErrorLog = typeof errorLogs.$inferInsert;
+
+export type CliAuthCodeStatus = "pending" | "approved" | "consumed";
+
+export const cliAuthCodes = sqliteTable("cli_auth_codes", {
+	id: integer("id").primaryKey({ autoIncrement: true }),
+	deviceCodeHash: text("device_code_hash").notNull().unique(),
+	userCode: text("user_code").notNull().unique(),
+	userId: text("user_id"),
+	status: text("status")
+		.notNull()
+		.default("pending")
+		.$type<CliAuthCodeStatus>(),
+	expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+	createdAt: integer("created_at", { mode: "timestamp" })
+		.notNull()
+		.default(sql`(unixepoch())`),
+});
+
+export type CliAuthCode = typeof cliAuthCodes.$inferSelect;
+
+export const cliTokens = sqliteTable("cli_tokens", {
+	id: integer("id").primaryKey({ autoIncrement: true }),
+	tokenHash: text("token_hash").notNull().unique(),
+	userId: text("user_id").notNull(),
+	createdAt: integer("created_at", { mode: "timestamp" })
+		.notNull()
+		.default(sql`(unixepoch())`),
+	lastUsedAt: integer("last_used_at", { mode: "timestamp" }),
+	revokedAt: integer("revoked_at", { mode: "timestamp" }),
+});
+
+export type CliToken = typeof cliTokens.$inferSelect;

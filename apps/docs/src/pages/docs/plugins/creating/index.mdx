@@ -238,16 +238,25 @@ npm version patch  # or minor, or major
 # Publish to npm
 npm publish
 
-# Tag release on GitHub
+# Tag a GitHub release (required for templates; fallback for plugins)
 
+# List the package on frame-master.com
+frame-master login
+frame-master publish
 ```
+
+The listing version is taken from npm or GitHub releases, not from the CLI. The GitHub repository must be a personal account that matches your linked GitHub App. Use `--draft` to save the listing unpublished.
+
+See the [publish command](/docs/cli/publish) for detection rules, fields, and flags.
 
 > Success checklist:
 >
 > - ✅ Clear README.md documentation
 > - ✅ TypeScript type definitions
-> - ✅ Example configuration
+> - ✅ Example configuration (`QUICK_EXEMPLE.md` and `CONFIG_EXEMPLE.md`)
 > - ✅ Proper versioning (semver)
+> - ✅ npm package or GitHub release published
+> - ✅ Listing created with `frame-master publish`
 
 ## ✨ Best Practices
 
@@ -261,6 +270,7 @@ npm publish
 ## 🎯 Next Steps
 
 - [Plugin Hooks Reference](/docs/plugins/hooks) — Complete reference for all available hooks
+- [publish](/docs/cli/publish) — Publish the listing to frame-master.com
 - [Plugin Lifecycle](/docs/plugins/lifecycle) — Understand how plugins are executed
 - [Build System](/docs/core/build) — Customize the build process
   Commander.js
