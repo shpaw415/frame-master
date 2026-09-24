@@ -1,9 +1,7 @@
 "server only";
 
-import { getDb } from "db/index";
+import { createClient } from "@/auth";
 import { ListingError } from "./access";
-import { sha256Hex } from "./device";
-import { findActiveCliToken, touchCliToken } from "./store";
 
 export function json(data: unknown, status = 200): Response {
 	return new Response(JSON.stringify(data), {
@@ -40,20 +38,36 @@ export function listingErrorResponse(error: unknown): Response | null {
 	);
 }
 
+export function cliAuthGone(): Response {
+	return json(
+		{
+			error:
+				"Device-code login was removed. Upgrade frame-master and run frame-master login.",
+			success: false,
+		},
+		410,
+	);
+}
+
 export async function requireCliUser(context: {
-	env: { DB: D1Database };
+	env: { AUTH_SECRET: string };
 	request: Request;
-}): Promise<{ tokenHash: string; userId: string } | Response> {
-	const token = readBearer(context.request);
-	if (!token?.startsWith("fm_cli_")) {
+}): Promise<{ userId: string } | Response> {
+	if (!readBearer(context.request)) {
 		return json({ error: "Unauthorized", success: false }, 401);
 	}
 
-	const db = getDb(context.env.DB);
-	const tokenHash = await sha256Hex(token);
-	const row = await findActiveCliToken({ db, tokenHash });
-	if (!row) return json({ error: "Unauthorized", success: false }, 401);
-
-	await touchCliToken({ db, tokenHash });
-	return { tokenHash, userId: row.userId };
+	try {
+		const client = await createClient({
+			secret: context.env.AUTH_SECRET,
+		}).setTokenFromRequest(context.request);
+		await client.getUserSession("public");
+		if (!client.isAuthenticated || !client.userMeta?.id) {
+			return json({ error: "Unauthorized", success: false }, 401);
+		}
+		return { userId: client.userMeta.id };
+	} catch (error) {
+		console.error("CLI auth error:", error);
+		return json({ error: "Unauthorized", success: false }, 401);
+	}
 }

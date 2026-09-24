@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -113,7 +113,7 @@ describe("frame-master publish", () => {
 	});
 });
 
-describe("frame-master login", () => {
+describe("frame-master logout", () => {
 	let dir: string | undefined;
 
 	afterEach(async () => {
@@ -121,43 +121,39 @@ describe("frame-master login", () => {
 		dir = undefined;
 	});
 
-	test("stores a token after the device code is approved", async () => {
-		dir = await mkdtemp(join(tmpdir(), "fm-login-"));
-		let polls = 0;
-		const server = Bun.serve({
-			hostname: "127.0.0.1",
-			port: 0,
-			fetch(request) {
-				const url = new URL(request.url);
-				if (url.pathname === "/api/cli/auth/start") {
-					return Response.json({
-						deviceCode: "device-1",
-						expiresIn: 30,
-						interval: 0,
-						userCode: "ABCD-EFGH",
-						verificationUrl: "https://example.test/cli/login?code=ABCD-EFGH",
-					});
-				}
-				if (url.pathname === "/api/cli/auth/poll") {
-					polls += 1;
-					if (polls === 1) return Response.json({ status: "pending" });
-					return Response.json({ status: "approved", token: "fm_cli_secret" });
-				}
-				return new Response("not found", { status: 404 });
-			},
-		});
+	test("removes the legacy credentials file", async () => {
+		dir = await mkdtemp(join(tmpdir(), "fm-logout-"));
+		const credentials = join(dir, "frame-master", "credentials.json");
+		await mkdir(join(dir, "frame-master"), { recursive: true });
+		await writeFile(credentials, `${JSON.stringify({ token: "fm_cli_old" })}\n`);
 
-		const result = await runCli(["login", "--no-browser"], dir, {
-			FRAME_MASTER_BASE_URL: `http://127.0.0.1:${server.port}`,
+		const result = await runCli(["logout"], dir, {
+			FRAME_MASTER_AUTH_TOKEN_PATH: join(dir, "missing-auth.json"),
 			FRAME_MASTER_CONFIG_DIR: dir,
+			FRAME_MASTER_TOKEN: "",
 		});
-		server.stop();
 
 		expect(result.exitCode).toBe(0);
-		expect(result.stdout).toContain("ABCD-EFGH");
-		const credentials = JSON.parse(
-			await Bun.file(join(dir, "frame-master", "credentials.json")).text(),
-		);
-		expect(credentials.token).toBe("fm_cli_secret");
+		expect(await Bun.file(credentials).exists()).toBe(false);
+	});
+});
+
+describe("frame-master whoami", () => {
+	let dir: string | undefined;
+
+	afterEach(async () => {
+		if (dir) await rm(dir, { recursive: true, force: true });
+		dir = undefined;
+	});
+
+	test("fails when not logged in", async () => {
+		dir = await mkdtemp(join(tmpdir(), "fm-whoami-"));
+		const result = await runCli(["whoami"], dir, {
+			FRAME_MASTER_AUTH_TOKEN_PATH: join(dir, "missing-auth.json"),
+			FRAME_MASTER_TOKEN: "",
+		});
+
+		expect(result.exitCode).toBe(1);
+		expect(result.stderr).toContain("Not logged in");
 	});
 });

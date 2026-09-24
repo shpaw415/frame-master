@@ -1,7 +1,7 @@
 {
 	"name": "frame-master",
 	"type": "module",
-	"version": "4.0.3-beta.1",
+	"version": "4.0.3-beta.2",
 	"baseUrl": ".",
 	"license": "MIT",
 	"description": "Plugin-first meta-framework for Bun.js",
@@ -47,6 +47,8 @@
 		"@shpaw415/webtoken": "^2.0.0",
 		"chalk": "^5.6.2",
 		"commander": "^14.0.3",
+		"drizzle-orm": "^0.45.2",
+		"openauthster-shared": "^1.0.5",
 		"git": "^0.1.5",
 		"lucide-react": "^1.14.0",
 		"react": "^19.2.5",

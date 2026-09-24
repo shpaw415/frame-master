@@ -222,7 +222,7 @@ my-custom-plugin/
 
 #### `frame-master login`
 
-Log in to [frame-master.com](https://frame-master.com) with a device code. Stores a token in `~/.config/frame-master/credentials.json`.
+Log in to [frame-master.com](https://frame-master.com) with OpenAuthster (authorization code + PKCE). Stores access and refresh tokens in `~/.openauthster/`.
 
 ```bash
 frame-master login

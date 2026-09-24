@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises";
 import chalk from "chalk";
 import { Command } from "commander";
+import { readAccessToken } from "../registry/auth";
 import { registryFetch } from "../registry/client";
-import { readCredentials } from "../registry/credentials";
 import { select } from "../share";
 import {
 	categoriesFor,
@@ -89,14 +89,12 @@ const publishCommand = new Command("publish")
 					return;
 				}
 
-				const credentials = await readCredentials();
-				if (!credentials) {
+				const token = await readAccessToken();
+				if (!token) {
 					throw new Error("Not logged in. Run frame-master login.");
 				}
 
-				const whoami = await registryFetch("/api/cli/whoami", {
-					token: credentials.token,
-				});
+				const whoami = await registryFetch("/api/cli/whoami", { token });
 				if (!whoami.response.ok) {
 					throw new Error(whoami.data?.error || "Unauthorized");
 				}
@@ -109,7 +107,7 @@ const publishCommand = new Command("publish")
 				const result = await registryFetch("/api/cli/publish", {
 					body: JSON.stringify(payload),
 					method: "POST",
-					token: credentials.token,
+					token,
 				});
 				if (!result.response.ok || !result.data?.success) {
 					const install = result.data?.installPath

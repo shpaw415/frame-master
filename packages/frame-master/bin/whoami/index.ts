@@ -1,21 +1,19 @@
 import chalk from "chalk";
 import { Command } from "commander";
+import { readAccessToken } from "../registry/auth";
 import { registryFetch } from "../registry/client";
-import { readCredentials } from "../registry/credentials";
 
 const whoamiCommand = new Command("whoami")
 	.description("Show the logged-in frame-master.com account")
 	.option("--json", "Print JSON")
 	.action(async (options: { json?: boolean }) => {
-		const credentials = await readCredentials();
-		if (!credentials) {
+		const token = await readAccessToken().catch(() => null);
+		if (!token) {
 			console.error(chalk.red("Not logged in. Run frame-master login."));
 			process.exit(1);
 		}
 
-		const result = await registryFetch("/api/cli/whoami", {
-			token: credentials.token,
-		});
+		const result = await registryFetch("/api/cli/whoami", { token });
 		if (!result.response.ok) {
 			console.error(chalk.red(result.data?.error || "Unauthorized"));
 			process.exit(1);

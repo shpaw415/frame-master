@@ -186,14 +186,6 @@ export default function LoginPage() {
 
 	useEffect(() => {
 		if (!auth.isAuthenticated) return;
-		const pendingCliCode =
-			typeof sessionStorage === "undefined"
-				? null
-				: sessionStorage.getItem("fm-cli-user-code");
-		if (pendingCliCode) {
-			navigate(`/cli/login?code=${encodeURIComponent(pendingCliCode)}`);
-			return;
-		}
 		navigate(routes.home);
 	}, [auth.isAuthenticated]);
 

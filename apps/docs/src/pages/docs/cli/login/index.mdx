@@ -15,21 +15,23 @@ frame-master whoami
 
 ## 🔐 How it works
 
-1. The CLI starts a device login and prints a short code plus a verification URL.
-2. Your browser opens `https://frame-master.com/cli/login`.
-3. Sign in if needed, confirm the code, and approve the CLI.
-4. The CLI stores a token in `~/.config/frame-master/credentials.json` (`0600`).
+1. The CLI starts an OpenAuthster authorization-code login with PKCE.
+2. Your browser opens the issuer. Sign in with the same account you use on frame-master.com.
+3. The issuer redirects to a loopback callback on `127.0.0.1`.
+4. The CLI stores the access and refresh tokens in `~/.openauthster/` (`0600`). No project secret is stored.
 
-The token is only used against `https://frame-master.com`. Override the site with `FRAME_MASTER_BASE_URL` for local docs, or pass `FRAME_MASTER_TOKEN` instead of the credentials file.
+`frame-master logout` deletes those tokens locally. It does not revoke the refresh token on the issuer.
+
+Override the site with `FRAME_MASTER_BASE_URL` for local docs. `FRAME_MASTER_TOKEN` can still pass an access token instead of the token file, for CI.
 
 ## ⚙️ Options
 
-- `--no-browser` — Print the URL without opening a browser
+- `--no-browser` — Print the authorize URL without opening a browser
 - `-h, --help` — Show help
 
 ## 👤 Related commands
 
-- `frame-master logout` — Revoke the stored token
+- `frame-master logout` — Delete the stored OpenAuthster tokens
 - `frame-master whoami` — Show the logged-in user and GitHub App status
 - `frame-master whoami --json` — Print the same data as JSON
 
