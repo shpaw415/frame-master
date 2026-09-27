@@ -1,6 +1,12 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+html,
+body {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
 /* ============================================================================
    THEME SYSTEM - CSS CUSTOM PROPERTIES
    ============================================================================ */

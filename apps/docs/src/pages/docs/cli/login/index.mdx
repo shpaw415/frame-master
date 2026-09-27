@@ -9,6 +9,8 @@ Log the Frame-Master CLI in to [frame-master.com](https://frame-master.com) so y
 ```bash
 frame-master login
 frame-master login --no-browser
+frame-master login --host 100.96.0.3
+frame-master login --code 'http://127.0.0.1:port/callback?code=...&state=...'
 frame-master logout
 frame-master whoami
 ```
@@ -18,7 +20,8 @@ frame-master whoami
 1. The CLI starts an OpenAuthster authorization-code login with PKCE.
 2. Your browser opens the issuer. Sign in with the same account you use on frame-master.com.
 3. The issuer redirects to a loopback callback on `127.0.0.1`.
-4. The CLI stores the access and refresh tokens in `~/.openauthster/` (`0600`). No project secret is stored.
+4. On the same machine, the CLI receives that callback. Over SSH, or when the browser cannot reach this host, paste the redirected URL (the address bar still has the code if the page fails to load) or pass `--code`.
+5. The CLI stores the access and refresh tokens in `~/.openauthster/` (`0600`). No project secret is stored.
 
 `frame-master logout` deletes those tokens locally. It does not revoke the refresh token on the issuer.
 
@@ -27,6 +30,8 @@ Override the site with `FRAME_MASTER_BASE_URL` for local docs. `FRAME_MASTER_TOK
 ## ⚙️ Options
 
 - `--no-browser` — Print the authorize URL without opening a browser
+- `--code <callback>` — Finish login with a pasted callback URL or authorization code
+- `--host <address>` — Bind the callback on a private address (`100.96.0.3`, `192.168.1.20`, `10.0.0.5`). The redirect URI is `http://<address>:<port>/callback`
 - `-h, --help` — Show help
 
 ## 👤 Related commands

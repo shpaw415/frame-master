@@ -11,6 +11,7 @@ type CliClient = {
 	login(options?: {
 		onAuthorize?: (url: string) => void | Promise<void>;
 		open?: boolean;
+		readCode?: (signal: AbortSignal) => Promise<string>;
 	}): Promise<{ access: string }>;
 	logout(): void;
 	getValidAccessToken(): Promise<string>;
@@ -19,6 +20,7 @@ type CliClient = {
 type CliModule = {
 	OpenAuthsterCliClient: new (options: {
 		clientID: string;
+		hostname?: string;
 		issuer: string;
 		open?: (url: string) => void | Promise<void>;
 		tokenPath?: string;
@@ -36,10 +38,13 @@ export function legacyCredentialsPath(): string {
 	return join(root, "frame-master", "credentials.json");
 }
 
-export async function createCliAuth(): Promise<CliClient> {
+export async function createCliAuth(options?: {
+	hostname?: string;
+}): Promise<CliClient> {
 	const { OpenAuthsterCliClient, openSystemBrowser } = await loadCli();
 	return new OpenAuthsterCliClient({
 		clientID: process.env.FRAME_MASTER_AUTH_CLIENT_ID || AUTH_CLIENT_ID,
+		hostname: options?.hostname,
 		issuer: process.env.FRAME_MASTER_AUTH_ISSUER || AUTH_ISSUER,
 		open: async (url) => {
 			try {

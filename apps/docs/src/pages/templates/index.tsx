@@ -135,12 +135,12 @@ export default function TemplatesPage() {
 	}, []);
 
 	return (
-		<div className="min-h-screen bg-theme-bg">
+		<div className="min-h-screen max-w-full overflow-x-hidden bg-theme-bg">
 			{/* Hero Section - Optimized for mobile */}
-			<section className="py-10 md:py-16 lg:py-20 bg-linear-to-b from-theme-bg to-theme-card border-b border-theme-border">
+			<section className="py-6 md:py-16 lg:py-20 bg-linear-to-b from-theme-bg to-theme-card border-b border-theme-border">
 				<div className="max-w-7xl mx-auto px-4 sm:px-6">
-					<div className="text-center mb-8 md:mb-12">
-						<h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-theme-text mb-4 md:mb-6 tracking-tight">
+					<div className="text-center mb-6 md:mb-12">
+						<h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-theme-text mb-3 md:mb-6 tracking-tight">
 							Project Templates
 						</h1>
 						<p className="text-base sm:text-lg md:text-xl text-theme-muted max-w-3xl mx-auto px-2">
@@ -151,8 +151,8 @@ export default function TemplatesPage() {
 					</div>
 
 					{/* Search Bar */}
-					<div className="max-w-2xl mx-auto">
-						<div className="relative">
+					<div className="max-w-2xl mx-auto flex items-stretch gap-2">
+						<div className="relative min-w-0 flex-1">
 							<input
 								type="text"
 								placeholder="Search templates..."
@@ -164,6 +164,19 @@ export default function TemplatesPage() {
 								🔍
 							</span>
 						</div>
+						<button
+							type="button"
+							onClick={() => setIsFilterOpen(true)}
+							className="lg:hidden shrink-0 flex items-center gap-2 px-4 py-3 bg-green-500 text-white font-semibold rounded-xl active:scale-95 transition-transform"
+						>
+							<span>⚙️</span>
+							<span>Filters</span>
+							{activeFilterCount > 0 && (
+								<span className="flex items-center justify-center w-5 h-5 bg-white text-green-500 text-xs font-bold rounded-full">
+									{activeFilterCount}
+								</span>
+							)}
+						</button>
 					</div>
 
 					{/* Quick Stats */}
@@ -188,23 +201,6 @@ export default function TemplatesPage() {
 				</div>
 			</section>
 
-			{/* Mobile Filter Button - Fixed at bottom */}
-			<div className="lg:hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-40">
-				<button
-					type="button"
-					onClick={() => setIsFilterOpen(true)}
-					className="flex items-center gap-2 px-5 py-3 bg-green-500 text-white font-semibold rounded-full shadow-lg shadow-green-500/25 active:scale-95 transition-transform"
-				>
-					<span>⚙️</span>
-					<span>Filters</span>
-					{activeFilterCount > 0 && (
-						<span className="flex items-center justify-center w-5 h-5 bg-white text-green-500 text-xs font-bold rounded-full">
-							{activeFilterCount}
-						</span>
-					)}
-				</button>
-			</div>
-
 			{/* Mobile Filter Drawer */}
 			{isFilterOpen && (
 				<MobileFilterDrawer
@@ -224,7 +220,7 @@ export default function TemplatesPage() {
 			)}
 
 			{/* Main Content */}
-			<section className="py-8 md:py-12 lg:py-16 bg-theme-bg pb-24 lg:pb-16">
+			<section className="py-6 md:py-12 lg:py-16 bg-theme-bg">
 				<div className="max-w-7xl mx-auto px-4 sm:px-6">
 					<div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
 						{/* Filters Sidebar - Desktop only */}
@@ -312,7 +308,7 @@ export default function TemplatesPage() {
 									{/* Templates Grid */}
 									{filteredTemplates.length > 0 ? (
 										<>
-											<div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 gap-4 sm:gap-6">
+											<div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
 												{filteredTemplates.map((template) => (
 													<TemplateCard key={template.id} template={template} />
 												))}
@@ -536,7 +532,7 @@ function MobileFilterDrawer({
 				</div>
 
 				{/* Footer Actions */}
-				<div className="p-4 border-t border-theme-border flex gap-3 bg-theme-card">
+				<div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))] border-t border-theme-border flex gap-3 bg-theme-card">
 					<button
 						type="button"
 						onClick={onClear}
@@ -580,13 +576,15 @@ function TemplateCard({ template }: { template: Template }) {
 	};
 
 	return (
-		<div className="p-4 sm:p-6 bg-theme-card border border-theme-border rounded-xl hover:border-green-500 transition-all duration-300 flex flex-col">
+		<div className="w-full min-w-0 overflow-hidden p-4 sm:p-6 bg-theme-card border border-theme-border rounded-xl hover:border-green-500 transition-all duration-300 flex flex-col">
 			{/* Header */}
 			<a
 				className="flex items-start gap-3 mb-3 sm:mb-4 cursor-pointer hover:bg-green-800/5 rounded-xl p-1 -m-1 transition-colors"
 				href={routes.showTemplate(String(template.id))}
 			>
-				<div className="text-3xl sm:text-4xl shrink-0">{template.icon}</div>
+				<div className="text-3xl sm:text-4xl w-10 h-10 sm:w-12 sm:h-12 shrink-0 overflow-hidden flex items-center justify-center">
+					{template.icon}
+				</div>
 				<div className="min-w-0 flex-1">
 					<h3 className="text-base sm:text-xl font-bold text-theme-text truncate">
 						{template.name}
@@ -648,10 +646,10 @@ function TemplateCard({ template }: { template: Template }) {
 			<div className="mb-3 sm:mb-4">
 				<button
 					type="button"
-					className="flex items-center justify-between bg-theme-bg border border-theme-border rounded-lg px-2 sm:px-3 py-2 cursor-pointer hover:border-theme-hover-border active:bg-theme-input transition-colors gap-2"
+					className="w-full min-w-0 flex items-center justify-between bg-theme-bg border border-theme-border rounded-lg px-2 sm:px-3 py-2 cursor-pointer hover:border-theme-hover-border active:bg-theme-input transition-colors gap-2"
 					onClick={copyInstallCommand}
 				>
-					<code className="text-xs text-theme-secondary font-mono truncate flex-1">
+					<code className="text-xs text-theme-secondary font-mono truncate min-w-0 flex-1">
 						{template.installation ||
 							`frame-master create --template ${template.name
 								.toLowerCase()

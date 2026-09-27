@@ -26,7 +26,10 @@ export default function RenderShell({
 		<html lang="en">
 			<head>
 				<meta charSet="utf-8" />
-				<meta name="viewport" content="width=device-width, initial-scale=1" />
+				<meta
+					name="viewport"
+					content="width=device-width, initial-scale=1, viewport-fit=cover"
+				/>
 				<link rel="stylesheet" href="/static/style.css" />
 				<link rel="icon" href="/static/favicon.ico" />
 				<script dangerouslySetInnerHTML={{ __html: themeScript }} />
@@ -34,7 +37,7 @@ export default function RenderShell({
 			</head>
 			<body
 				id="root"
-				className="bg-background text-foreground antialiased transition-colors"
+				className="bg-background text-foreground antialiased transition-colors overflow-x-hidden max-w-full"
 			>
 				<AuthProvider>
 					<ThemeProvider>{children}</ThemeProvider>

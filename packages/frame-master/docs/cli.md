@@ -227,9 +227,14 @@ Log in to [frame-master.com](https://frame-master.com) with OpenAuthster (author
 ```bash
 frame-master login
 frame-master login --no-browser
+frame-master login --code '<callback-url-or-code>'
 frame-master logout
 frame-master whoami
 ```
+
+Over SSH the browser cannot reach the CLI loopback. Open the printed URL locally, then paste the redirected callback URL. The address bar still contains the code if the local page fails to load.
+
+`frame-master login --host 100.96.0.3` listens on that private address and uses `http://100.96.0.3:<port>/callback` as the redirect URI. Public addresses are rejected.
 
 #### `frame-master publish`
 
